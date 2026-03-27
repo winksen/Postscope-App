@@ -45,7 +45,7 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
   )
 
   return (
-    <div className="relative min-h-screen bg-muted/50">
+    <div className="relative min-h-screen bg-background">
       <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">

@@ -26,7 +26,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card shadow-sm transition-[width] duration-200',
+        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card shadow-none transition-[width] duration-200',
         collapsed ? 'w-[72px]' : 'w-60'
       )}
     >

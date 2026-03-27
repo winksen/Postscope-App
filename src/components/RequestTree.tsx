@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Lock, LockOpen } from 'lucide-react'
 import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
@@ -118,7 +118,10 @@ function FolderNode({
   onSelectRequest: (r: ParsedRequest) => void
   searchQuery: string
 }) {
-  const [open, setOpen] = useState(defaultOpen || !!searchQuery.trim())
+  const [open, setOpen] = useState(defaultOpen)
+  useEffect(() => {
+    if (searchQuery.trim()) setOpen(true)
+  }, [searchQuery])
   const total = node.requests.length + node.children.reduce((s, c) => s + c.requests.length + c.children.length, 0)
   return (
     <div className="border-l border-border pl-3">

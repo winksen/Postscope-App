@@ -101,7 +101,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                 ) : (
                   <ul className="mt-3 space-y-3">
                     {findings.map((f) => (
-                      <li key={f.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                      <li key={f.id} className="rounded-lg border-0 bg-card p-4 shadow-none">
                         <div className="flex flex-wrap items-center gap-2">
                           <SeverityBadge severity={f.severity} />
                           <span className="font-mono text-[10px] text-muted-foreground">{f.category.toUpperCase()}</span>

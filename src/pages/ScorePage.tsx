@@ -58,7 +58,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2 transition-shadow duration-200 hover:shadow-md">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">Overall grade</CardTitle>
             <CardDescription>Animated from zero on each import refresh</CardDescription>
@@ -68,7 +68,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
           </CardContent>
         </Card>
 
-        <Card className="transition-shadow duration-200 hover:shadow-md">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Category mix</CardTitle>
             <CardDescription>Contribution to the headline score</CardDescription>

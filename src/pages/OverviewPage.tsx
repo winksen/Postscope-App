@@ -3,7 +3,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -14,27 +13,41 @@ import {
 import { FileText, FolderOpen, Key, Layers } from 'lucide-react'
 import { StatCard } from '../components/StatCard'
 import { RequestTree } from '../components/RequestTree'
-import type { ParsedCollection } from '../lib/parser'
+import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
 
-const METHOD_COLORS: Record<string, string> = {
-  GET: 'hsl(var(--chart-2))',
-  POST: 'hsl(var(--chart-1))',
-  PUT: 'hsl(var(--chart-3))',
-  PATCH: 'hsl(var(--chart-4))',
-  DELETE: 'hsl(var(--chart-5))',
-}
-
-const PIE_COLORS = [
+/** Auth / accent slice colors (blue → green → orange). */
+const DASHBOARD_ACCENT = [
   'hsl(var(--chart-1))',
   'hsl(var(--chart-2))',
   'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(var(--muted-foreground))',
-]
+] as const
+
+/** Distinct color per HTTP verb; DELETE uses destructive red. */
+const VERB_COLORS: Record<string, string> = {
+  GET: 'hsl(var(--chart-1))',
+  POST: 'hsl(var(--chart-2))',
+  PUT: 'hsl(var(--chart-3))',
+  PATCH: 'hsl(var(--chart-4))',
+  DELETE: 'hsl(var(--destructive))',
+  HEAD: 'hsl(199 89% 46%)',
+  OPTIONS: 'hsl(271 70% 52%)',
+  TRACE: 'hsl(173 58% 40%)',
+  CONNECT: 'hsl(25 90% 48%)',
+}
+
+const FALLBACK_VERB_HUES = [340, 187, 48, 24, 142, 285, 35, 310]
+
+const CHART_FONT = "'Lexend Deca', 'Lexend', ui-sans-serif, system-ui, sans-serif"
+
+function fillForMethod(method: string, fallbackIndex: number): string {
+  const known = VERB_COLORS[method]
+  if (known) return known
+  const h = FALLBACK_VERB_HUES[fallbackIndex % FALLBACK_VERB_HUES.length]
+  return `hsl(${h} 72% 44%)`
+}
 
 interface OverviewPageProps {
   parsed: ParsedCollection
@@ -42,20 +55,84 @@ interface OverviewPageProps {
   search: string
 }
 
+function variableNamesUsedInRequests(requests: ParsedRequest[]): Set<string> {
+  const names = new Set<string>()
+  for (const r of requests) {
+    const blob = [r.url, ...r.headers.map((h) => h.key + h.value), r.bodyRaw ?? ''].join(' ')
+    for (const m of blob.matchAll(/\{\{(\w+)\}\}/g)) {
+      names.add(m[1])
+    }
+  }
+  return names
+}
+
 export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
-  const methodData = Object.entries(parsed.methods).map(([method, count]) => ({
+  const methodEntries = Object.entries(parsed.methods).sort((a, b) => b[1] - a[1])
+  let verbFallbackSlot = 0
+  const methodData = methodEntries.map(([method, count]) => ({
     name: method,
     count,
-    fill: METHOD_COLORS[method] ?? 'hsl(var(--muted-foreground))',
+    fill: fillForMethod(method, VERB_COLORS[method] ? 0 : verbFallbackSlot++),
   }))
 
-  const authData = Object.entries(parsed.authTypes)
-    .filter(([k]) => k !== 'noauth')
+  const authPieData = Object.entries(parsed.authTypes)
     .map(([name, value]) => ({ name, value }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
 
-  if (authData.length === 0) {
-    authData.push({ name: 'noauth', value: parsed.totalRequests })
+  if (authPieData.length === 0) {
+    authPieData.push({ name: 'noauth', value: parsed.totalRequests })
   }
+
+  const noauthCount = parsed.authTypes.noauth ?? 0
+  const typedAuthSharePct =
+    parsed.totalRequests > 0
+      ? Math.round(((parsed.totalRequests - noauthCount) / parsed.totalRequests) * 100)
+      : 0
+
+  const varsUsedInRequests = variableNamesUsedInRequests(parsed.requests)
+  const unusedDefinedVars = parsed.definedVariables.filter((k) => !varsUsedInRequests.has(k)).length
+
+  const methodDetailRows = [
+    { label: 'Distinct methods', value: methodEntries.length },
+    ...methodEntries.slice(0, 3).map(([method, count]) => ({ label: method, value: count })),
+  ]
+
+  const maxFolderDepth =
+    parsed.folders.length > 0 ? Math.max(...parsed.folders.map((f) => f.path.length)) : 0
+  const avgRequestsPerFolder = parsed.totalFolders
+    ? (parsed.totalRequests / parsed.totalFolders).toFixed(1)
+    : '0'
+  const busiestFolder =
+    parsed.folders.length > 0
+      ? parsed.folders.reduce((best, f) => (f.requestCount > best.requestCount ? f : best))
+      : undefined
+  const folderDetailRows = [
+    { label: 'Max nesting depth', value: maxFolderDepth },
+    { label: 'Avg requests / folder', value: avgRequestsPerFolder },
+    ...(busiestFolder
+      ? [
+          {
+            label: 'Busiest folder',
+            value: `${busiestFolder.requestCount} req`,
+          },
+        ]
+      : []),
+  ]
+
+  const variableDetailRows = [
+    { label: 'Used in requests', value: varsUsedInRequests.size },
+    { label: 'Unused definitions', value: unusedDefinedVars },
+    { label: 'Unique names (total)', value: parsed.variables.length },
+  ]
+
+  const authTypeRows = Object.entries(parsed.authTypes)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({
+      label: name,
+      value: count,
+    }))
+  const distinctAuthTypes = authTypeRows.length
 
   const chartTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value?: number }[]; label?: string }) => {
     if (!active || !payload?.length) return null
@@ -82,88 +159,116 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           label="Total requests"
           value={parsed.totalRequests}
           subtext={`${parsed.totalFolders} folders`}
+          details={methodDetailRows}
         />
         <StatCard
           icon={FolderOpen}
           label="Folders"
           value={parsed.totalFolders}
           subtext={`${parsed.totalRequests} requests`}
+          details={folderDetailRows}
         />
         <StatCard
           icon={Key}
           label="Variables defined"
           value={parsed.definedVariables.length}
-          subtext={`${parsed.variables.length} referenced`}
+          subtext={`${parsed.variables.length} unique names in collection`}
+          details={variableDetailRows}
         />
         <StatCard
           icon={Layers}
           label="Auth profiles"
-          value={Object.keys(parsed.authTypes).filter((k) => k !== 'noauth').length || 1}
-          subtext={Object.entries(parsed.authTypes)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join(', ')}
+          value={distinctAuthTypes}
+          subtext={`Across ${parsed.totalRequests} requests`}
+          details={authTypeRows}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="transition-shadow duration-200 hover:shadow-md">
-          <CardHeader>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle>HTTP methods</CardTitle>
             <CardDescription>Distribution of verbs across the collection</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2">
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={methodData} layout="vertical" margin={{ left: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                <BarChart
+                  data={methodData}
+                  margin={{ top: 12, right: 8, left: 8, bottom: 4 }}
+                  barCategoryGap="40%"
+                >
+                  <CartesianGrid
+                    strokeDasharray="6 10"
+                    vertical={false}
+                    stroke="hsl(var(--border))"
+                    strokeLinecap="round"
+                  />
                   <XAxis
-                    type="number"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                  />
-                  <YAxis
-                    type="category"
                     dataKey="name"
-                    width={44}
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    tick={{
+                      fill: 'hsl(var(--muted-foreground))',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      fontFamily: CHART_FONT,
+                    }}
+                    interval={0}
                   />
-                  <Tooltip content={chartTooltip} cursor={{ fill: 'hsl(var(--muted) / 0.35)' }} />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                    {methodData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
+                  <YAxis hide />
+                  <Tooltip content={chartTooltip} cursor={{ fill: 'hsl(var(--muted) / 0.22)' }} />
+                  <Bar dataKey="count" maxBarSize={26} radius={[13, 13, 13, 13]}>
+                    {methodData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="mt-4 text-center text-sm font-semibold text-foreground">Method mix</p>
+            <p className="mx-auto mt-1 max-w-sm text-center text-xs leading-relaxed text-muted-foreground">
+              Each verb keeps its own color; DELETE uses a destructive red. Taller bars are more common
+              in this collection.
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-shadow duration-200 hover:shadow-md">
-          <CardHeader>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle>Authentication</CardTitle>
             <CardDescription>How requests declare auth in the collection</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-64 w-full">
+          <CardContent className="space-y-0 pt-2">
+            <div className="mx-auto w-full max-w-md shrink-0 px-1 text-center">
+              <p
+                className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                style={{ fontFamily: CHART_FONT }}
+              >
+                {typedAuthSharePct}
+                <span className="text-2xl font-semibold text-muted-foreground">%</span>
+              </p>
+              <p className="text-xs font-medium leading-snug text-muted-foreground">typed auth share</p>
+            </div>
+            <div className="mx-auto h-[min(280px,42vw)] min-h-[240px] w-full max-w-md sm:h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: -28, right: 8, left: 8, bottom: 4 }}>
                   <Pie
-                    data={authData}
+                    data={authPieData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
-                    cy="50%"
-                    innerRadius={56}
-                    outerRadius={78}
+                    cy="88%"
+                    startAngle={180}
+                    endAngle={0}
+                    innerRadius="46%"
+                    outerRadius="82%"
                     paddingAngle={2}
-                    stroke="hsl(var(--background))"
+                    stroke="hsl(var(--card))"
+                    strokeWidth={2}
                   >
-                    {authData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    {authPieData.map((_, i) => (
+                      <Cell key={i} fill={DASHBOARD_ACCENT[i % DASHBOARD_ACCENT.length]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -178,24 +283,33 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
                       )
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <text
-                    x="50%"
-                    y="50%"
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    style={{ fill: 'hsl(var(--foreground))', fontSize: '1.35rem', fontWeight: 600 }}
-                  >
-                    {parsed.totalRequests}
-                  </text>
                 </PieChart>
               </ResponsiveContainer>
             </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              {authPieData.map((entry, i) => (
+                <div key={entry.name} className="flex items-center gap-2 text-xs">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: DASHBOARD_ACCENT[i % DASHBOARD_ACCENT.length] }}
+                  />
+                  <span className="capitalize text-muted-foreground">{entry.name}</span>
+                  <span className="tabular-nums font-semibold text-foreground">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-5 text-center text-sm font-semibold text-foreground">Auth coverage</p>
+            <p className="mx-auto mt-1 max-w-sm text-center text-xs leading-relaxed text-muted-foreground">
+              {typedAuthSharePct}% of requests use a non-empty auth type. The arc shows how requests split
+              across bearer, API keys, and other profiles.
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="transition-shadow duration-200 hover:shadow-md">
+      <Card>
         <CardHeader>
           <CardTitle>Request tree</CardTitle>
           <CardDescription>Open a request to inspect headers, body, and related findings</CardDescription>
