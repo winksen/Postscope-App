@@ -10,7 +10,15 @@ export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
   const variant =
     severity === 'critical' ? 'critical' : severity === 'warning' ? 'warning' : 'secondary'
   return (
-    <Badge variant={variant} className={cn('font-mono text-[10px] uppercase', className)}>
+    <Badge
+      variant={variant}
+      className={cn(
+        'font-mono text-[10px] uppercase transition-all duration-200',
+        severity === 'critical' && 'shadow-sm shadow-destructive/20',
+        severity === 'warning' && 'shadow-sm shadow-[hsl(var(--warning))]/20',
+        className
+      )}
+    >
       {severity}
     </Badge>
   )

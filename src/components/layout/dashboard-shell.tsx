@@ -19,11 +19,15 @@ export function DashboardShell({ collectionName, issueCount, active, onNav, sear
   const sidebarW = collapsed ? 72 : 240;
 
   return (
-    <div className="min-h-screen bg-neutral-200">
+    <div className="min-h-screen bg-background">
       <AppSidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} active={active} onNav={onNav} issueCount={issueCount} />
-      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onSearchChange={onSearchChange} onAnalyzeAnother={onAnalyzeAnother} />
+      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onSearchChange={onSearchChange} onAnalyzeAnother={onAnalyzeAnother} active={active} />
       <main className={cn("min-h-screen pt-14 transition-[padding] duration-200")} style={{ paddingLeft: sidebarW }}>
-        <div className="p-6 lg:p-8">{children}</div>
+        <div className="p-6 lg:p-8">
+          <div className="animate-fade-in">
+            {children}
+          </div>
+        </div>
       </main>
     </div>
   );

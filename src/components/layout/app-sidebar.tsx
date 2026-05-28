@@ -26,12 +26,12 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card shadow-none transition-[width] duration-200',
+        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card shadow-sm transition-[width] duration-200',
         collapsed ? 'w-[72px]' : 'w-60'
       )}
     >
       <div className={cn('flex h-14 items-center gap-2 border-b border-border px-4', collapsed && 'justify-center px-2')}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 text-primary">
           <Sparkles className="h-4 w-4" />
         </div>
         {!collapsed && (
@@ -59,13 +59,16 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
                 variant={isActive ? 'secondary' : 'ghost'}
                 size="sm"
                 className={cn(
-                  'h-9 w-full justify-start gap-3 font-normal transition-colors duration-200',
+                  'h-9 w-full justify-start gap-3 font-normal transition-all duration-200 relative',
                   isActive && 'bg-primary/10 text-primary hover:bg-primary/15',
                   collapsed && 'justify-center px-0'
                 )}
                 onClick={() => onNav(item.id)}
               >
-                <Icon className={cn('h-4 w-4 shrink-0', isActive && 'text-primary')} />
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                )}
+                <Icon className={cn('h-4 w-4 shrink-0 transition-colors duration-200', isActive && 'text-primary')} />
                 {!collapsed && (
                   <>
                     <span className="flex-1 truncate text-left">{item.label}</span>

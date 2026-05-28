@@ -17,6 +17,7 @@ import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
+// cn removed - not needed
 
 /** Auth / accent slice colors (blue → green → orange). */
 const DASHBOARD_ACCENT = [
@@ -146,7 +147,7 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <div>
+      <div className="animate-fade-in">
         <h1 className="text-2xl font-semibold tracking-tight">Collection overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Structure, auth coverage, and request inventory for this import.
@@ -160,6 +161,8 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           value={parsed.totalRequests}
           subtext={`${parsed.totalFolders} folders`}
           details={methodDetailRows}
+          gradient="blue"
+          delay={0}
         />
         <StatCard
           icon={FolderOpen}
@@ -167,6 +170,8 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           value={parsed.totalFolders}
           subtext={`${parsed.totalRequests} requests`}
           details={folderDetailRows}
+          gradient="amber"
+          delay={100}
         />
         <StatCard
           icon={Key}
@@ -174,6 +179,8 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           value={parsed.definedVariables.length}
           subtext={`${parsed.variables.length} unique names in collection`}
           details={variableDetailRows}
+          gradient="violet"
+          delay={200}
         />
         <StatCard
           icon={Layers}
@@ -181,11 +188,13 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           value={distinctAuthTypes}
           subtext={`Across ${parsed.totalRequests} requests`}
           details={authTypeRows}
+          gradient="green"
+          delay={300}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="animate-fade-in animate-delay-200">
           <CardHeader className="pb-2">
             <CardTitle>HTTP methods</CardTitle>
             <CardDescription>Distribution of verbs across the collection</CardDescription>
@@ -220,7 +229,7 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
                   <Tooltip content={chartTooltip} cursor={{ fill: 'hsl(var(--muted) / 0.22)' }} />
                   <Bar dataKey="count" maxBarSize={26} radius={[13, 13, 13, 13]}>
                     {methodData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
+                      <Cell key={entry.name} fill={entry.fill} className="transition-all duration-200 hover:opacity-80" />
                     ))}
                   </Bar>
                 </BarChart>
@@ -234,7 +243,7 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="animate-fade-in animate-delay-300">
           <CardHeader className="pb-2">
             <CardTitle>Authentication</CardTitle>
             <CardDescription>How requests declare auth in the collection</CardDescription>
@@ -266,9 +275,15 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
                     paddingAngle={2}
                     stroke="hsl(var(--card))"
                     strokeWidth={2}
+                    animationBegin={200}
+                    animationDuration={800}
                   >
                     {authPieData.map((_, i) => (
-                      <Cell key={i} fill={DASHBOARD_ACCENT[i % DASHBOARD_ACCENT.length]} />
+                      <Cell
+                        key={i}
+                        fill={DASHBOARD_ACCENT[i % DASHBOARD_ACCENT.length]}
+                        className="transition-all duration-200 hover:opacity-80"
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -309,7 +324,7 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
         </Card>
       </div>
 
-      <Card>
+      <Card className="animate-fade-in animate-delay-400">
         <CardHeader>
           <CardTitle>Request tree</CardTitle>
           <CardDescription>Open a request to inspect headers, body, and related findings</CardDescription>

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Upload, FileJson, Sparkles } from 'lucide-react'
+import { Upload, FileJson, Sparkles, Shield, Zap, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,47 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface DropZoneProps {
   onFile: (file: File) => void
   loading?: boolean
+}
+
+function AnimatedBlob({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'absolute rounded-full blur-3xl opacity-30 dark:opacity-20',
+        className
+      )}
+    />
+  )
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+  delay,
+}: {
+  icon: typeof Shield
+  title: string
+  description: string
+  delay: number
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-5 text-center backdrop-blur-sm',
+        'animate-fade-in transition-all duration-300 hover:-translate-y-0.5 hover:bg-card hover:shadow-md'
+      )}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+        <Icon className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  )
 }
 
 export function DropZone({ onFile, loading = false }: DropZoneProps) {
@@ -45,8 +86,22 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
   )
 
   return (
-    <div className="relative min-h-screen bg-background">
-      <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      {/* Animated background blobs */}
+      <AnimatedBlob className="-left-20 -top-20 h-96 w-96 bg-primary/40 animate-blob" />
+      <AnimatedBlob className="-right-20 top-1/3 h-80 w-80 bg-chart-2/40 animate-blob animation-delay-2000" />
+      <AnimatedBlob className="bottom-0 left-1/3 h-72 w-72 bg-chart-3/30 animate-blob animation-delay-4000" />
+
+      {/* Subtle grid pattern */}
+      <div
+        className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03]"
+        style={{
+          backgroundImage: `radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)`,
+          backgroundSize: '32px 32px',
+        }}
+      />
+
+      <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="h-4 w-4" />
@@ -63,18 +118,30 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
         </Button>
       </header>
 
-      <div className="flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
+      <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
+        {/* Main drop card */}
         <Card
           className={cn(
-            'w-full max-w-xl border-2 border-dashed shadow-sm transition-all duration-200',
-            drag ? 'border-primary/60 bg-primary/[0.03] shadow-md' : 'border-border hover:border-primary/30 hover:shadow-md'
+            'w-full max-w-xl border-2 border-dashed shadow-sm transition-all duration-300',
+            'animate-fade-in-scale',
+            drag
+              ? 'border-primary/60 bg-primary/[0.03] shadow-lg scale-[1.02]'
+              : 'border-border hover:border-primary/30 hover:shadow-md'
           )}
+
         >
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-              <FileJson className="h-6 w-6 text-primary" />
+            <div
+              className={cn(
+                'mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 transition-transform duration-300',
+                drag && 'scale-110'
+              )}
+            >
+              <FileJson className="h-7 w-7 text-primary" />
             </div>
-            <CardTitle className="text-2xl font-semibold">Import a collection</CardTitle>
+            <CardTitle className="text-2xl font-semibold">
+              <span className="gradient-text">Import a collection</span>
+            </CardTitle>
             <CardDescription className="text-base">
               Drop a Postman export — parsed in your browser, never uploaded.
             </CardDescription>
@@ -85,8 +152,8 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               className={cn(
-                'flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-muted/30 px-8 py-12 transition-colors duration-200',
-                drag && 'bg-primary/[0.06]'
+                'flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-muted/30 px-8 py-12 transition-all duration-300',
+                drag && 'bg-primary/[0.06] border-primary/20'
               )}
             >
               {loading ? (
@@ -97,7 +164,19 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
                 </div>
               ) : (
                 <>
-                  <Upload className="h-10 w-10 text-muted-foreground" />
+                  <div
+                    className={cn(
+                      'flex h-16 w-16 items-center justify-center rounded-2xl bg-muted transition-all duration-300',
+                      drag && 'animate-pulse-glow'
+                    )}
+                  >
+                    <Upload
+                      className={cn(
+                        'h-8 w-8 text-muted-foreground transition-all duration-300',
+                        drag && 'text-primary scale-110'
+                      )}
+                    />
+                  </div>
                   <p className="text-center text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">Drag & drop</span> your JSON here
                   </p>
@@ -132,11 +211,36 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
               )}
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              Accepts <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">.postman_collection.json</code>{' '}
+              Accepts{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                .postman_collection.json
+              </code>{' '}
               and standard exports.
             </p>
           </CardContent>
         </Card>
+
+        {/* Feature highlights */}
+        <div className="mt-10 grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-3">
+          <FeatureCard
+            icon={Shield}
+            title="Privacy-first"
+            description="Parsed locally, never uploaded to any server."
+            delay={200}
+          />
+          <FeatureCard
+            icon={Zap}
+            title="Instant analysis"
+            description="Results in milliseconds, no waiting."
+            delay={400}
+          />
+          <FeatureCard
+            icon={BarChart3}
+            title="Visual insights"
+            description="Charts and security scoring at a glance."
+            delay={600}
+          />
+        </div>
       </div>
     </div>
   )

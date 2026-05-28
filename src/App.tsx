@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { DropZone } from './components/DropZone'
 import { DashboardShell } from './components/layout/dashboard-shell'
 import { OverviewPage } from './pages/OverviewPage'
@@ -17,6 +17,19 @@ export default function App() {
   const [active, setActive] = useState<NavId>('overview')
   const [search, setSearch] = useState('')
   const [landingLoading, setLandingLoading] = useState(false)
+
+  // Keyboard shortcut: Ctrl+K to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement
+        searchInput?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [parsed])
 
   const handleFile = useCallback((file: File) => {
     setLandingLoading(true)

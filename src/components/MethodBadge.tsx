@@ -2,11 +2,11 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 const PALETTE: Record<string, string> = {
-  GET: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  POST: 'border-sky-200 bg-sky-50 text-sky-800',
-  PUT: 'border-amber-200 bg-amber-50 text-amber-900',
-  PATCH: 'border-violet-200 bg-violet-50 text-violet-800',
-  DELETE: 'border-red-200 bg-red-50 text-red-800',
+  GET: 'bg-emerald-600 text-white border-transparent shadow-sm shadow-emerald-600/20',
+  POST: 'bg-sky-600 text-white border-transparent shadow-sm shadow-sky-600/20',
+  PUT: 'bg-amber-600 text-white border-transparent shadow-sm shadow-amber-600/20',
+  PATCH: 'bg-violet-600 text-white border-transparent shadow-sm shadow-violet-600/20',
+  DELETE: 'bg-red-600 text-white border-transparent shadow-sm shadow-red-600/20',
 }
 
 interface MethodBadgeProps {
@@ -16,10 +16,10 @@ interface MethodBadgeProps {
 
 export function MethodBadge({ method, className }: MethodBadgeProps) {
   const m = method.toUpperCase()
-  const tones = PALETTE[m] ?? 'border-border bg-muted text-muted-foreground'
+  const tones = PALETTE[m] ?? 'bg-muted text-muted-foreground border-transparent'
   return (
-    <Badge variant="outline" className={cn('font-mono text-[10px] font-semibold', tones, className)}>
-      {method}
+    <Badge className={cn('font-mono text-[10px] font-bold transition-all duration-200 hover:scale-105', tones, className)}>
+      {m}
     </Badge>
   )
 }

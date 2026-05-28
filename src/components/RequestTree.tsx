@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Lock, LockOpen } from 'lucide-react'
+import { ChevronRight, Lock, LockOpen, Folder, FolderOpen } from 'lucide-react'
 import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
@@ -28,15 +28,15 @@ function RequestRow({
       type="button"
       variant="ghost"
       size="sm"
-      className="h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 font-normal transition-colors duration-200 hover:bg-muted/80"
+      className="h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 font-normal transition-all duration-200 hover:bg-muted/80 group"
       onClick={() => onSelect(request)}
     >
       <MethodBadge method={request.method} />
       <span className="min-w-0 flex-1 truncate text-left text-sm">{request.name}</span>
       {hasAuth ? (
-        <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success))]" />
+        <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success))] opacity-60 group-hover:opacity-100 transition-opacity" />
       ) : (
-        <LockOpen className="h-3.5 w-3.5 shrink-0 text-destructive" />
+        <LockOpen className="h-3.5 w-3.5 shrink-0 text-destructive opacity-60 group-hover:opacity-100 transition-opacity" />
       )}
     </Button>
   )
@@ -112,11 +112,13 @@ function FolderNode({
   defaultOpen = true,
   onSelectRequest,
   searchQuery,
+  depth = 0,
 }: {
   node: TreeNode
   defaultOpen?: boolean
   onSelectRequest: (r: ParsedRequest) => void
   searchQuery: string
+  depth?: number
 }) {
   const [open, setOpen] = useState(defaultOpen)
   useEffect(() => {
@@ -124,17 +126,27 @@ function FolderNode({
   }, [searchQuery])
   const total = node.requests.length + node.children.reduce((s, c) => s + c.requests.length + c.children.length, 0)
   return (
-    <div className="border-l border-border pl-3">
+    <div className={cn('border-l border-border/60 pl-3', depth > 0 && 'ml-1')}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 hover:text-primary"
+        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary group"
       >
         <ChevronRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+        {open ? (
+          <FolderOpen className="h-4 w-4 shrink-0 text-primary/70" />
+        ) : (
+          <Folder className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary/70 transition-colors" />
+        )}
         <span className="font-medium">{node.name}</span>
-        <span className="text-xs text-muted-foreground">({total} requests)</span>
+        <span className="text-xs text-muted-foreground">({total})</span>
       </button>
-      {open && (
+      <div
+        className={cn(
+          'overflow-hidden transition-all duration-300',
+          open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+        )}
+      >
         <div className="ml-1 mt-1 space-y-0.5 border-l border-transparent pl-2">
           {node.requests.map((req) => (
             <RequestRow key={req.id} request={req} onSelect={onSelectRequest} />
@@ -146,10 +158,11 @@ function FolderNode({
               defaultOpen={false}
               onSelectRequest={onSelectRequest}
               searchQuery={searchQuery}
+              depth={depth + 1}
             />
           ))}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -169,14 +182,18 @@ export function RequestTree({ parsed, findings, search = '' }: RequestTreeProps)
       <ScrollArea className="h-[min(420px,calc(100vh-320px))] pr-3">
         {empty ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <Folder className="h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm font-medium text-foreground">No requests match</p>
             <p className="max-w-sm text-sm text-muted-foreground">Try a different search, or clear the header filter.</p>
           </div>
         ) : (
           <div className="space-y-2">
             {filteredRoot.length > 0 && (
-              <div className="border-l border-border pl-3">
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Root</span>
+              <div className="border-l border-border/60 pl-3">
+                <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Root
+                </span>
                 <div className="mt-2 space-y-0.5">
                   {filteredRoot.map((req) => (
                     <RequestRow key={req.id} request={req} onSelect={setSelected} />
