@@ -30,11 +30,11 @@ const GRADIENTS = {
 }
 
 const ICON_GRADIENTS = {
-  blue: 'bg-gradient-to-br from-slate-500/30 to-slate-500/10',
-  green: 'bg-gradient-to-br from-zinc-500/30 to-zinc-500/10',
-  amber: 'bg-gradient-to-br from-neutral-500/30 to-neutral-500/10',
-  violet: 'bg-gradient-to-br from-stone-500/30 to-stone-500/10',
-  rose: 'bg-gradient-to-br from-gray-500/20 to-gray-500/5',
+  blue: 'bg-muted text-muted-foreground',
+  green: 'bg-muted text-muted-foreground',
+  amber: 'bg-muted text-muted-foreground',
+  violet: 'bg-muted text-muted-foreground',
+  rose: 'bg-muted text-muted-foreground',
 }
 
 export function StatCard({
@@ -56,7 +56,7 @@ export function StatCard({
   return (
     <Card
       className={cn(
-        'group overflow-hidden p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md',
+        'group overflow-hidden p-6 transition-all duration-300',
         'animate-fade-in',
         className
       )}
@@ -65,7 +65,7 @@ export function StatCard({
       <div className="flex gap-4">
         <div
           className={cn(
-            'flex h-14 w-14 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-105',
+            'flex h-14 w-14 shrink-0 items-center justify-center rounded-xl transition-all duration-300',
             ICON_GRADIENTS[gradient]
           )}
           aria-hidden

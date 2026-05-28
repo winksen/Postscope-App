@@ -36,7 +36,7 @@ function FeatureCard({
     <div
       className={cn(
         'flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-5 text-center backdrop-blur-sm',
-        'animate-fade-in transition-all duration-300 hover:-translate-y-0.5 hover:bg-card hover:shadow-md'
+        'animate-fade-in transition-all duration-300 hover:bg-card'
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
@@ -125,22 +125,19 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
             'w-full max-w-xl border-2 border-dashed shadow-sm transition-all duration-300',
             'animate-fade-in-scale',
             drag
-              ? 'border-primary/60 bg-primary/[0.03] shadow-lg scale-[1.02]'
-              : 'border-border hover:border-primary/30 hover:shadow-md'
+              ? 'border-primary/60 bg-primary/[0.03] shadow-lg'
+              : 'border-border hover:border-primary/30'
           )}
 
         >
           <CardHeader className="text-center">
             <div
-              className={cn(
-                'mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 transition-transform duration-300',
-                drag && 'scale-110'
-              )}
+              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted transition-transform duration-300"
             >
               <FileCode className="h-7 w-7 text-primary" />
             </div>
             <CardTitle className="text-2xl font-semibold">
-              <span className="gradient-text">Import a collection</span>
+              <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
               Drop a Postman export — parsed in your browser, never uploaded.
@@ -173,7 +170,7 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
                     <UploadSimple
                       className={cn(
                         'h-8 w-8 text-muted-foreground transition-all duration-300',
-                        drag && 'text-primary scale-110'
+                        drag && 'text-primary'
                       )}
                     />
                   </div>

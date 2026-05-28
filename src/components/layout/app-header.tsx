@@ -1,4 +1,4 @@
-import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, SquaresFour, Shield, Gauge } from '@phosphor-icons/react'
+import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, type Icon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -15,8 +15,8 @@ import { useTheme } from '@/hooks/use-theme'
 // cn removed - not needed
 import type { NavId } from './app-sidebar'
 
-const NAV_LABELS: Record<NavId, { label: string; icon: typeof SquaresFour }> = {
-  overview: { label: 'Overview', icon: SquaresFour },
+const NAV_LABELS: Record<NavId, { label: string; icon: Icon }> = {
+  overview: { label: 'Dashboard', icon: ChartPieSlice },
   security: { label: 'Security', icon: Shield },
   score: { label: 'Score', icon: Gauge },
 }
@@ -65,7 +65,7 @@ export function AppHeader({
         <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search findings, requests…"
-          className="h-9 bg-muted/70 pl-9 pr-9 transition-colors duration-200 hover:bg-muted focus-visible:bg-muted"
+          className="h-9 bg-muted/70 pl-9 pr-9 transition-colors duration-200 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-orange-400/50"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
@@ -94,7 +94,7 @@ export function AppHeader({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-xs font-medium text-primary">
+                <AvatarFallback className="bg-muted text-xs font-medium text-foreground">
                   PS
                 </AvatarFallback>
               </Avatar>

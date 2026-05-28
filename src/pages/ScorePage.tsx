@@ -113,7 +113,7 @@ function ActionCard({
   return (
     <div
       className={cn(
-        'flex gap-3 rounded-xl border bg-card px-4 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm animate-fade-in'
+        'flex gap-3 rounded-xl border bg-card px-4 py-3.5 transition-all duration-200 animate-fade-in'
       )}
       style={{ animationDelay: `${index * 100}ms` }}
     >

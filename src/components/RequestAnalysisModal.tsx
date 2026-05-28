@@ -148,7 +148,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                       <li
                         key={f.id}
                         className={cn(
-                          'rounded-xl border p-4 transition-all duration-200 hover:shadow-sm',
+                          'rounded-xl border p-4 transition-all duration-200',
                           f.severity === 'critical'
                             ? 'border-destructive/20 bg-destructive/5'
                             : f.severity === 'warning'

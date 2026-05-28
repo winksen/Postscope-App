@@ -56,7 +56,7 @@ function SeveritySummaryCard({
   return (
     <Card
       className={cn(
-        'flex items-center gap-4 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md animate-fade-in',
+        'flex items-center gap-4 p-4 transition-all duration-300 animate-fade-in',
         count === 0 && 'opacity-60'
       )}
       style={{ animationDelay: `${delay}ms` }}

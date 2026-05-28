@@ -42,7 +42,7 @@ const VERB_COLORS: Record<string, string> = {
 
 const FALLBACK_VERB_HUES = [340, 187, 48, 24, 142, 285, 35, 310]
 
-const CHART_FONT = "'Lexend Deca', 'Lexend', ui-sans-serif, system-ui, sans-serif"
+const CHART_FONT = "'Elms Sans', ui-sans-serif, system-ui, sans-serif"
 
 function fillForMethod(method: string, fallbackIndex: number): string {
   const known = VERB_COLORS[method]
