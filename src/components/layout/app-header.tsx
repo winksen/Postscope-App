@@ -1,4 +1,4 @@
-import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, type Icon } from '@phosphor-icons/react'
+import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, FolderSimple, type Icon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -17,6 +17,7 @@ import type { NavId } from './app-sidebar'
 
 const NAV_LABELS: Record<NavId, { label: string; icon: Icon }> = {
   overview: { label: 'Dashboard', icon: ChartPieSlice },
+  requests: { label: 'Requests', icon: FolderSimple },
   security: { label: 'Security', icon: Shield },
   score: { label: 'Score', icon: Gauge },
 }

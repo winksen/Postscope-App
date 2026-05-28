@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect } from 'react'
 import { DropZone } from './components/DropZone'
 import { DashboardShell } from './components/layout/dashboard-shell'
 import { OverviewPage } from './pages/OverviewPage'
+import { RequestsPage } from './pages/RequestsPage'
 import { SecurityPage } from './pages/SecurityPage'
 import { ScorePage } from './pages/ScorePage'
 import { parseCollection } from './lib/parser'
@@ -85,6 +86,7 @@ export default function App() {
       onAnalyzeAnother={handleAnalyzeAnother}
     >
       {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} search={search} isLoading={pageLoading} />}
+      {active === 'requests' && <RequestsPage parsed={parsed} search={search} isLoading={pageLoading} />}
       {active === 'security' && <SecurityPage findings={findings} score={score} search={search} isLoading={pageLoading} />}
       {active === 'score' && <ScorePage score={score} findings={findings} isLoading={pageLoading} />}
     </DashboardShell>

@@ -1,0 +1,221 @@
+{
+  "info": {
+    "name": "PostScope Security Issues Sample",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "sample-security-issues-001"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://api.internal.local" }
+  ],
+  "item": [
+    {
+      "name": "Auth and Session",
+      "item": [
+        {
+          "name": "Login With Hardcoded Password",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "http://api.internal.local/auth/login",
+            "body": { "mode": "raw", "raw": "{\"username\":\"admin\",\"password\":\"Admin123!\"}" }
+          }
+        },
+        {
+          "name": "Reset Root Password",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer" },
+            "header": [{ "key": "Authorization", "value": "Bearer root-static-token-123" }],
+            "url": "http://api.internal.local/auth/reset-root",
+            "body": { "mode": "raw", "raw": "{\"newPassword\":\"RootPass!2026\"}" }
+          }
+        },
+        {
+          "name": "Issue Debug Token",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "basic" },
+            "url": "http://api.internal.local/auth/debug-token"
+          }
+        },
+        {
+          "name": "Validate MFA Bypass",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "apikey" },
+            "url": "http://api.internal.local/auth/mfa/validate?bypass=true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PII Endpoints",
+      "item": [
+        {
+          "name": "Dump All Users",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/users/export?include=ssn,email,phone"
+          }
+        },
+        {
+          "name": "Get User Secret Notes",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "apikey" },
+            "url": "http://api.internal.local/users/1/notes",
+            "header": [{ "key": "X-Internal-Key", "value": "internal_master_key_plaintext" }]
+          }
+        },
+        {
+          "name": "Batch PII Search",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "oauth2" },
+            "url": "http://api.internal.local/users/search",
+            "body": { "mode": "raw", "raw": "{\"query\":\"all\",\"includeSensitive\":true}" }
+          }
+        },
+        {
+          "name": "Unmasked Address Lookup",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer" },
+            "url": "http://api.internal.local/users/1/address?mask=false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Card Token (unsafe)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/payments/card-token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cardNumber\":\"4242424242424242\",\"cvv\":\"123\",\"expiry\":\"12/29\"}"
+            }
+          }
+        },
+        {
+          "name": "Webhook Verify Disabled",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer" },
+            "url": "http://api.internal.local/payments/webhook?skipVerification=true",
+            "header": [{ "key": "Authorization", "value": "Bearer webhook-disabled-check" }]
+          }
+        },
+        {
+          "name": "Refund Without Signature",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "apikey" },
+            "url": "http://api.internal.local/payments/refunds",
+            "body": { "mode": "raw", "raw": "{\"paymentId\":\"pay_01\",\"amount\":9000}" }
+          }
+        },
+        {
+          "name": "List Failed Charges",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "oauth2" },
+            "url": "http://api.internal.local/payments/failed?withPii=true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Delete Tenant Without Auth",
+          "request": {
+            "method": "DELETE",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/admin/tenants/tenant-001"
+          }
+        },
+        {
+          "name": "Get Config Secrets",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "apikey" },
+            "url": "http://api.internal.local/admin/config",
+            "header": [{ "key": "X-Admin-Token", "value": "admin_token_plain_exposed" }]
+          }
+        },
+        {
+          "name": "Patch Auth Policy",
+          "request": {
+            "method": "PATCH",
+            "auth": { "type": "bearer" },
+            "url": "http://api.internal.local/admin/auth-policy",
+            "body": { "mode": "raw", "raw": "{\"mfaRequired\":false,\"allowWeakPasswords\":true}" }
+          }
+        },
+        {
+          "name": "Enable Public Debug",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "basic" },
+            "url": "http://api.internal.local/admin/debug/public"
+          }
+        },
+        {
+          "name": "Rotate Admin Token (hardcoded)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer" },
+            "url": "http://api.internal.local/admin/token/rotate",
+            "body": { "mode": "raw", "raw": "{\"newToken\":\"adm_new_token_exposed_2026\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Infra and Internal",
+      "item": [
+        {
+          "name": "Download Logs",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "oauth2" },
+            "url": "http://api.internal.local/infra/logs?from=2026-01-01&level=debug"
+          }
+        },
+        {
+          "name": "Restart Workers",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "basic" },
+            "url": "http://api.internal.local/infra/workers/restart"
+          }
+        },
+        {
+          "name": "Expose Metrics Endpoint",
+          "request": {
+            "method": "PATCH",
+            "auth": { "type": "apikey" },
+            "url": "http://api.internal.local/infra/metrics",
+            "body": { "mode": "raw", "raw": "{\"public\":true}" }
+          }
+        },
+        {
+          "name": "Open SSH Tunnel",
+          "request": {
+            "method": "CONNECT",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/infra/tunnel"
+          }
+        }
+      ]
+    }
+  ]
+}

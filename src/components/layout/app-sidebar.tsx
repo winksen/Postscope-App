@@ -1,4 +1,4 @@
-import { ChartPieSlice, Shield, Gauge, CaretLeft, CaretRight, Stethoscope, type Icon } from "@phosphor-icons/react";
+import { ChartPieSlice, Shield, Gauge, CaretLeft, CaretRight, Stethoscope, FolderSimple, type Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -6,10 +6,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-export type NavId = "overview" | "security" | "score";
+export type NavId = "overview" | "requests" | "security" | "score";
 
 const nav: { id: NavId; label: string; icon: Icon; badge?: number }[] = [
   { id: "overview", label: "Dashboard", icon: ChartPieSlice },
+  { id: "requests", label: "Requests", icon: FolderSimple },
   { id: "security", label: "Security", icon: Shield },
   { id: "score", label: "Score", icon: Gauge },
 ];

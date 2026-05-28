@@ -1,0 +1,83 @@
+{
+  "info": {
+    "name": "PostScope Messy Large Sample",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "sample-messy-001"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://staging.api.example.com" },
+    { "key": "legacyHost", "value": "https://legacy.example.net" }
+  ],
+  "item": [
+    {
+      "name": "v1",
+      "item": [
+        { "name": "health-check", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/health" } },
+        { "name": "getUsers_old", "request": { "method": "GET", "auth": { "type": "basic" }, "url": "{{legacyHost}}/api/users" } },
+        { "name": "CREATE_USER", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/users", "body": { "mode": "raw", "raw": "{\"name\":\"A\"}" } } },
+        { "name": "DeleteUser", "request": { "method": "DELETE", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/users/22" } },
+        { "name": "Weird spacing request", "request": { "method": "GET", "auth": { "type": "apikey" }, "url": "https://api.example.com/users?sort=desc" } },
+        { "name": "legacy_reactivate", "request": { "method": "PATCH", "auth": { "type": "basic" }, "url": "{{legacyHost}}/api/users/22/reactivate" } },
+        { "name": "bulk-import-users", "request": { "method": "POST", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/users/import" } },
+        { "name": "whoami", "request": { "method": "GET", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/whoami" } }
+      ]
+    },
+    {
+      "name": "Orders and Billing",
+      "item": [
+        { "name": "list-orders", "request": { "method": "GET", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders?status=open&page=1" } },
+        { "name": "create-order", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders", "body": { "mode": "raw", "raw": "{\"sku\":\"SKU-1\",\"qty\":2}" } } },
+        { "name": "patch-order", "request": { "method": "PATCH", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders/ord_01", "body": { "mode": "raw", "raw": "{\"status\":\"approved\"}" } } },
+        { "name": "cancel-order", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders/ord_01/cancel" } },
+        { "name": "invoice_preview", "request": { "method": "GET", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/billing/invoice/preview?customer=cus_1&currency=usd" } },
+        { "name": "refund!!", "request": { "method": "POST", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/billing/refunds", "body": { "mode": "raw", "raw": "{\"invoice\":\"inv_9\",\"amount\":1000}" } } },
+        { "name": "chargeback-reasons", "request": { "method": "GET", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/billing/chargebacks/reasons" } },
+        { "name": "retry-payment-job", "request": { "method": "POST", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/billing/jobs/retry-failed" } }
+      ]
+    },
+    {
+      "name": "deep",
+      "item": [
+        {
+          "name": "nested-A",
+          "item": [
+            {
+              "name": "nested-B",
+              "item": [
+                {
+                  "name": "nested-C",
+                  "item": [
+                    { "name": "final-get", "request": { "method": "GET", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/deep/final?verbose=true" } },
+                    { "name": "final-put", "request": { "method": "PUT", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/deep/final/2", "body": { "mode": "raw", "raw": "{\"enabled\":true}" } } },
+                    { "name": "final-delete", "request": { "method": "DELETE", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/deep/final/2" } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Misc",
+      "item": [
+        { "name": "upload-file", "request": { "method": "POST", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/files/upload" } },
+        { "name": "download-report", "request": { "method": "GET", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/reports/monthly?month=2026-01" } },
+        { "name": "internal-debug", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "http://localhost:3001/debug/state" } },
+        { "name": "OPTIONS check", "request": { "method": "OPTIONS", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/users" } },
+        { "name": "HEAD ping", "request": { "method": "HEAD", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/ping" } },
+        { "name": "sync-cache-now", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/ops/cache/sync" } },
+        { "name": "full-reindex", "request": { "method": "POST", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/ops/search/reindex" } }
+      ]
+    },
+    {
+      "name": "Experimental",
+      "item": [
+        { "name": "graphQL-ish", "request": { "method": "POST", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/graphql" } },
+        { "name": "trace-route", "request": { "method": "TRACE", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/network/trace" } },
+        { "name": "connect-proxy", "request": { "method": "CONNECT", "auth": { "type": "basic" }, "url": "{{baseUrl}}/proxy/tunnel" } },
+        { "name": "legacy-batch-export", "request": { "method": "GET", "auth": { "type": "basic" }, "url": "{{legacyHost}}/batch/export?format=csv" } }
+      ]
+    }
+  ]
+}

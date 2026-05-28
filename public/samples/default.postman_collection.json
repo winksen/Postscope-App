@@ -1,0 +1,183 @@
+{
+  "info": {
+    "name": "PostScope Default Sample",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "sample-default-001"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.example.com" },
+    { "key": "token", "value": "" },
+    { "key": "apiKey", "value": "demo-api-key" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "noauth" },
+            "body": { "mode": "raw", "raw": "{\"email\":\"demo@example.com\",\"password\":\"change-me\"}" },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Get access token"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": { "type": "bearer" },
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{token}}\"}" },
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "Refresh session token"
+          }
+        },
+        {
+          "name": "Get Session",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/auth/session",
+            "description": "Check active session"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/users?page=1&limit=20",
+            "description": "Paginated list"
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/users",
+            "body": { "mode": "raw", "raw": "{\"name\":\"New User\",\"role\":\"member\"}" },
+            "description": "Create one user"
+          }
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/users/42",
+            "description": "Fetch one user"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "auth": { "type": "bearer" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/users/42",
+            "body": { "mode": "raw", "raw": "{\"role\":\"admin\"}" },
+            "description": "Update role"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/users/42",
+            "description": "Remove user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get Product",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "apikey" },
+            "url": "{{baseUrl}}/products/42",
+            "description": "Fetch one product"
+          }
+        },
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "apikey" },
+            "url": "{{baseUrl}}/products?sort=updatedAt&limit=50",
+            "description": "Product listing"
+          }
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "apikey" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/products",
+            "body": { "mode": "raw", "raw": "{\"name\":\"Notebook\",\"price\":19.99}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Sales Summary",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "oauth2" },
+            "url": "{{baseUrl}}/reports/sales?range=30d"
+          }
+        },
+        {
+          "name": "Active Users",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "oauth2" },
+            "url": "{{baseUrl}}/reports/active-users?range=7d"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy Integration",
+      "item": [
+        {
+          "name": "Ping Legacy",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "basic" },
+            "url": "https://legacy.example.com/ping"
+          }
+        },
+        {
+          "name": "Sync Legacy Accounts",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "basic" },
+            "url": "https://legacy.example.com/sync/accounts"
+          }
+        }
+      ]
+    }
+  ]
+}
