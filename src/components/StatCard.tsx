@@ -1,4 +1,4 @@
-import { type LucideIcon } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { useCountUp } from '@/hooks/use-count-up'
@@ -9,7 +9,7 @@ export interface StatCardDetail {
 }
 
 interface StatCardProps {
-  icon: LucideIcon
+  icon: ComponentType<{ className?: string }>
   label: string
   value: string | number
   subtext?: string
@@ -22,19 +22,19 @@ interface StatCardProps {
 }
 
 const GRADIENTS = {
-  blue: 'from-blue-500/15 to-blue-500/5 text-blue-600 dark:text-blue-400',
-  green: 'from-emerald-500/15 to-emerald-500/5 text-emerald-600 dark:text-emerald-400',
-  amber: 'from-amber-500/15 to-amber-500/5 text-amber-600 dark:text-amber-400',
-  violet: 'from-violet-500/15 to-violet-500/5 text-violet-600 dark:text-violet-400',
-  rose: 'from-rose-500/15 to-rose-500/5 text-rose-600 dark:text-rose-400',
+  blue: 'from-slate-500/20 to-slate-500/5 text-slate-700 dark:text-slate-300',
+  green: 'from-zinc-500/20 to-zinc-500/5 text-zinc-700 dark:text-zinc-300',
+  amber: 'from-neutral-500/20 to-neutral-500/5 text-neutral-700 dark:text-neutral-300',
+  violet: 'from-stone-500/20 to-stone-500/5 text-stone-700 dark:text-stone-300',
+  rose: 'from-gray-500/20 to-gray-500/5 text-gray-700 dark:text-gray-300',
 }
 
 const ICON_GRADIENTS = {
-  blue: 'bg-gradient-to-br from-blue-500/20 to-blue-500/5',
-  green: 'bg-gradient-to-br from-emerald-500/20 to-emerald-500/5',
-  amber: 'bg-gradient-to-br from-amber-500/20 to-amber-500/5',
-  violet: 'bg-gradient-to-br from-violet-500/20 to-violet-500/5',
-  rose: 'bg-gradient-to-br from-rose-500/20 to-rose-500/5',
+  blue: 'bg-gradient-to-br from-slate-500/30 to-slate-500/10',
+  green: 'bg-gradient-to-br from-zinc-500/30 to-zinc-500/10',
+  amber: 'bg-gradient-to-br from-neutral-500/30 to-neutral-500/10',
+  violet: 'bg-gradient-to-br from-stone-500/30 to-stone-500/10',
+  rose: 'bg-gradient-to-br from-gray-500/20 to-gray-500/5',
 }
 
 export function StatCard({
@@ -87,7 +87,7 @@ export function StatCard({
             </p>
           )}
           {details && details.length > 0 && (
-            <ul className="mt-3 space-y-1.5 border-t border-border/60 pt-3">
+            <ul className="mt-3 space-y-1.5 pt-3">
               {details.map((row) => (
                 <li key={`${row.label}-${row.value}`} className="flex items-baseline justify-between gap-3 text-xs">
                   <span className="min-w-0 truncate text-muted-foreground">{row.label}</span>

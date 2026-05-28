@@ -1,6 +1,20 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark' | 'system'
+const STORAGE_KEY = 'postscope-theme'
+
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'system'
+  return (localStorage.getItem(STORAGE_KEY) as Theme) || 'system'
+}
+
+function resolveTheme(theme: Theme): 'light' | 'dark' {
+  if (typeof window === 'undefined') return 'light'
+  if (theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+  return theme
+}
 
 interface ThemeContextType {
   theme: Theme
@@ -17,14 +31,8 @@ const ThemeContext = createContext<ThemeContextType>({
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('postscope-theme') as Theme) || 'system'
-    }
-    return 'system'
-  })
-
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme)
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(getInitialTheme()))
 
   useEffect(() => {
     const root = document.documentElement
@@ -51,7 +59,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (t: Theme) => {
     setThemeState(t)
-    localStorage.setItem('postscope-theme', t)
+    localStorage.setItem(STORAGE_KEY, t)
   }
 
   const toggleTheme = () => {

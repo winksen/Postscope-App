@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, ExternalLink, ShieldAlert, AlertTriangle, Info, Filter, X } from 'lucide-react'
+import { CheckCircle, ArrowSquareOut, ShieldWarning, Warning, Info, FunnelSimple, X } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import type { Finding } from '../lib/auditor'
 import type { ScoreBreakdown } from '../lib/scorer'
@@ -23,6 +23,7 @@ interface SecurityPageProps {
   findings: Finding[]
   score: ScoreBreakdown
   search: string
+  isLoading?: boolean
 }
 
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
@@ -46,7 +47,7 @@ function SeveritySummaryCard({
   colorClass,
   delay,
 }: {
-  icon: typeof ShieldAlert
+  icon: typeof ShieldWarning
   count: number
   label: string
   colorClass: string
@@ -71,7 +72,24 @@ function SeveritySummaryCard({
   )
 }
 
-export function SecurityPage({ findings, score, search }: SecurityPageProps) {
+function SecurityPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-52" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+      </div>
+      <Skeleton className="h-36 rounded-2xl" />
+      <Skeleton className="h-[28rem] rounded-2xl" />
+    </div>
+  )
+}
+
+export function SecurityPage({ findings, score, search, isLoading = false }: SecurityPageProps) {
+  if (isLoading) return <SecurityPageSkeleton />
   const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
   const [detail, setDetail] = useState<Finding | null>(null)
@@ -112,14 +130,14 @@ export function SecurityPage({ findings, score, search }: SecurityPageProps) {
       {/* Severity Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SeveritySummaryCard
-          icon={ShieldAlert}
+          icon={ShieldWarning}
           count={criticalCount}
           label="Critical issues"
           colorClass="bg-destructive"
           delay={0}
         />
         <SeveritySummaryCard
-          icon={AlertTriangle}
+          icon={Warning}
           count={warningCount}
           label="Warnings"
           colorClass="bg-[hsl(var(--warning))]"
@@ -138,7 +156,7 @@ export function SecurityPage({ findings, score, search }: SecurityPageProps) {
       <Card className="animate-fade-in animate-delay-200">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
+            <FunnelSimple className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">Filters</CardTitle>
           </div>
           <CardDescription>Narrow the table by severity and category</CardDescription>
@@ -284,7 +302,7 @@ export function SecurityPage({ findings, score, search }: SecurityPageProps) {
                           }}
                         >
                           View
-                          <ExternalLink className="h-3.5 w-3.5" />
+                          <ArrowSquareOut className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>

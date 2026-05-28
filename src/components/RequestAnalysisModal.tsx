@@ -1,4 +1,4 @@
-import { Lock, LockOpen, Copy, Check } from 'lucide-react'
+import { Lock, LockOpen, Copy, Check } from '@phosphor-icons/react'
 import { MethodBadge } from './MethodBadge'
 import { SeverityBadge } from './SeverityBadge'
 import type { ParsedRequest } from '../lib/parser'

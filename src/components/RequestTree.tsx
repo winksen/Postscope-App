@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Lock, LockOpen, Folder, FolderOpen } from 'lucide-react'
+import { CaretRight, Lock, LockOpen, Folder, FolderOpen } from '@phosphor-icons/react'
 import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
@@ -132,7 +132,7 @@ function FolderNode({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary group"
       >
-        <ChevronRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
+        <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         {open ? (
           <FolderOpen className="h-4 w-4 shrink-0 text-primary/70" />
         ) : (

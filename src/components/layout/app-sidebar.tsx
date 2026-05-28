@@ -1,4 +1,4 @@
-import { LayoutDashboard, Shield, Gauge, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { SquaresFour, Shield, Gauge, CaretLeft, CaretRight, Sparkle } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge'
 
 export type NavId = 'overview' | 'security' | 'score'
 
-const nav: { id: NavId; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+const nav: { id: NavId; label: string; icon: typeof SquaresFour; badge?: number }[] = [
+  { id: 'overview', label: 'Overview', icon: SquaresFour },
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'score', label: 'Score', icon: Gauge },
 ]
@@ -26,13 +26,13 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card shadow-sm transition-[width] duration-200',
+        'fixed left-0 top-0 z-40 flex h-screen flex-col bg-card/95 shadow-[12px_0_36px_hsl(var(--background)/0.6)] backdrop-blur-md transition-[width] duration-200',
         collapsed ? 'w-[72px]' : 'w-60'
       )}
     >
-      <div className={cn('flex h-14 items-center gap-2 border-b border-border px-4', collapsed && 'justify-center px-2')}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 text-primary">
-          <Sparkles className="h-4 w-4" />
+      <div className={cn('flex h-14 items-center gap-2 px-4', collapsed && 'justify-center px-2')}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 text-primary">
+          <Sparkle className="h-4 w-4" />
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
@@ -60,7 +60,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
                 size="sm"
                 className={cn(
                   'h-9 w-full justify-start gap-3 font-normal transition-all duration-200 relative',
-                  isActive && 'bg-primary/10 text-primary hover:bg-primary/15',
+                  isActive && 'bg-primary/15 text-primary hover:bg-primary/20',
                   collapsed && 'justify-center px-0'
                 )}
                 onClick={() => onNav(item.id)}
@@ -97,7 +97,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
         </nav>
       </ScrollArea>
 
-      <Separator />
+      <Separator className="bg-transparent" />
       <div className="p-2">
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
@@ -108,7 +108,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
               onClick={onToggleCollapse}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              {collapsed ? <CaretRight className="h-4 w-4" /> : <CaretLeft className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">{collapsed ? 'Expand' : 'Collapse'}</TooltipContent>

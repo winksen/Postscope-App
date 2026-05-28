@@ -17,6 +17,7 @@ export default function App() {
   const [active, setActive] = useState<NavId>('overview')
   const [search, setSearch] = useState('')
   const [landingLoading, setLandingLoading] = useState(false)
+  const [pageLoading, setPageLoading] = useState(false)
 
   // Keyboard shortcut: Ctrl+K to focus search
   useEffect(() => {
@@ -60,6 +61,13 @@ export default function App() {
     setSearch('')
   }, [])
 
+  useEffect(() => {
+    if (!parsed) return
+    setPageLoading(true)
+    const timer = window.setTimeout(() => setPageLoading(false), 260)
+    return () => window.clearTimeout(timer)
+  }, [active, parsed])
+
   if (!parsed) {
     return <DropZone onFile={handleFile} loading={landingLoading} />
   }
@@ -76,9 +84,9 @@ export default function App() {
       onSearchChange={setSearch}
       onAnalyzeAnother={handleAnalyzeAnother}
     >
-      {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} search={search} />}
-      {active === 'security' && <SecurityPage findings={findings} score={score} search={search} />}
-      {active === 'score' && <ScorePage score={score} findings={findings} />}
+      {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} search={search} isLoading={pageLoading} />}
+      {active === 'security' && <SecurityPage findings={findings} score={score} search={search} isLoading={pageLoading} />}
+      {active === 'score' && <ScorePage score={score} findings={findings} isLoading={pageLoading} />}
     </DashboardShell>
   )
 }

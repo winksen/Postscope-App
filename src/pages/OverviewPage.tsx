@@ -10,13 +10,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { FileText, FolderOpen, Key, Layers } from 'lucide-react'
+import { FileText, FolderOpen, Key, Stack, ChartBar } from '@phosphor-icons/react'
 import { StatCard } from '../components/StatCard'
 import { RequestTree } from '../components/RequestTree'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
+import { Skeleton } from '@/components/ui/skeleton'
 // cn removed - not needed
 
 /** Auth / accent slice colors (blue → green → orange). */
@@ -54,6 +55,7 @@ interface OverviewPageProps {
   parsed: ParsedCollection
   findings: Finding[]
   search: string
+  isLoading?: boolean
 }
 
 function variableNamesUsedInRequests(requests: ParsedRequest[]): Set<string> {
@@ -67,7 +69,27 @@ function variableNamesUsedInRequests(requests: ParsedRequest[]): Set<string> {
   return names
 }
 
-export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
+function OverviewPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Skeleton className="h-[24rem] rounded-2xl" />
+        <Skeleton className="h-[24rem] rounded-2xl" />
+      </div>
+      <Skeleton className="h-[22rem] rounded-2xl" />
+    </div>
+  )
+}
+
+export function OverviewPage({ parsed, findings, search, isLoading = false }: OverviewPageProps) {
+  if (isLoading) return <OverviewPageSkeleton />
   const methodEntries = Object.entries(parsed.methods).sort((a, b) => b[1] - a[1])
   let verbFallbackSlot = 0
   const methodData = methodEntries.map(([method, count]) => ({
@@ -183,7 +205,7 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
           delay={200}
         />
         <StatCard
-          icon={Layers}
+          icon={Stack}
           label="Auth profiles"
           value={distinctAuthTypes}
           subtext={`Across ${parsed.totalRequests} requests`}
@@ -196,7 +218,7 @@ export function OverviewPage({ parsed, findings, search }: OverviewPageProps) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="animate-fade-in animate-delay-200">
           <CardHeader className="pb-2">
-            <CardTitle>HTTP methods</CardTitle>
+            <CardTitle className="flex items-center gap-2"><ChartBar className="h-4 w-4 text-muted-foreground" />HTTP methods</CardTitle>
             <CardDescription>Distribution of verbs across the collection</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">

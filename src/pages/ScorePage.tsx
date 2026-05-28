@@ -8,8 +8,9 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Key, Link, Lock, Sparkles, CheckCircle, AlertCircle, Lightbulb, Download } from 'lucide-react'
+import { Key, Link, Lock, Sparkle, CheckCircle, WarningCircle, Lightbulb, DownloadSimple } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 function getProgressTone(value: number): string {
   if (value >= 90) return 'bg-[hsl(var(--chart-2))]'
@@ -31,7 +32,7 @@ const CATEGORY_ICONS = {
   secrets: Key,
   variables: Link,
   auth: Lock,
-  hygiene: Sparkles,
+  hygiene: Sparkle,
 }
 
 const CATEGORY_LABELS: Record<keyof ScoreBreakdown['categories'], string> = {
@@ -44,6 +45,7 @@ const CATEGORY_LABELS: Record<keyof ScoreBreakdown['categories'], string> = {
 interface ScorePageProps {
   score: ScoreBreakdown
   findings: Finding[]
+  isLoading?: boolean
 }
 
 function CategoryBar({
@@ -100,7 +102,7 @@ function ActionCard({
   priority: 'P0' | 'P1' | 'P2'
 }) {
   const priorityConfig = {
-    P0: { icon: AlertCircle, color: 'bg-destructive/10 text-destructive border-destructive/20' },
+    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive border-destructive/20' },
     P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/20' },
     P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20' },
   }
@@ -130,7 +132,24 @@ function ActionCard({
   )
 }
 
-export function ScorePage({ score, findings }: ScorePageProps) {
+function ScorePageSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-44" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Skeleton className="h-[22rem] rounded-2xl xl:col-span-2" />
+        <Skeleton className="h-[22rem] rounded-2xl" />
+      </div>
+      <Skeleton className="h-[24rem] rounded-2xl" />
+    </div>
+  )
+}
+
+export function ScorePage({ score, findings, isLoading = false }: ScorePageProps) {
+  if (isLoading) return <ScorePageSkeleton />
   const advice: { text: string; priority: 'P0' | 'P1' | 'P2' }[] = []
   const critical = findings.filter((f) => f.severity === 'critical')
   const warning = findings.filter((f) => f.severity === 'warning')
@@ -214,7 +233,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
             <CardDescription>What to do next based on this run</CardDescription>
           </div>
           <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
-            <Download className="h-3.5 w-3.5" />
+            <DownloadSimple className="h-3.5 w-3.5" />
             Export
           </Button>
         </CardHeader>

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Upload, FileJson, Sparkles, Shield, Zap, BarChart3 } from 'lucide-react'
+import { UploadSimple, FileCode, Sparkle, ShieldCheck, Lightning, ChartBar } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,7 +27,7 @@ function FeatureCard({
   description,
   delay,
 }: {
-  icon: typeof Shield
+  icon: typeof ShieldCheck
   title: string
   description: string
   delay: number
@@ -104,7 +104,7 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
       <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Sparkles className="h-4 w-4" />
+            <Sparkle className="h-4 w-4" />
           </div>
           <div>
             <p className="text-sm font-semibold tracking-tight">PostScope</p>
@@ -137,7 +137,7 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
                 drag && 'scale-110'
               )}
             >
-              <FileJson className="h-7 w-7 text-primary" />
+              <FileCode className="h-7 w-7 text-primary" />
             </div>
             <CardTitle className="text-2xl font-semibold">
               <span className="gradient-text">Import a collection</span>
@@ -170,7 +170,7 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
                       drag && 'animate-pulse-glow'
                     )}
                   >
-                    <Upload
+                    <UploadSimple
                       className={cn(
                         'h-8 w-8 text-muted-foreground transition-all duration-300',
                         drag && 'text-primary scale-110'
@@ -223,19 +223,19 @@ export function DropZone({ onFile, loading = false }: DropZoneProps) {
         {/* Feature highlights */}
         <div className="mt-10 grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-3">
           <FeatureCard
-            icon={Shield}
+            icon={ShieldCheck}
             title="Privacy-first"
             description="Parsed locally, never uploaded to any server."
             delay={200}
           />
           <FeatureCard
-            icon={Zap}
+            icon={Lightning}
             title="Instant analysis"
             description="Results in milliseconds, no waiting."
             delay={400}
           />
           <FeatureCard
-            icon={BarChart3}
+            icon={ChartBar}
             title="Visual insights"
             description="Charts and security scoring at a glance."
             delay={600}
