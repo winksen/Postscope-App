@@ -1,14 +1,5 @@
-import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, FolderSimple, type Icon } from '@phosphor-icons/react'
+import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, FolderSimple, Books, BookmarkSimple, type Icon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTheme } from '@/hooks/use-theme'
 // cn removed - not needed
@@ -27,6 +18,11 @@ interface AppHeaderProps {
   search: string
   onOpenSearch: () => void
   onAnalyzeAnother: () => void
+  onOpenLibrary?: () => void
+  onSaveToLibrary?: () => void
+  isSavedToLibrary: boolean
+  savingToLibrary: boolean
+  historyEnabled: boolean
   active: NavId
 }
 
@@ -36,6 +32,11 @@ export function AppHeader({
   search,
   onOpenSearch,
   onAnalyzeAnother,
+  onOpenLibrary,
+  onSaveToLibrary,
+  isSavedToLibrary,
+  savingToLibrary,
+  historyEnabled,
   active,
 }: AppHeaderProps) {
   const { resolvedTheme, toggleTheme } = useTheme()
@@ -79,6 +80,39 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-1">
+        {historyEnabled && onOpenLibrary && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={onOpenLibrary}
+              >
+                <Books className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Team library</TooltipContent>
+          </Tooltip>
+        )}
+
+        {historyEnabled && !isSavedToLibrary && onSaveToLibrary && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={onSaveToLibrary}
+                disabled={savingToLibrary}
+              >
+                <BookmarkSimple className="h-4 w-4" weight={savingToLibrary ? 'regular' : 'fill'} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{savingToLibrary ? 'Saving…' : 'Save to library'}</TooltipContent>
+          </Tooltip>
+        )}
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -93,34 +127,10 @@ export function AppHeader({
           <TooltipContent>Toggle theme</TooltipContent>
         </Tooltip>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-muted text-xs font-medium text-foreground">
-                  PS
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">Workspace</p>
-                <p className="text-xs text-muted-foreground">Local analysis only</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer gap-2">
-              {resolvedTheme === 'dark' ? <SunDim className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              {resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onAnalyzeAnother} className="cursor-pointer gap-2">
-              <SignOut className="h-4 w-4" />
-              New collection
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button variant="secondary" size="sm" className="gap-2" onClick={onAnalyzeAnother}>
+          <SignOut className="h-4 w-4" />
+          <span className="hidden sm:inline">New collection</span>
+        </Button>
       </div>
     </header>
   )

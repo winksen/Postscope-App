@@ -11,22 +11,25 @@ interface DashboardShellProps {
   search: string;
   onOpenSearch: () => void;
   onAnalyzeAnother: () => void;
+  onOpenLibrary?: () => void;
+  onSaveToLibrary?: () => void;
+  isSavedToLibrary: boolean;
+  savingToLibrary: boolean;
+  historyEnabled: boolean;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ collectionName, issueCount, active, onNav, search, onOpenSearch, onAnalyzeAnother, children }: DashboardShellProps) {
+export function DashboardShell({ collectionName, issueCount, active, onNav, search, onOpenSearch, onAnalyzeAnother, onOpenLibrary, onSaveToLibrary, isSavedToLibrary, savingToLibrary, historyEnabled, children }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebarW = collapsed ? 72 : 240;
 
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} active={active} onNav={onNav} issueCount={issueCount} />
-      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onOpenSearch={onOpenSearch} onAnalyzeAnother={onAnalyzeAnother} active={active} />
+      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onOpenSearch={onOpenSearch} onAnalyzeAnother={onAnalyzeAnother} onOpenLibrary={onOpenLibrary} onSaveToLibrary={onSaveToLibrary} isSavedToLibrary={isSavedToLibrary} savingToLibrary={savingToLibrary} historyEnabled={historyEnabled} active={active} />
       <main className={cn("min-h-screen pt-14 transition-[padding] duration-200")} style={{ paddingLeft: sidebarW }}>
         <div className="p-6 lg:p-8">
-          <div className="animate-fade-in">
-            {children}
-          </div>
+          {children}
         </div>
       </main>
     </div>
