@@ -126,7 +126,7 @@ Brief skeleton flash on mount (`useEffect` timeout) for perceived loading polish
 
 | | Purpose | How it works | Main files |
 |---|--------|--------------|------------|
-| Drill-down | Tie findings to one request | `findingsForRequest` filters by `Finding.affected.includes(request.name)`; `requestHealthScore` applies same penalty table as global scorer (duplicated constants) | `RequestAnalysisModal.tsx`, `requestFindings.ts` |
+| Drill-down | Tie findings to one request | `findingsForRequest` filters by stable `request.id`; labels via `findingDisplay.ts`; `requestHealthScore` applies same penalty table as global scorer (duplicated constants) | `RequestAnalysisModal.tsx`, `requestFindings.ts` |
 
 ---
 
@@ -199,7 +199,7 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 
 2. **Pure-function pipeline (parse → audit → score)** — Predictable, test-friendly, and easy to reason about. Trade-off: no incremental parsing or Web Worker offload for huge files.
 
-3. **Findings keyed by request `name`** — Simple join in `findingsForRequest`. Trade-off: duplicate request names across folders could mis-attribute findings (Postman allows duplicate names).
+3. **Findings keyed by stable request `id`** — Parser assigns folder-path ids and disambiguates duplicate names in the same folder (`#2`, `#3`, …). `findingDisplay.ts` maps ids to human-readable paths in the UI.
 
 4. **In-memory navigation instead of URL routes** — Few views; state resets on full reload. Trade-off: cannot deep-link to `/security`; refresh loses import (could add session storage or query params later).
 
@@ -211,9 +211,9 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 
 ## 8. Known limitations
 
-- **Duplicate request names** may associate the wrong findings in per-request views.
+- **Heuristic rules** can produce false positives/negatives; treat output as guidance, not proof.
 - **Audit coverage** is heuristic (regex, JSON body shape); non-JSON bodies and edge-case Postman features may be missed.
-- **`BASIC_AUTH_PLAINTEXT`** exists in `auditor.ts` metadata but **no code path** currently registers that rule ID — dead entry / future work.
+- **`BASIC_AUTH_PLAINTEXT`** fires when Postman basic auth uses literal `username` / `password` fields (not `{{variables}}`).
 - **No persistence:** Refresh clears session; no export of reports.
 - **`alert` for errors** on failed parse — rough UX.
 - **Large files** may block the main thread during parse/audit.

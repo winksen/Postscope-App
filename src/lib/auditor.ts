@@ -6,6 +6,7 @@ export interface Finding {
   category: 'secrets' | 'variables' | 'auth' | 'hygiene';
   title: string;
   description: string;
+  /** Stable request ids from the parser (not display names). */
   affected: string[];
   recommendation: string;
 }
@@ -29,17 +30,17 @@ function runCriticalChecks(parsed: ParsedCollection): Finding[] {
       if (SECRET_KEY_REGEX.test(h.key) && !isVariable(h.value) && h.value) {
         const key = 'HARDCODED_PASSWORD'
         if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.name)
+        affectedByRule.get(key)!.push(req.id)
       }
       if (h.key.toLowerCase() === 'authorization' && !isVariable(h.value) && h.value && BEARER_OR_BASIC_REGEX.test(h.value)) {
         const key = 'HARDCODED_TOKEN'
         if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.name)
+        affectedByRule.get(key)!.push(req.id)
       }
       if (API_KEY_REGEX.test(h.key) && !isVariable(h.value) && h.value) {
         const key = 'HARDCODED_API_KEY'
         if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.name)
+        affectedByRule.get(key)!.push(req.id)
       }
     }
 
@@ -51,7 +52,7 @@ function runCriticalChecks(parsed: ParsedCollection): Finding[] {
             if (BODY_SECRET_REGEX.test(k) && typeof v === 'string' && !isVariable(v) && v) {
               const key = 'HARDCODED_SECRET'
               if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-              affectedByRule.get(key)!.push(req.name)
+              affectedByRule.get(key)!.push(req.id)
               return
             }
             if (v && typeof v === 'object' && !Array.isArray(v)) check(v as Record<string, unknown>)
@@ -62,7 +63,7 @@ function runCriticalChecks(parsed: ParsedCollection): Finding[] {
         if (BODY_SECRET_REGEX.test(req.bodyRaw) && !VARIABLE_PATTERN.test(req.bodyRaw)) {
           const key = 'HARDCODED_SECRET'
           if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-          affectedByRule.get(key)!.push(req.name)
+          affectedByRule.get(key)!.push(req.id)
         }
       }
     }
@@ -120,12 +121,12 @@ function runWarningChecks(parsed: ParsedCollection): Finding[] {
     if (url && !urlVarPattern.test(url) && (url.startsWith('http://') || url.startsWith('https://'))) {
       const key = 'HARDCODED_BASEURL'
       if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-      affectedByRule.get(key)!.push(req.name)
+      affectedByRule.get(key)!.push(req.id)
     }
     if (url && envHostPattern.test(url) && !VARIABLE_PATTERN.test(url)) {
       const key = 'HARDCODED_ENV_URL'
       if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-      affectedByRule.get(key)!.push(req.name)
+      affectedByRule.get(key)!.push(req.id)
     }
 
     const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
@@ -133,7 +134,18 @@ function runWarningChecks(parsed: ParsedCollection): Finding[] {
     if (mutationMethods.includes(req.method) && req.auth === 'noauth' && !hasAuthHeader) {
       const key = 'MISSING_AUTH'
       if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-      affectedByRule.get(key)!.push(req.name)
+      affectedByRule.get(key)!.push(req.id)
+    }
+
+    if (req.auth === 'basic' && req.basicAuth) {
+      const { username, password } = req.basicAuth
+      const literalUser = username && !isVariable(username)
+      const literalPass = password && !isVariable(password)
+      if (literalUser || literalPass) {
+        const key = 'BASIC_AUTH_PLAINTEXT'
+        if (!affectedByRule.has(key)) affectedByRule.set(key, [])
+        affectedByRule.get(key)!.push(req.id)
+      }
     }
   }
 
@@ -189,7 +201,7 @@ function runInfoChecks(parsed: ParsedCollection): Finding[] {
       category: 'hygiene',
       title: 'Requests without description',
       description: `${noDesc.length} request(s) have no description.`,
-      affected: noDesc.map((r) => r.name),
+      affected: noDesc.map((r) => r.id),
       recommendation: 'Add descriptions to document purpose and usage of each request.',
     })
   }
@@ -229,7 +241,7 @@ function runInfoChecks(parsed: ParsedCollection): Finding[] {
       category: 'hygiene',
       title: 'Requests with empty header values',
       description: `${emptyHeaders.length} request(s) have headers with empty values.`,
-      affected: emptyHeaders.map((r) => r.name),
+      affected: emptyHeaders.map((r) => r.id),
       recommendation: 'Remove empty headers or populate with values.',
     })
   }

@@ -2,7 +2,7 @@ import type { Finding } from './auditor'
 import type { ParsedRequest } from './parser'
 
 export function findingsForRequest(request: ParsedRequest, findings: Finding[]): Finding[] {
-  return findings.filter((f) => f.affected.includes(request.name))
+  return findings.filter((f) => f.affected.includes(request.id))
 }
 
 const PENALTY = { critical: 20, warning: 8, info: 2 } as const

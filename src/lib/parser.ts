@@ -9,6 +9,8 @@ export interface ParsedRequest {
   url: string;
   folderPath: string[];
   auth: string;
+  /** Present when Postman auth type is basic (username/password fields). */
+  basicAuth?: { username: string; password: string };
   headers: Array<{ key: string; value: string }>;
   bodyRaw?: string;
   hasDescription: boolean;
@@ -59,10 +61,24 @@ function getAuthType(auth: PostmanAuth | undefined): string {
   return t || 'noauth';
 }
 
+function getBasicAuthCreds(auth: PostmanAuth | undefined): { username: string; password: string } | undefined {
+  if (!auth?.basic?.length) return undefined;
+  const username = auth.basic.find((e) => e.key === 'username')?.value ?? '';
+  const password = auth.basic.find((e) => e.key === 'password')?.value ?? '';
+  if (!username && !password) return undefined;
+  return { username, password };
+}
+
 function parseItem(
   item: PostmanItem,
   folderPath: string[],
-  acc: { requests: ParsedRequest[]; methods: Record<string, number>; authTypes: Record<string, number>; variables: Set<string> }
+  acc: {
+    requests: ParsedRequest[];
+    methods: Record<string, number>;
+    authTypes: Record<string, number>;
+    variables: Set<string>;
+    idCounts: Map<string, number>;
+  }
 ): void {
   if (item.request) {
     const req = item.request;
@@ -70,6 +86,7 @@ function parseItem(
     const url = getUrlString(req.url);
     const headers = (req.header || []).filter((h) => !h.disabled).map((h) => ({ key: h.key, value: h.value }));
     const auth = getAuthType(req.auth);
+    const basicAuth = auth === 'basic' ? getBasicAuthCreds(req.auth) : undefined;
 
     const bodyRaw = req.body?.raw ?? req.body?.urlencoded?.map((e) => `${e.key}=${e.value}`).join('&');
 
@@ -80,13 +97,19 @@ function parseItem(
     acc.methods[method] = (acc.methods[method] || 0) + 1;
     acc.authTypes[auth] = (acc.authTypes[auth] || 0) + 1;
 
+    const baseId = `${folderPath.join('/')}/${item.name}`.replace(/^\//, '') || item.name;
+    const seen = (acc.idCounts.get(baseId) ?? 0) + 1;
+    acc.idCounts.set(baseId, seen);
+    const id = seen > 1 ? `${baseId}#${seen}` : baseId;
+
     acc.requests.push({
-      id: `${folderPath.join('/')}/${item.name}`.replace(/^\//, ''),
+      id,
       name: item.name,
       method,
       url,
       folderPath,
       auth,
+      basicAuth,
       headers,
       bodyRaw: bodyRaw || undefined,
       hasDescription: !!(req.description && String(req.description).trim()),
@@ -108,6 +131,7 @@ export function parseCollection(json: unknown): ParsedCollection {
     methods: {} as Record<string, number>,
     authTypes: {} as Record<string, number>,
     variables: new Set<string>(),
+    idCounts: new Map<string, number>(),
   }
 
   col.item.forEach((item) => parseItem(item, [], acc))

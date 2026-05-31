@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils'
 interface RequestsPageProps {
   parsed: ParsedCollection
   search: string
+  focusRequestId?: string | null
+  onFocusRequestHandled?: () => void
   isLoading?: boolean
 }
 
@@ -199,7 +201,13 @@ function FolderNode({
   )
 }
 
-export function RequestsPage({ parsed, search, isLoading = false }: RequestsPageProps) {
+export function RequestsPage({
+  parsed,
+  search,
+  focusRequestId,
+  onFocusRequestHandled,
+  isLoading = false,
+}: RequestsPageProps) {
   const { root, nodes } = useMemo(() => buildTree(parsed.requests), [parsed.requests])
   const filteredRoot = useMemo(() => filterRequests(root, search), [root, search])
   const filteredNodes = useMemo(() => filterNodes(nodes, search), [nodes, search])
@@ -213,8 +221,16 @@ export function RequestsPage({ parsed, search, isLoading = false }: RequestsPage
   }, [selected, search, firstFiltered])
 
   useEffect(() => {
+    if (focusRequestId) return
     setSelected(firstFiltered ?? null)
-  }, [parsed, firstFiltered])
+  }, [parsed, firstFiltered, focusRequestId])
+
+  useEffect(() => {
+    if (!focusRequestId) return
+    const request = parsed.requests.find((r) => r.id === focusRequestId)
+    if (request) setSelected(request)
+    onFocusRequestHandled?.()
+  }, [focusRequestId, parsed.requests, onFocusRequestHandled])
 
   if (isLoading) return <RequestsPageSkeleton />
 

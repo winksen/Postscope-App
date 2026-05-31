@@ -1,6 +1,5 @@
 import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, FolderSimple, type Icon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -26,7 +25,7 @@ interface AppHeaderProps {
   sidebarOffset: string
   collectionName: string
   search: string
-  onSearchChange: (v: string) => void
+  onOpenSearch: () => void
   onAnalyzeAnother: () => void
   active: NavId
 }
@@ -35,7 +34,7 @@ export function AppHeader({
   sidebarOffset,
   collectionName,
   search,
-  onSearchChange,
+  onOpenSearch,
   onAnalyzeAnother,
   active,
 }: AppHeaderProps) {
@@ -63,13 +62,16 @@ export function AppHeader({
       </div>
 
       <div className="relative min-w-0 flex-1 max-w-md ml-auto md:ml-0">
-        <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search findings, requests…"
-          className="h-9 bg-muted/70 pl-9 pr-9 transition-colors duration-200 hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-orange-400/50"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          className="flex h-9 w-full items-center rounded-xl bg-muted/70 pl-9 pr-9 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50"
+        >
+          <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <span className={search ? 'truncate text-foreground' : 'truncate text-muted-foreground'}>
+            {search || 'Search requests…'}
+          </span>
+        </button>
         <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[10px] text-muted-foreground/60 sm:flex">
           <kbd className="rounded bg-background/40 px-1 py-0.5 font-mono text-[10px]">Ctrl</kbd>
           <kbd className="rounded bg-background/40 px-1 py-0.5 font-mono text-[10px]">K</kbd>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { CheckCircle, ArrowSquareOut, ShieldWarning, Warning, Info, FunnelSimple, X } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import type { Finding } from '../lib/auditor'
+import { affectedLabels } from '../lib/findingDisplay'
+import type { ParsedCollection } from '../lib/parser'
 import type { ScoreBreakdown } from '../lib/scorer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -20,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 interface SecurityPageProps {
+  parsed: ParsedCollection
   findings: Finding[]
   score: ScoreBreakdown
   search: string
@@ -29,14 +32,16 @@ interface SecurityPageProps {
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
 const CATEGORIES = ['all', 'secrets', 'variables', 'auth', 'hygiene'] as const
 
-function findingMatchesQuery(f: Finding, q: string): boolean {
+function findingMatchesQuery(f: Finding, q: string, requests: ParsedCollection['requests']): boolean {
   if (!q.trim()) return true
   const s = q.toLowerCase()
+  const labels = affectedLabels(f, requests)
   return (
     f.title.toLowerCase().includes(s) ||
     f.description.toLowerCase().includes(s) ||
     f.category.includes(s) ||
-    f.affected.some((a) => a.toLowerCase().includes(s))
+    f.affected.some((id) => id.toLowerCase().includes(s)) ||
+    labels.some((label) => label.toLowerCase().includes(s))
   )
 }
 
@@ -88,7 +93,7 @@ function SecurityPageSkeleton() {
   )
 }
 
-export function SecurityPage({ findings, score, search, isLoading = false }: SecurityPageProps) {
+export function SecurityPage({ parsed, findings, score, search, isLoading = false }: SecurityPageProps) {
   if (isLoading) return <SecurityPageSkeleton />
   const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
@@ -107,7 +112,7 @@ export function SecurityPage({ findings, score, search, isLoading = false }: Sec
   const filtered = findings.filter((f) => {
     if (severityFilter !== 'all' && f.severity !== severityFilter) return false
     if (categoryFilter !== 'all' && f.category !== categoryFilter) return false
-    if (!findingMatchesQuery(f, search)) return false
+    if (!findingMatchesQuery(f, search, parsed.requests)) return false
     return true
   })
 
@@ -336,7 +341,9 @@ export function SecurityPage({ findings, score, search, isLoading = false }: Sec
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Affected</p>
                   <p className="mt-1 font-mono text-sm text-primary">
-                    {detail.affected.slice(0, 8).join(', ')}
+                    {affectedLabels(detail, parsed.requests)
+                      .slice(0, 8)
+                      .join(', ')}
                     {detail.affected.length > 8 ? ` +${detail.affected.length - 8}` : ''}
                   </p>
                 </div>

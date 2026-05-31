@@ -14,7 +14,13 @@ PostScope **parses a collection file locally in the browser**, runs a rule-based
 - A **security / findings** view with severities and recommendations
 - A **score** view with grade and category breakdowns (secrets, variables, auth, hygiene)
 
-**No server or API keys are required.** Data stays on the client unless you choose to deploy the static build elsewhere.
+**No server or API keys are required.** Collection analysis runs in the browser; the last imported collection is restored from **session storage** after a refresh (same tab, ~4.5 MB limit). There is no server-side persistence.
+
+### Limitations (by design)
+
+- **Rule-based auditor** — findings are heuristic; expect false positives and false negatives. Review recommendations before acting.
+- **No backend** — collections are not uploaded or stored on a server.
+- **Large collections** — parsing and audit yield to the browser event loop, but very large files may still feel slow on low-end devices.
 
 ---
 
@@ -49,14 +55,14 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 
 ## Screenshots
 
-_Add screenshots here after first run (e.g. landing drop zone, overview charts, security findings, score gauge)._
+Screenshots are not checked in yet. After running the app locally, capture these views and add them under `docs/screenshots/`:
 
-Suggested filenames (optional):
-
-- `docs/screenshots/01-drop-zone.png`
-- `docs/screenshots/02-overview.png`
-- `docs/screenshots/03-security.png`
-- `docs/screenshots/04-score.png`
+| File | View |
+|------|------|
+| `docs/screenshots/01-drop-zone.png` | Landing import zone |
+| `docs/screenshots/02-overview.png` | Overview dashboard |
+| `docs/screenshots/03-security.png` | Security findings |
+| `docs/screenshots/04-score.png` | Score gauge |
 
 ---
 
@@ -156,6 +162,8 @@ Postscope-App/
 5. Use the header **search** to filter content where supported.
 6. Use **Analyze another** to clear state and import a new file.
 
+Refreshing the page keeps the current collection in this browser tab (session storage). Closing the tab clears it.
+
 If parsing fails, confirm the file is valid JSON and a Postman collection (schema in `info.schema` is expected for real exports).
 
 ---
@@ -187,6 +195,7 @@ For audit rules, extend `src/lib/auditor.ts` and adjust scoring in `src/lib/scor
 
 - Export findings as JSON or SARIF for CI
 - Deeper Postman features (pre-request scripts, tests, multi-file collections)
+- Web Worker offload for very large collections
 - Custom rule packs or configurable severity weights
 - Offline / PWA packaging for air-gapped use
 - Internationalization
@@ -195,4 +204,4 @@ For audit rules, extend `src/lib/auditor.ts` and adjust scoring in `src/lib/scor
 
 ## License
 
-_Add a `LICENSE` file and reference it here if the project is open source._
+[MIT](LICENSE)

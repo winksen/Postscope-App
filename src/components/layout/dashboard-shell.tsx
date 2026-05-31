@@ -9,19 +9,19 @@ interface DashboardShellProps {
   active: NavId;
   onNav: (id: NavId) => void;
   search: string;
-  onSearchChange: (v: string) => void;
+  onOpenSearch: () => void;
   onAnalyzeAnother: () => void;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ collectionName, issueCount, active, onNav, search, onSearchChange, onAnalyzeAnother, children }: DashboardShellProps) {
+export function DashboardShell({ collectionName, issueCount, active, onNav, search, onOpenSearch, onAnalyzeAnother, children }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebarW = collapsed ? 72 : 240;
 
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} active={active} onNav={onNav} issueCount={issueCount} />
-      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onSearchChange={onSearchChange} onAnalyzeAnother={onAnalyzeAnother} active={active} />
+      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onOpenSearch={onOpenSearch} onAnalyzeAnother={onAnalyzeAnother} active={active} />
       <main className={cn("min-h-screen pt-14 transition-[padding] duration-200")} style={{ paddingLeft: sidebarW }}>
         <div className="p-6 lg:p-8">
           <div className="animate-fade-in">
