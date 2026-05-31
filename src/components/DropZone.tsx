@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { UploadSimple, FileCode, Stethoscope, ShieldCheck, Lightning, ChartBar, Books, Clock, ClockCounterClockwise, EyeSlash, Warning, CloudArrowUp } from '@phosphor-icons/react'
+import { UploadSimple, FileCode, ShieldCheck, Lightning, ChartBar, Clock, ClockCounterClockwise, EyeSlash, Warning, CloudArrowUp } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { formatSavedAt, type SavedCollectionMeta } from '@/lib/collectionLibrary'
+import {
+  FeatureCard,
+  MarketingBackground,
+  MarketingHeader,
+} from '@/components/marketing/marketing-shell'
 import {
   canChoosePrivacyMode,
   getPrivacyModeDescription,
@@ -64,47 +69,6 @@ const SAMPLE_COLLECTIONS = [
     filename: 'sample-security-issues.postman_collection.json',
   },
 ] as const
-
-function AnimatedBlob({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'absolute rounded-full blur-3xl opacity-30 dark:opacity-20',
-        className
-      )}
-    />
-  )
-}
-
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-  delay,
-}: {
-  icon: typeof ShieldCheck
-  title: string
-  description: string
-  delay: number
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-5 text-center backdrop-blur-sm',
-        'animate-fade-in transition-all duration-300 hover:bg-card'
-      )}
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-        <Icon className="h-5 w-5 text-primary" />
-      </div>
-      <div>
-        <p className="text-sm font-semibold">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  )
-}
 
 export function DropZone({
   onFile,
@@ -171,44 +135,9 @@ export function DropZone({
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
-      {/* Animated background blobs */}
-      <AnimatedBlob className="-left-20 -top-20 h-96 w-96 bg-primary/40 animate-blob" />
-      <AnimatedBlob className="-right-20 top-1/3 h-80 w-80 bg-chart-2/40 animate-blob animation-delay-2000" />
-      <AnimatedBlob className="bottom-0 left-1/3 h-72 w-72 bg-chart-3/30 animate-blob animation-delay-4000" />
+      <MarketingBackground />
 
-      {/* Subtle grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03]"
-        style={{
-          backgroundImage: `radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)`,
-          backgroundSize: '32px 32px',
-        }}
-      />
-
-      <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center text-orange-400">
-            <Stethoscope className="h-8 w-8" weight="fill" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold tracking-tight">PostScope</p>
-            <p className="text-xs text-muted-foreground">Local collection intelligence</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {onOpenLibrary && (
-            <Button variant="secondary" size="sm" className="gap-2" onClick={onOpenLibrary}>
-              <Books className="h-4 w-4" />
-              <span className="hidden sm:inline">Team library</span>
-            </Button>
-          )}
-          <Button variant="secondary" size="sm" className="hidden sm:inline-flex" asChild>
-            <a href="https://www.postman.com/" target="_blank" rel="noreferrer">
-              Postman ecosystem
-            </a>
-          </Button>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
         <div className="mb-6 w-full max-w-xl animate-fade-in">

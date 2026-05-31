@@ -6,14 +6,25 @@ export { parseLoggingMode }
 
 export interface AppConfig {
   loggingMode: LoggingMode
+  publicLandingPage: boolean
 }
 
-/** Fetch deployment config from the app server (single source of truth: LOGGING_MODE). */
+function parseBooleanFlag(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value !== 'string') return false
+  const normalized = value.trim().toLowerCase()
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on'
+}
+
+/** Fetch deployment config from the app server (LOGGING_MODE, PUBLIC_LANDING_PAGE). */
 export async function fetchAppConfig(): Promise<AppConfig> {
   const res = await fetch('/api/config')
   if (!res.ok) throw new Error('Failed to load app config')
-  const body = (await res.json()) as AppConfig
-  return { loggingMode: parseLoggingMode(body.loggingMode) }
+  const body = (await res.json()) as Partial<AppConfig>
+  return {
+    loggingMode: parseLoggingMode(body.loggingMode),
+    publicLandingPage: parseBooleanFlag(body.publicLandingPage),
+  }
 }
 
 export function canChoosePrivacyMode(loggingMode: LoggingMode): boolean {

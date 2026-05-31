@@ -1,7 +1,7 @@
-import { MagnifyingGlass, SignOut, FileCode, SunDim, Moon, ChartPieSlice, Shield, Gauge, FolderSimple, Books, BookmarkSimple, type Icon } from '@phosphor-icons/react'
+import { MagnifyingGlass, SignOut, FileCode, ChartPieSlice, Shield, Gauge, FolderSimple, BookmarkSimple, type Icon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTheme } from '@/hooks/use-theme'
+import { ThemeToggle } from '@/components/theme-toggle'
 // cn removed - not needed
 import type { NavId } from './app-sidebar'
 
@@ -18,7 +18,6 @@ interface AppHeaderProps {
   search: string
   onOpenSearch: () => void
   onAnalyzeAnother: () => void
-  onOpenLibrary?: () => void
   onSaveToLibrary?: () => void
   isSavedToLibrary: boolean
   savingToLibrary: boolean
@@ -32,14 +31,12 @@ export function AppHeader({
   search,
   onOpenSearch,
   onAnalyzeAnother,
-  onOpenLibrary,
   onSaveToLibrary,
   isSavedToLibrary,
   savingToLibrary,
   historyEnabled,
   active,
 }: AppHeaderProps) {
-  const { resolvedTheme, toggleTheme } = useTheme()
   const activeNav = NAV_LABELS[active]
 
   return (
@@ -80,21 +77,7 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-1">
-        {historyEnabled && onOpenLibrary && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground"
-                onClick={onOpenLibrary}
-              >
-                <Books className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Team library</TooltipContent>
-          </Tooltip>
-        )}
+        <ThemeToggle />
 
         {historyEnabled && !isSavedToLibrary && onSaveToLibrary && (
           <Tooltip>
@@ -112,20 +95,6 @@ export function AppHeader({
             <TooltipContent>{savingToLibrary ? 'Saving…' : 'Save to library'}</TooltipContent>
           </Tooltip>
         )}
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={toggleTheme}
-            >
-              {resolvedTheme === 'dark' ? <SunDim className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Toggle theme</TooltipContent>
-        </Tooltip>
 
         <Button variant="secondary" size="sm" className="gap-2" onClick={onAnalyzeAnother}>
           <SignOut className="h-4 w-4" />
