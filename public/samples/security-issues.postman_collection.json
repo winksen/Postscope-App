@@ -46,6 +46,14 @@
             "auth": { "type": "apikey" },
             "url": "http://api.internal.local/auth/mfa/validate?bypass=true"
           }
+        },
+        {
+          "name": "Session probe HEAD",
+          "request": {
+            "method": "HEAD",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/auth/session"
+          }
         }
       ]
     },
@@ -169,6 +177,14 @@
           }
         },
         {
+          "name": "Admin CORS OPTIONS",
+          "request": {
+            "method": "OPTIONS",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/admin/config"
+          }
+        },
+        {
           "name": "Rotate Admin Token (hardcoded)",
           "request": {
             "method": "POST",
@@ -213,6 +229,105 @@
             "method": "CONNECT",
             "auth": { "type": "noauth" },
             "url": "http://api.internal.local/infra/tunnel"
+          }
+        },
+        {
+          "name": "Metrics HEAD (no auth)",
+          "request": {
+            "method": "HEAD",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/infra/metrics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "GraphQL and MCP (unauthenticated)",
+      "item": [
+        {
+          "name": "Public schema introspection",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/graphql",
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { __schema { queryType { name } mutationType { name } } }"
+              }
+            }
+          }
+        },
+        {
+          "name": "Dump users GraphQL",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"query\":\"query { users { id ssn email phone } }\"}"
+            }
+          }
+        },
+        {
+          "name": "MCP tools/list no auth",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "X-Protocol", "value": "mcp" }],
+            "url": "http://api.internal.local/mcp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}"
+            }
+          }
+        },
+        {
+          "name": "MCP admin tool call",
+          "request": {
+            "method": "MCP",
+            "auth": { "type": "noauth" },
+            "url": "http://api.internal.local/mcp/rpc",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"delete_tenant\",\"arguments\":{\"tenantId\":\"tenant-001\"}}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Realtime leaks",
+      "item": [
+        {
+          "name": "Debug event stream",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "header": [
+              { "key": "Accept", "value": "text/event-stream" },
+              { "key": "X-Protocol", "value": "sse" }
+            ],
+            "url": "http://api.internal.local/events/debug?includePii=true"
+          }
+        },
+        {
+          "name": "Admin websocket feed",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": "ws://api.internal.local/ws/admin-feed"
+          }
+        },
+        {
+          "name": "ExportAuditLogs gRPC",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "X-Protocol", "value": "grpc" }],
+            "url": "http://api.internal.local/grpc/audit.AuditService/ExportLogs",
+            "body": { "mode": "raw", "raw": "{\"include_pii\":true}" }
           }
         }
       ]

@@ -1,5 +1,5 @@
 import { Lock, LockOpen, Copy, Check } from '@phosphor-icons/react'
-import { MethodBadge } from './MethodBadge'
+import { RequestBadges } from './RequestBadges'
 import { SeverityBadge } from './SeverityBadge'
 import type { ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
@@ -50,7 +50,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
             </DialogDescription>
             <DialogTitle className="text-xl font-semibold leading-snug">{request.name}</DialogTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <MethodBadge method={request.method} />
+              <RequestBadges request={request} muteHttp={false} />
               {hasAuth ? (
                 <Badge variant="success" className="gap-1 font-normal">
                   <Lock className="h-3 w-3" /> {request.auth}

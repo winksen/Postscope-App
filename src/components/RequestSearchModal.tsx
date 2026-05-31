@@ -3,7 +3,7 @@ import { MagnifyingGlass, FolderSimple } from '@phosphor-icons/react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MethodBadge } from '@/components/MethodBadge'
+import { RequestBadges } from '@/components/RequestBadges'
 import { searchRequests } from '@/lib/requestSearch'
 import type { ParsedRequest } from '@/lib/parser'
 import { cn } from '@/lib/utils'
@@ -83,7 +83,7 @@ export function RequestSearchModal({
             <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               ref={inputRef}
-              placeholder="Search by name, URL, method, or folder…"
+              placeholder="Search by name, URL, method, protocol, or folder…"
               className="h-10 bg-muted/70 pl-9 pr-4 focus-visible:ring-2 focus-visible:ring-orange-400/50"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -112,7 +112,7 @@ export function RequestSearchModal({
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => selectAt(index)}
                     >
-                      <MethodBadge method={request.method} />
+                      <RequestBadges request={request} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{request.name}</p>
                         <p className="truncate font-mono text-xs text-muted-foreground">{request.url}</p>

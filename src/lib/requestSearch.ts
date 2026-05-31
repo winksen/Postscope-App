@@ -7,6 +7,7 @@ export function requestMatches(req: ParsedRequest, q: string): boolean {
     req.name.toLowerCase().includes(query) ||
     req.url.toLowerCase().includes(query) ||
     req.method.toLowerCase().includes(query) ||
+    req.protocol.toLowerCase().includes(query) ||
     req.folderPath.join('/').toLowerCase().includes(query)
   )
 }

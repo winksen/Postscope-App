@@ -7,6 +7,9 @@ const PALETTE: Record<string, string> = {
   PUT: 'bg-amber-600 text-white border-transparent shadow-sm shadow-amber-600/20',
   PATCH: 'bg-violet-600 text-white border-transparent shadow-sm shadow-violet-600/20',
   DELETE: 'bg-red-600 text-white border-transparent shadow-sm shadow-red-600/20',
+  HEAD: 'bg-cyan-700 text-white border-transparent shadow-sm shadow-cyan-700/20',
+  OPTIONS: 'bg-purple-700 text-white border-transparent shadow-sm shadow-purple-700/20',
+  CONNECT: 'bg-orange-700 text-white border-transparent shadow-sm shadow-orange-700/20',
 }
 
 interface MethodBadgeProps {

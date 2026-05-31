@@ -24,6 +24,10 @@ export interface PostmanBody {
   raw?: string;
   urlencoded?: Array<{ key: string; value: string }>;
   formdata?: unknown;
+  graphql?: {
+    query?: string;
+    variables?: string;
+  };
 }
 
 export interface PostmanUrl {

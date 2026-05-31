@@ -1,56 +1,2543 @@
 {
   "info": {
-    "name": "PostScope Messy Large Sample",
+    "name": "PostScope Enterprise Messy Demo (120+ requests)",
+    "description": "Synthetic mega-collection simulating merged team exports: distinct child collections, duplicate clusters, extreme nesting, and uneven auth/method distributions.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "sample-messy-001"
+    "_postman_id": "sample-messy-heavy-001"
   },
   "variable": [
-    { "key": "baseUrl", "value": "https://staging.api.example.com" },
-    { "key": "legacyHost", "value": "https://legacy.example.net" }
+    {
+      "key": "baseUrl",
+      "value": "https://staging.api.acme-corp.io"
+    },
+    {
+      "key": "legacyHost",
+      "value": "https://legacy-internal.example.net"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "apiKey",
+      "value": "demo-key-not-for-prod"
+    },
+    {
+      "key": "tenantId",
+      "value": "tenant_7f3a"
+    },
+    {
+      "key": "env",
+      "value": "staging"
+    }
   ],
   "item": [
     {
-      "name": "v1",
-      "item": [
-        { "name": "health-check", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/health" } },
-        { "name": "getUsers_old", "request": { "method": "GET", "auth": { "type": "basic" }, "url": "{{legacyHost}}/api/users" } },
-        { "name": "CREATE_USER", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/users", "body": { "mode": "raw", "raw": "{\"name\":\"A\"}" } } },
-        { "name": "DeleteUser", "request": { "method": "DELETE", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/users/22" } },
-        { "name": "Weird spacing request", "request": { "method": "GET", "auth": { "type": "apikey" }, "url": "https://api.example.com/users?sort=desc" } },
-        { "name": "legacy_reactivate", "request": { "method": "PATCH", "auth": { "type": "basic" }, "url": "{{legacyHost}}/api/users/22/reactivate" } },
-        { "name": "bulk-import-users", "request": { "method": "POST", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/users/import" } },
-        { "name": "whoami", "request": { "method": "GET", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/whoami" } }
-      ]
-    },
-    {
-      "name": "Orders and Billing",
-      "item": [
-        { "name": "list-orders", "request": { "method": "GET", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders?status=open&page=1" } },
-        { "name": "create-order", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders", "body": { "mode": "raw", "raw": "{\"sku\":\"SKU-1\",\"qty\":2}" } } },
-        { "name": "patch-order", "request": { "method": "PATCH", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders/ord_01", "body": { "mode": "raw", "raw": "{\"status\":\"approved\"}" } } },
-        { "name": "cancel-order", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/orders/ord_01/cancel" } },
-        { "name": "invoice_preview", "request": { "method": "GET", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/billing/invoice/preview?customer=cus_1&currency=usd" } },
-        { "name": "refund!!", "request": { "method": "POST", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/billing/refunds", "body": { "mode": "raw", "raw": "{\"invoice\":\"inv_9\",\"amount\":1000}" } } },
-        { "name": "chargeback-reasons", "request": { "method": "GET", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/billing/chargebacks/reasons" } },
-        { "name": "retry-payment-job", "request": { "method": "POST", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/billing/jobs/retry-failed" } }
-      ]
-    },
-    {
-      "name": "deep",
+      "name": "Acme Core API v3 [PRODUCTION]",
       "item": [
         {
-          "name": "nested-A",
+          "name": "Auth",
           "item": [
             {
-              "name": "nested-B",
+              "name": "Login",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/auth/login",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"email\":\"{{userEmail}}\",\"password\":\"{{userPassword}}\"}"
+                },
+                "description": "Primary login"
+              }
+            },
+            {
+              "name": "Refresh session",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/auth/refresh",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"refreshToken\":\"{{token}}\"}"
+                }
+              }
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "OPTIONS",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/auth/logout",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "CRUD",
               "item": [
                 {
-                  "name": "nested-C",
-                  "item": [
-                    { "name": "final-get", "request": { "method": "GET", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/deep/final?verbose=true" } },
-                    { "name": "final-put", "request": { "method": "PUT", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/deep/final/2", "body": { "mode": "raw", "raw": "{\"enabled\":true}" } } },
-                    { "name": "final-delete", "request": { "method": "DELETE", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/deep/final/2" } }
+                  "name": "List users",
+                  "request": {
+                    "method": "POST",
+                    "auth": {
+                      "type": "bearer"
+                    },
+                    "url": "{{baseUrl}}/v3/users?page=1&limit=50",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "Create user",
+                  "request": {
+                    "method": "DELETE",
+                    "auth": {
+                      "type": "bearer"
+                    },
+                    "url": "{{baseUrl}}/v3/users",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\"name\":\"Jane\",\"role\":\"member\"}"
+                    }
+                  }
+                },
+                {
+                  "name": "Get user by id",
+                  "request": {
+                    "method": "PUT",
+                    "auth": {
+                      "type": "apikey"
+                    },
+                    "url": "{{baseUrl}}/v3/users/{{userId}}",
+                    "header": [
+                      {
+                        "key": "X-Api-Key",
+                        "value": "{{apiKey}}"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "Update user",
+                  "request": {
+                    "method": "GET",
+                    "auth": {
+                      "type": "apikey"
+                    },
+                    "url": "{{baseUrl}}/v3/users/{{userId}}",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "X-Api-Key",
+                        "value": "{{apiKey}}"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\"role\":\"admin\"}"
+                    }
+                  }
+                },
+                {
+                  "name": "Delete user",
+                  "request": {
+                    "method": "GET",
+                    "auth": {
+                      "type": "bearer"
+                    },
+                    "url": "{{baseUrl}}/v3/users/{{userId}}",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Permissions",
+              "item": [
+                {
+                  "name": "List roles",
+                  "request": {
+                    "method": "GET",
+                    "auth": {
+                      "type": "bearer"
+                    },
+                    "url": "{{baseUrl}}/v3/users/roles",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "Assign role",
+                  "request": {
+                    "method": "PATCH",
+                    "auth": {
+                      "type": "oauth2"
+                    },
+                    "url": "{{baseUrl}}/v3/users/{{userId}}/roles",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\"roleId\":\"role_admin\"}"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Billing",
+          "item": [
+            {
+              "name": "List invoices",
+              "request": {
+                "method": "PUT",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/billing/invoices",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Create invoice",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/v3/billing/invoices",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"customerId\":\"cus_1\",\"amount\":9900}"
+                }
+              }
+            },
+            {
+              "name": "Subscriptions",
+              "item": [
+                {
+                  "name": "List subscriptions",
+                  "request": {
+                    "method": "GET",
+                    "auth": {
+                      "type": "bearer"
+                    },
+                    "url": "{{baseUrl}}/v3/billing/subscriptions",
+                    "header": [
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "Cancel subscription",
+                  "request": {
+                    "method": "GET",
+                    "auth": {
+                      "type": "oauth2"
+                    },
+                    "url": "{{baseUrl}}/v3/billing/subscriptions/{{subId}}/cancel"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Webhooks",
+          "item": [
+            {
+              "name": "Register webhook",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/webhooks",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"url\":\"https://hooks.acme.io/in\"}"
+                }
+              }
+            },
+            {
+              "name": "List deliveries",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/v3/webhooks/deliveries?status=failed",
+                "header": [
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/v3/health"
+          }
+        },
+        {
+          "name": "Users CORS preflight",
+          "request": {
+            "method": "OPTIONS",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/v3/users"
+          }
+        },
+        {
+          "name": "Billing HEAD probe",
+          "request": {
+            "method": "HEAD",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/v3/billing/invoices",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Acme Core API v2 — DEPRECATED",
+      "item": [
+        {
+          "name": "getUsers",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "basic"
+            },
+            "url": "{{baseUrl}}/v2/users"
+          }
+        },
+        {
+          "name": "getUsers_old",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "apikey"
+            },
+            "url": "{{baseUrl}}/v2/users",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{apiKey}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "GET /users (duplicate)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/v2/users",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "create_user",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic"
+            },
+            "url": "{{baseUrl}}/v2/users",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"test\"}"
+            }
+          }
+        },
+        {
+          "name": "CREATE_USER",
+          "request": {
+            "method": "HEAD",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/v2/users",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Test User\"}"
+            }
+          }
+        },
+        {
+          "name": "deleteUser",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/v2/users/22"
+          }
+        },
+        {
+          "name": "Delete User copy",
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/v2/users/22"
+          }
+        },
+        {
+          "name": "whoami",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/v2/whoami"
+          }
+        },
+        {
+          "name": "legacy ping",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "https://legacy-internal.example.net/api/ping"
+          }
+        },
+        {
+          "name": "bulk import users",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/v2/users/import",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"csvUrl\":\"s3://bucket/users.csv\"}"
+            }
+          }
+        },
+        {
+          "name": "misc — do not delete",
+          "item": [
+            {
+              "name": "temp endpoint",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v2/misc/temp-fix-441"
+              }
+            },
+            {
+              "name": "another temp",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v2/misc/temp-fix-441"
+              }
+            },
+            {
+              "name": "PATCH accounts (forgot why)",
+              "request": {
+                "method": "HEAD",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v2/accounts/patch-all",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"force\":true}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "orphan at root",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic"
+            },
+            "url": "{{baseUrl}}/v2/unknown-endpoint"
+          }
+        },
+        {
+          "name": "v2 graphql (deprecated path)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "basic"
+            },
+            "url": "{{baseUrl}}/v2/graphql",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { users { id email } }"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mobile BFF (iOS + Android)",
+      "item": [
+        {
+          "name": "Home feed",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/feed?version=3",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Home feed v2 fallback",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/feed?version=2",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Product carousel",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/home/carousel",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Promo banner",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/home/promo",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Cart summary",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/cart/summary",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Add to cart",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/cart/items",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sku\":\"SKU-1\",\"qty\":1}"
+            }
+          }
+        },
+        {
+          "name": "Checkout preview",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/checkout/preview",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Place order",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/checkout/submit",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"paymentMethod\":\"apple_pay\"}"
+            }
+          }
+        },
+        {
+          "name": "Push token register",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/push/register",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{deviceToken}}\"}"
+            }
+          }
+        },
+        {
+          "name": "Push preferences",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/push/preferences",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Experiment flags",
+          "request": {
+            "method": "HEAD",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/experiments/active",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Deep link resolver",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/deeplink/resolve?url={{deeplink}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "iOS only",
+          "item": [
+            {
+              "name": "StoreKit receipt validate",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/bff/mobile/ios/receipt/validate",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"receipt\":\"base64...\"}"
+                }
+              }
+            },
+            {
+              "name": "App Store review mode",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/bff/mobile/ios/review-mode",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Android FCM topic subscribe",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/bff/mobile/android/fcm/subscribe",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"topic\":\"promos\"}"
+            }
+          }
+        },
+        {
+          "name": "Feed WebSocket handshake",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "wss://realtime.acme-corp.io/bff/feed",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Checkout OPTIONS",
+          "request": {
+            "method": "OPTIONS",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/bff/mobile/checkout/preview"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Internal Admin & Ops",
+      "item": [
+        {
+          "name": "Dashboard",
+          "item": [
+            {
+              "name": "Ops overview",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "ops_ro"
+                    },
+                    {
+                      "key": "password",
+                      "value": "readonly-2024"
+                    }
                   ]
+                },
+                "url": "{{baseUrl}}/internal/admin/dashboard/overview"
+              }
+            },
+            {
+              "name": "Metrics",
+              "item": [
+                {
+                  "name": "Daily rollup",
+                  "item": [
+                    {
+                      "name": "By region",
+                      "item": [
+                        {
+                          "name": "EU daily metrics",
+                          "request": {
+                            "method": "PATCH",
+                            "auth": {
+                              "type": "noauth"
+                            },
+                            "url": "{{baseUrl}}/internal/admin/metrics/daily/eu"
+                          }
+                        },
+                        {
+                          "name": "US daily metrics",
+                          "request": {
+                            "method": "DELETE",
+                            "auth": {
+                              "type": "basic"
+                            },
+                            "url": "{{baseUrl}}/internal/admin/metrics/daily/us"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "Global daily",
+                      "request": {
+                        "method": "DELETE",
+                        "auth": {
+                          "type": "apikey"
+                        },
+                        "url": "{{baseUrl}}/internal/admin/metrics/daily/global",
+                        "header": [
+                          {
+                            "key": "X-Api-Key",
+                            "value": "{{apiKey}}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Audit Logs",
+          "item": [
+            {
+              "name": "Search audit events",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/internal/admin/audit/search?q=login",
+                "header": [
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Exports",
+              "item": [
+                {
+                  "name": "archive 2024",
+                  "item": [
+                    {
+                      "name": "Q1",
+                      "item": [
+                        {
+                          "name": "Download Q1 audit export",
+                          "request": {
+                            "method": "PATCH",
+                            "auth": {
+                              "type": "basic"
+                            },
+                            "url": "{{baseUrl}}/internal/admin/audit/exports/2024/q1.csv"
+                          }
+                        },
+                        {
+                          "name": "Regenerate Q1 export",
+                          "request": {
+                            "method": "GET",
+                            "auth": {
+                              "type": "basic"
+                            },
+                            "url": "{{baseUrl}}/internal/admin/audit/exports/2024/q1/regenerate",
+                            "header": [
+                              {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                              }
+                            ],
+                            "body": {
+                              "mode": "raw",
+                              "raw": "{\"reason\":\"compliance\"}"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Support Tools",
+          "item": [
+            {
+              "name": "Impersonate user",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "support_lead"
+                    },
+                    {
+                      "key": "password",
+                      "value": "break-glass"
+                    }
+                  ]
+                },
+                "url": "{{baseUrl}}/internal/admin/support/impersonate",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"userId\":\"{{userId}}\"}"
+                }
+              }
+            },
+            {
+              "name": "Force password reset",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/internal/admin/support/users/{{userId}}/reset-password",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"notify\":false}"
+                }
+              }
+            },
+            {
+              "name": "Purge user cache",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/internal/admin/support/cache/purge",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"userId\":\"{{userId}}\"}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Kill switch — payments",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic"
+            },
+            "url": "{{baseUrl}}/internal/admin/ops/kill-switch/payments",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"enabled\":true}"
+            }
+          }
+        },
+        {
+          "name": "Audit export gRPC",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "ops_ro"
+                },
+                {
+                  "key": "password",
+                  "value": "readonly-2024"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/internal/admin/grpc/audit.AuditService/Export",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Protocol",
+                "value": "grpc"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"format\":\"csv\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Partner Integrations",
+      "item": [
+        {
+          "name": "OAuth authorize",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "apikey"
+            },
+            "url": "{{baseUrl}}/partners/oauth/authorize?client_id={{clientId}}",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{apiKey}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "OAuth token exchange",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "oauth2"
+            },
+            "url": "{{baseUrl}}/partners/oauth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"grant_type\":\"authorization_code\",\"code\":\"{{authCode}}\"}"
+            }
+          }
+        },
+        {
+          "name": "OAuth revoke",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "oauth2"
+            },
+            "url": "{{baseUrl}}/partners/oauth/revoke",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{token}}\"}"
+            }
+          }
+        },
+        {
+          "name": "Merchants",
+          "item": [
+            {
+              "name": "Create merchant",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/partners/merchants",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"legalName\":\"Acme LLC\"}"
+                }
+              }
+            },
+            {
+              "name": "Onboarding",
+              "item": [
+                {
+                  "name": "KYC",
+                  "item": [
+                    {
+                      "name": "Documents",
+                      "item": [
+                        {
+                          "name": "Upload KYC document",
+                          "request": {
+                            "method": "PUT",
+                            "auth": {
+                              "type": "apikey"
+                            },
+                            "url": "{{baseUrl}}/partners/merchants/{{merchantId}}/kyc/documents",
+                            "header": [
+                              {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                              },
+                              {
+                                "key": "X-Api-Key",
+                                "value": "{{apiKey}}"
+                              }
+                            ],
+                            "body": {
+                              "mode": "raw",
+                              "raw": "{\"type\":\"passport\",\"url\":\"https://...\"}"
+                            }
+                          }
+                        },
+                        {
+                          "name": "Verify KYC status",
+                          "request": {
+                            "method": "GET",
+                            "auth": {
+                              "type": "apikey"
+                            },
+                            "url": "{{baseUrl}}/partners/merchants/{{merchantId}}/kyc/status",
+                            "header": [
+                              {
+                                "key": "X-Api-Key",
+                                "value": "{{apiKey}}"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "Submit onboarding",
+                      "request": {
+                        "method": "POST",
+                        "auth": {
+                          "type": "oauth2"
+                        },
+                        "url": "{{baseUrl}}/partners/merchants/{{merchantId}}/onboarding/submit"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "List merchant payouts",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/partners/merchants/{{merchantId}}/payouts"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sandbox",
+          "item": [
+            {
+              "name": "Seed sandbox data",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/partners/sandbox/seed",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"profile\":\"default\"}"
+                }
+              }
+            },
+            {
+              "name": "Reset sandbox",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/partners/sandbox/reset",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"confirm\":true}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Partner MCP initialize",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "oauth2"
+            },
+            "url": "{{baseUrl}}/partners/mcp/rpc",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Protocol",
+                "value": "mcp"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy Monolith — DO NOT USE",
+      "item": [
+        {
+          "name": "GET /ping",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/ping"
+          }
+        },
+        {
+          "name": "POST /sync/accounts",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "batch"
+                },
+                {
+                  "key": "password",
+                  "value": "batch123"
+                }
+              ]
+            },
+            "url": "http://legacy-internal.example.net/sync/accounts",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"full\":true}"
+            }
+          }
+        },
+        {
+          "name": "GET /accounts/list",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/accounts/list"
+          }
+        },
+        {
+          "name": "GET /accounts/list (copy)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/accounts/list"
+          }
+        },
+        {
+          "name": "cron job 1",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-1"
+          }
+        },
+        {
+          "name": "cron job 2",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-2"
+          }
+        },
+        {
+          "name": "cron job 3",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-3"
+          }
+        },
+        {
+          "name": "cron job 4",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-4"
+          }
+        },
+        {
+          "name": "cron job 5",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-5"
+          }
+        },
+        {
+          "name": "cron job 6",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-6"
+          }
+        },
+        {
+          "name": "cron job 7",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "apikey"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-7",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{apiKey}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cron job 8",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-8"
+          }
+        },
+        {
+          "name": "cron job 9",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "basic"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-9"
+          }
+        },
+        {
+          "name": "cron job 10",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-10"
+          }
+        },
+        {
+          "name": "cron job 11",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-11"
+          }
+        },
+        {
+          "name": "cron job 12",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/cron/job-12"
+          }
+        },
+        {
+          "name": "HEAD /ping",
+          "request": {
+            "method": "HEAD",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/ping"
+          }
+        },
+        {
+          "name": "OPTIONS /accounts",
+          "request": {
+            "method": "OPTIONS",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "http://legacy-internal.example.net/accounts/list"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Copy of Copy of Webhooks",
+      "item": [
+        {
+          "name": "incoming",
+          "item": [
+            {
+              "name": "Stripe payment succeeded",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/hooks/stripe/payment-succeeded",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"id\":\"evt_1\"}"
+                }
+              }
+            },
+            {
+              "name": "stripe payment succeeded",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/hooks/stripe/payment-succeeded",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"id\":\"evt_1\"}"
+                }
+              }
+            },
+            {
+              "name": "incoming",
+              "item": [
+                {
+                  "name": "Duplicate nested incoming handler",
+                  "request": {
+                    "method": "POST",
+                    "auth": {
+                      "type": "noauth"
+                    },
+                    "url": "{{baseUrl}}/hooks/incoming/generic",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\"source\":\"unknown\"}"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "retry queue",
+          "item": [
+            {
+              "name": "List stuck jobs",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/hooks/retry/stuck"
+              }
+            },
+            {
+              "name": "Retry all stuck",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/hooks/retry/stuck/replay-all",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"maxAgeHours\":24}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "dead letter",
+          "item": [
+            {
+              "name": "Peek dead letter",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/hooks/dlq/peek"
+              }
+            },
+            {
+              "name": "Replay dead letter item",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/hooks/dlq/{{messageId}}/replay",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Root webhook test",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/hooks/test",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ping\":true}"
+            }
+          }
+        },
+        {
+          "name": "Webhook endpoint HEAD",
+          "request": {
+            "method": "HEAD",
+            "auth": {
+              "type": "apikey"
+            },
+            "url": "{{baseUrl}}/hooks/test",
+            "header": [
+              {
+                "key": "X-Api-Key",
+                "value": "{{apiKey}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "_scratch / WIP / untitled",
+      "item": [
+        {
+          "name": "empty folder — ignore",
+          "item": [
+            {
+              "name": "also empty",
+              "item": []
+            }
+          ]
+        },
+        {
+          "name": "does this work??",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer"
+            },
+            "url": "{{baseUrl}}/wip/test/ping",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "DELETE ME",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "https://api.example.com/debug/{{randomId}}"
+          }
+        },
+        {
+          "name": "jason experiments",
+          "item": [
+            {
+              "name": "graphql attempt",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/wip/graphql",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query { users { id name } }"
+                  }
+                }
+              }
+            },
+            {
+              "name": "websocket???",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "wss://wip.acme-corp.io/ws/handshake"
+              }
+            },
+            {
+              "name": "MCP tools/call (wip)",
+              "request": {
+                "method": "MCP",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/wip/mcp",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"ping\"}}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "TODO rename",
+          "item": [
+            {
+              "name": "untitled request 47",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/wip/unknown/47"
+              }
+            }
+          ]
+        },
+        {
+          "name": "orphan POST at root",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/wip/orphan",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"note\":\"forgot context\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Possible Duplicates (review queue)",
+      "item": [
+        {
+          "name": "Same URL — different names",
+          "item": [
+            {
+              "name": "List orders",
+              "request": {
+                "method": "PUT",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/orders?page=1",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "list orders",
+              "request": {
+                "method": "PUT",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/v3/orders?page=1"
+              }
+            },
+            {
+              "name": "GET orders (Sarah copy)",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v3/orders?page=1"
+              }
+            },
+            {
+              "name": "Fetch user profile",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v3/users/{{userId}}"
+              }
+            },
+            {
+              "name": "Get User Profile",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/v3/users/{{userId}}"
+              }
+            },
+            {
+              "name": "get user profile v2",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/v3/users/{{userId}}",
+                "header": [
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Create webhook endpoint",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/hooks/register"
+              }
+            },
+            {
+              "name": "create webhook endpoint",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/hooks/register",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Webhook register (duplicate)",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/hooks/register"
+              }
+            },
+            {
+              "name": "Search products",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v3/products?q=notebook"
+              }
+            },
+            {
+              "name": "search products",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/v3/products?q=notebook",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Product search - backup",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v3/products?q=notebook"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same name — different URLs",
+          "item": [
+            {
+              "name": "Health check",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/health"
+              }
+            },
+            {
+              "name": "Health check",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/v3/health"
+              }
+            },
+            {
+              "name": "Health check",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "https://staging.api.acme-corp.io/health"
+              }
+            },
+            {
+              "name": "Health check",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "http://legacy-internal.example.net/health"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Copy-paste drift",
+          "item": [
+            {
+              "name": "Update order status",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/v3/orders/{{orderId}}",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"status\":\"shipped\"}"
+                }
+              }
+            },
+            {
+              "name": "Update order status (Copy)",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "basic"
+                },
+                "url": "{{baseUrl}}/v3/orders/{{orderId}}",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"status\":\"SHIPPED\"}"
+                }
+              }
+            },
+            {
+              "name": "Update order status (Copy 2)",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/v3/orders/{{orderId}}?notify=true",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"status\":\"shipped\"}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Extra Deep Nesting (stress test)",
+      "item": [
+        {
+          "name": "Level 1 — migrated export",
+          "item": [
+            {
+              "name": "Level 2 — old team folder",
+              "item": [
+                {
+                  "name": "Level 3 — Q4 cleanup",
+                  "item": [
+                    {
+                      "name": "Level 4 — billing sub-tree",
+                      "item": [
+                        {
+                          "name": "Level 5 — invoices branch",
+                          "item": [
+                            {
+                              "name": "Level 6 — line items",
+                              "item": [
+                                {
+                                  "name": "Level 7 — tax overrides",
+                                  "item": [
+                                    {
+                                      "name": "Level 8 — jurisdiction rules",
+                                      "item": [
+                                        {
+                                          "name": "Apply EU VAT rule",
+                                          "request": {
+                                            "method": "POST",
+                                            "auth": {
+                                              "type": "basic"
+                                            },
+                                            "url": "{{baseUrl}}/archive/deep/invoices/{{invoiceId}}/tax/eu/vat",
+                                            "header": [
+                                              {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                              }
+                                            ],
+                                            "body": {
+                                              "mode": "raw",
+                                              "raw": "{\"rate\":0.2}"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "name": "Apply US sales tax rule",
+                                          "request": {
+                                            "method": "DELETE",
+                                            "auth": {
+                                              "type": "basic"
+                                            },
+                                            "url": "{{baseUrl}}/archive/deep/invoices/{{invoiceId}}/tax/us/sales",
+                                            "header": [
+                                              {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                              }
+                                            ],
+                                            "body": {
+                                              "mode": "raw",
+                                              "raw": "{\"state\":\"CA\"}"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "name": "List tax overrides",
+                                      "request": {
+                                        "method": "GET",
+                                        "auth": {
+                                          "type": "noauth"
+                                        },
+                                        "url": "{{baseUrl}}/archive/deep/invoices/{{invoiceId}}/tax/overrides"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "Bulk update line items",
+                                  "request": {
+                                    "method": "POST",
+                                    "auth": {
+                                      "type": "basic"
+                                    },
+                                    "url": "{{baseUrl}}/archive/deep/invoices/{{invoiceId}}/lines/bulk",
+                                    "header": [
+                                      {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                      }
+                                    ],
+                                    "body": {
+                                      "mode": "raw",
+                                      "raw": "{\"ops\":[]}"
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "name": "Get invoice PDF",
+                              "request": {
+                                "method": "POST",
+                                "auth": {
+                                  "type": "basic"
+                                },
+                                "url": "{{baseUrl}}/archive/deep/invoices/{{invoiceId}}/pdf"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "name": "Archive old invoices",
+                          "request": {
+                            "method": "GET",
+                            "auth": {
+                              "type": "basic"
+                            },
+                            "url": "{{baseUrl}}/archive/deep/invoices/archive",
+                            "header": [
+                              {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                              }
+                            ],
+                            "body": {
+                              "mode": "raw",
+                              "raw": "{\"before\":\"2023-01-01\"}"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "name": "Legacy report stub",
+                      "request": {
+                        "method": "PUT",
+                        "auth": {
+                          "type": "apikey"
+                        },
+                        "url": "{{baseUrl}}/archive/deep/reports/legacy/stub",
+                        "header": [
+                          {
+                            "key": "X-Api-Key",
+                            "value": "{{apiKey}}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "name": "Orphan in level 2",
+                  "request": {
+                    "method": "PUT",
+                    "auth": {
+                      "type": "apikey"
+                    },
+                    "url": "{{baseUrl}}/archive/deep/orphan/l2",
+                    "header": [
+                      {
+                        "key": "X-Api-Key",
+                        "value": "{{apiKey}}"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Root of deep tree ping",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/archive/deep/ping",
+                "header": [
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Wide + deep hybrid",
+          "item": [
+            {
+              "name": "branch A",
+              "item": [
+                {
+                  "name": "A1",
+                  "item": [
+                    {
+                      "name": "A1a",
+                      "item": [
+                        {
+                          "name": "Deep leaf A1a",
+                          "request": {
+                            "method": "GET",
+                            "auth": {
+                              "type": "basic"
+                            },
+                            "url": "{{baseUrl}}/archive/deep/wide/a/1/a"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "branch B",
+              "item": [
+                {
+                  "name": "B1",
+                  "item": [
+                    {
+                      "name": "B1a",
+                      "item": [
+                        {
+                          "name": "B1a-i",
+                          "item": [
+                            {
+                              "name": "Deep leaf B1a-i",
+                              "request": {
+                                "method": "PATCH",
+                                "auth": {
+                                  "type": "apikey"
+                                },
+                                "url": "{{baseUrl}}/archive/deep/wide/b/1/a/i",
+                                "header": [
+                                  {
+                                    "key": "X-Api-Key",
+                                    "value": "{{apiKey}}"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "branch C",
+              "item": [
+                {
+                  "name": "Shallow leaf C",
+                  "request": {
+                    "method": "PATCH",
+                    "auth": {
+                      "type": "apikey"
+                    },
+                    "url": "{{baseUrl}}/archive/deep/wide/c/shallow",
+                    "header": [
+                      {
+                        "key": "X-Api-Key",
+                        "value": "{{apiKey}}"
+                      }
+                    ]
+                  }
                 }
               ]
             }
@@ -59,24 +2546,312 @@
       ]
     },
     {
-      "name": "Misc",
+      "name": "Mixed Protocols Dump (imported)",
       "item": [
-        { "name": "upload-file", "request": { "method": "POST", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/files/upload" } },
-        { "name": "download-report", "request": { "method": "GET", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/reports/monthly?month=2026-01" } },
-        { "name": "internal-debug", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": "http://localhost:3001/debug/state" } },
-        { "name": "OPTIONS check", "request": { "method": "OPTIONS", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/users" } },
-        { "name": "HEAD ping", "request": { "method": "HEAD", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/ping" } },
-        { "name": "sync-cache-now", "request": { "method": "POST", "auth": { "type": "bearer" }, "url": "{{baseUrl}}/ops/cache/sync" } },
-        { "name": "full-reindex", "request": { "method": "POST", "auth": { "type": "oauth2" }, "url": "{{baseUrl}}/ops/search/reindex" } }
-      ]
-    },
-    {
-      "name": "Experimental",
-      "item": [
-        { "name": "graphQL-ish", "request": { "method": "POST", "auth": { "type": "apikey" }, "url": "{{baseUrl}}/graphql" } },
-        { "name": "trace-route", "request": { "method": "TRACE", "auth": { "type": "noauth" }, "url": "{{baseUrl}}/network/trace" } },
-        { "name": "connect-proxy", "request": { "method": "CONNECT", "auth": { "type": "basic" }, "url": "{{baseUrl}}/proxy/tunnel" } },
-        { "name": "legacy-batch-export", "request": { "method": "GET", "auth": { "type": "basic" }, "url": "{{legacyHost}}/batch/export?format=csv" } }
+        {
+          "name": "HTTP edge cases",
+          "item": [
+            {
+              "name": "Global HEAD health",
+              "request": {
+                "method": "HEAD",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/health"
+              }
+            },
+            {
+              "name": "API gateway OPTIONS",
+              "request": {
+                "method": "OPTIONS",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "{{baseUrl}}/v3/users",
+                "header": [
+                  {
+                    "key": "Access-Control-Request-Method",
+                    "value": "PATCH"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "CDN asset HEAD",
+              "request": {
+                "method": "HEAD",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "https://cdn.acme-corp.io/assets/logo.png"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GraphQL misc",
+          "item": [
+            {
+              "name": "Search orders GQL",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/graphql",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "graphql",
+                  "graphql": {
+                    "query": "query($q: String!) { orders(search: $q) { id total } }",
+                    "variables": "{\"q\":\"open\"}"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Admin schema dump",
+              "request": {
+                "method": "GRAPHQL",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/admin/graphql",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"query\":\"query { __schema { types { name kind } } }\"}"
+                }
+              }
+            },
+            {
+              "name": "Legacy GQL via POST",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/v2/graphql",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"query\":\"mutation { ping }\"}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "MCP + agents",
+          "item": [
+            {
+              "name": "tools/list",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/agent/mcp",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Protocol",
+                    "value": "mcp"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}"
+                }
+              }
+            },
+            {
+              "name": "tools/call export_users",
+              "request": {
+                "method": "MCP",
+                "auth": {
+                  "type": "oauth2"
+                },
+                "url": "{{baseUrl}}/agent/mcp/rpc",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"export_users\"}}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "gRPC stubs",
+          "item": [
+            {
+              "name": "UserService/GetUser",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/grpc/users.UserService/GetUser",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Protocol",
+                    "value": "grpc"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"user_id\":\"{{userId}}\"}"
+                }
+              }
+            },
+            {
+              "name": "BillingService/ListInvoices",
+              "request": {
+                "method": "GRPC",
+                "auth": {
+                  "type": "apikey"
+                },
+                "url": "{{baseUrl}}/grpc/billing.BillingService/ListInvoices",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Api-Key",
+                    "value": "{{apiKey}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"page\":1}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Realtime",
+          "item": [
+            {
+              "name": "Notifications SSE",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "{{baseUrl}}/notifications/stream",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "text/event-stream"
+                  },
+                  {
+                    "key": "X-Protocol",
+                    "value": "sse"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Order updates WebSocket",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer"
+                },
+                "url": "wss://realtime.acme-corp.io/orders",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Debug WS (no auth)",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": "ws://localhost:9090/debug"
+              }
+            }
+          ]
+        },
+        {
+          "name": "orphan GraphQL at section root",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/graphql",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { ping }"
+              }
+            }
+          }
+        }
       ]
     }
   ]

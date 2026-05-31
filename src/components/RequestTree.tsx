@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CaretRight, Lock, LockOpen, Folder, FolderOpen } from '@phosphor-icons/react'
-import { MethodBadge } from './MethodBadge'
+import { RequestBadges } from './RequestBadges'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
@@ -31,7 +31,7 @@ function RequestRow({
       className="h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 font-normal transition-all duration-200 hover:bg-muted/80 group"
       onClick={() => onSelect(request)}
     >
-      <MethodBadge method={request.method} />
+      <RequestBadges request={request} />
       <span className="min-w-0 flex-1 truncate text-left text-sm">{request.name}</span>
       {hasAuth ? (
         <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success))] opacity-60 group-hover:opacity-100 transition-opacity" />

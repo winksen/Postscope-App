@@ -1,11 +1,15 @@
 import type { PostmanAuth, PostmanCollection, PostmanItem } from '../types/postman'
+import { detectRequestProtocol, type RequestProtocol } from './requestProtocol'
 
 const VARIABLE_REGEX = /\{\{(\w+)\}\}/g
+
+export type { RequestProtocol }
 
 export interface ParsedRequest {
   id: string;
   name: string;
   method: string;
+  protocol: RequestProtocol;
   url: string;
   folderPath: string[];
   auth: string;
@@ -89,8 +93,17 @@ function parseItem(
     const basicAuth = auth === 'basic' ? getBasicAuthCreds(req.auth) : undefined;
 
     const bodyRaw = req.body?.raw ?? req.body?.urlencoded?.map((e) => `${e.key}=${e.value}`).join('&');
+    const graphqlQuery = req.body?.graphql?.query;
+    const protocol = detectRequestProtocol({
+      method,
+      url,
+      headers: req.header || [],
+      bodyMode: req.body?.mode,
+      bodyRaw: bodyRaw || graphqlQuery,
+      graphqlQuery,
+    });
 
-    const allText = [url, headers.map((h) => h.key + h.value).join(''), bodyRaw || ''].join(' ');
+    const allText = [url, headers.map((h) => h.key + h.value).join(''), bodyRaw || graphqlQuery || ''].join(' ');
     const vars = extractVariables(allText);
     vars.forEach((v) => acc.variables.add(v));
 
@@ -106,6 +119,7 @@ function parseItem(
       id,
       name: item.name,
       method,
+      protocol,
       url,
       folderPath,
       auth,

@@ -21,8 +21,8 @@ const SAMPLE_COLLECTIONS = [
   },
   {
     id: 'messy-large',
-    label: 'Messy / large sample',
-    description: 'Many endpoints, mixed naming, and nested folders',
+    label: 'Enterprise messy demo',
+    description: '140+ requests, duplicates, deep nesting, uneven auth/method mix',
     path: '/samples/messy-large.postman_collection.json',
     filename: 'sample-messy-large.postman_collection.json',
   },

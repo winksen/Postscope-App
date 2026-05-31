@@ -101,6 +101,26 @@
             "url": "{{baseUrl}}/users/42",
             "description": "Remove user"
           }
+        },
+        {
+          "name": "User exists (HEAD)",
+          "request": {
+            "method": "HEAD",
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/users/42"
+          }
+        },
+        {
+          "name": "CORS preflight users",
+          "request": {
+            "method": "OPTIONS",
+            "auth": { "type": "noauth" },
+            "header": [
+              { "key": "Origin", "value": "https://app.example.com" },
+              { "key": "Access-Control-Request-Method", "value": "POST" }
+            ],
+            "url": "{{baseUrl}}/users"
+          }
         }
       ]
     },
@@ -133,6 +153,14 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/products",
             "body": { "mode": "raw", "raw": "{\"name\":\"Notebook\",\"price\":19.99}" }
+          }
+        },
+        {
+          "name": "Products catalog preflight",
+          "request": {
+            "method": "OPTIONS",
+            "auth": { "type": "noauth" },
+            "url": "{{baseUrl}}/products"
           }
         }
       ]
@@ -175,6 +203,101 @@
             "method": "POST",
             "auth": { "type": "basic" },
             "url": "https://legacy.example.com/sync/accounts"
+          }
+        }
+      ]
+    },
+    {
+      "name": "GraphQL and Realtime",
+      "item": [
+        {
+          "name": "List users (GraphQL)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListUsers($limit: Int!) { users(limit: $limit) { id name email } }",
+                "variables": "{\"limit\": 20}"
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order mutation",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer" },
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"query\":\"mutation CreateOrder($input: OrderInput!) { createOrder(input: $input) { id } }\",\"variables\":{\"input\":{\"sku\":\"NB-1\"}}}"
+            }
+          }
+        },
+        {
+          "name": "Live feed (WebSocket)",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer" },
+            "url": "wss://realtime.example.com/ws/feed?token={{token}}"
+          }
+        },
+        {
+          "name": "Activity stream (SSE)",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer" },
+            "header": [
+              { "key": "Accept", "value": "text/event-stream" },
+              { "key": "X-Protocol", "value": "sse" }
+            ],
+            "url": "{{baseUrl}}/events/stream"
+          }
+        },
+        {
+          "name": "MCP tools/list",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "apikey" },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Protocol", "value": "mcp" }
+            ],
+            "url": "{{baseUrl}}/mcp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}"
+            }
+          }
+        },
+        {
+          "name": "GetUser gRPC",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer" },
+            "header": [
+              { "key": "Content-Type", "value": "application/grpc" },
+              { "key": "X-Protocol", "value": "grpc" }
+            ],
+            "url": "{{baseUrl}}/grpc/users.UserService/GetUser",
+            "body": { "mode": "raw", "raw": "{\"user_id\":\"42\"}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health probes",
+      "item": [
+        {
+          "name": "API HEAD health",
+          "request": {
+            "method": "HEAD",
+            "auth": { "type": "noauth" },
+            "url": "{{baseUrl}}/health"
           }
         }
       ]

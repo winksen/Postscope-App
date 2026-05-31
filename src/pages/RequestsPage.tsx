@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MethodBadge } from '@/components/MethodBadge'
+import { RequestBadges } from '@/components/RequestBadges'
 import type { ParsedCollection, ParsedRequest } from '@/lib/parser'
 import { cn } from '@/lib/utils'
 
@@ -64,7 +64,8 @@ function requestMatches(req: ParsedRequest, q: string): boolean {
   return (
     req.name.toLowerCase().includes(query) ||
     req.url.toLowerCase().includes(query) ||
-    req.method.toLowerCase().includes(query)
+    req.method.toLowerCase().includes(query) ||
+    req.protocol.toLowerCase().includes(query)
   )
 }
 
@@ -144,7 +145,11 @@ function RequestRow({
       )}
       onClick={() => onSelect(request)}
     >
-      <MethodBadge method={request.method} className={active ? 'bg-white/20 text-white shadow-none' : ''} />
+      <RequestBadges
+        request={request}
+        methodClassName={active ? 'bg-white/20 text-white shadow-none' : ''}
+        protocolClassName={active ? 'bg-white/15 text-white border-white/30' : ''}
+      />
       <span className="truncate">{request.name}</span>
     </Button>
   )
@@ -284,7 +289,7 @@ export function RequestsPage({
             {selected ? (
               <>
                 <div className="flex items-center gap-2">
-                  <MethodBadge method={selected.method} />
+                  <RequestBadges request={selected} />
                   <CardTitle className="truncate text-base">{selected.name}</CardTitle>
                 </div>
                 <CardDescription className="truncate">
