@@ -83,12 +83,16 @@ export function MarketingGitHubLink() {
 export function MarketingHeader({ actions }: MarketingHeaderProps) {
   return (
     <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
-      <div className="flex items-center gap-2">
+      <Link
+        to="/"
+        className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="PostScope home"
+      >
         <div className="flex h-10 w-10 items-center justify-center text-orange-400">
           <Stethoscope className="h-8 w-8" weight="fill" />
         </div>
         <p className="text-sm font-semibold tracking-tight">PostScope</p>
-      </div>
+      </Link>
       <div className="flex items-center gap-2">
         <ThemeToggle />
         <MarketingGitHubLink />

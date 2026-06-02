@@ -42,9 +42,10 @@ import type { NavId } from '../components/layout/app-sidebar'
 
 interface AnalyzeAppProps {
   loggingMode: LoggingMode
+  samplesPath?: string
 }
 
-export function AnalyzeApp({ loggingMode }: AnalyzeAppProps) {
+export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeAppProps) {
   const [parsed, setParsed] = useState<ParsedCollection | null>(null)
   const [findings, setFindings] = useState<Finding[]>([])
   const [rawJson, setRawJson] = useState<string | null>(null)
@@ -261,6 +262,7 @@ export function AnalyzeApp({ loggingMode }: AnalyzeAppProps) {
           savedCollections={teamLibraryVisible ? savedCollections : []}
           onOpenLibrary={teamLibraryVisible ? () => setLibraryOpen(true) : undefined}
           onLoadSaved={teamLibraryVisible ? (id) => void handleLoadFromLibrary(id) : undefined}
+          samplesPath={samplesPath}
         />
         {teamLibraryVisible && (
           <CollectionLibraryModal

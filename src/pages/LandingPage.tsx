@@ -71,7 +71,7 @@ export function LandingPage() {
               </Link>
             </Button>
             <Button size="lg" variant="secondary" asChild>
-              <Link to="/analyze">Try a sample collection</Link>
+              <Link to="/samples">Try a sample collection</Link>
             </Button>
           </div>
         </section>

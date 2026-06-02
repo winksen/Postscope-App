@@ -1,19 +1,15 @@
 import { useCallback, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { UploadSimple, FileCode, ShieldCheck, Lightning, ChartBar, Clock, ClockCounterClockwise, EyeSlash, Warning, CloudArrowUp } from '@phosphor-icons/react'
+import { UploadSimple, FileCode, ShieldCheck, Clock, ClockCounterClockwise, EyeSlash, Warning, CloudArrowUp, ArrowRight } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { formatSavedAt, type SavedCollectionMeta } from '@/lib/collectionLibrary'
-import {
-  FeatureCard,
-  MarketingBackground,
-  MarketingHeader,
-} from '@/components/marketing/marketing-shell'
+import { MarketingBackground, MarketingHeader } from '@/components/marketing/marketing-shell'
 import {
   canChoosePrivacyMode,
   getPrivacyModeDescription,
@@ -37,38 +33,8 @@ interface DropZoneProps {
   savedCollections?: SavedCollectionMeta[]
   onOpenLibrary?: () => void
   onLoadSaved?: (id: string) => void
+  samplesPath?: string
 }
-
-const SAMPLE_COLLECTIONS = [
-  {
-    id: 'default',
-    label: 'Default sample',
-    description: 'Balanced API collection with clean structure',
-    path: '/samples/default.postman_collection.json',
-    filename: 'sample-default.postman_collection.json',
-  },
-  {
-    id: 'messy-large',
-    label: 'Enterprise messy demo',
-    description: '140+ requests, duplicates, deep nesting, uneven auth/method mix',
-    path: '/samples/messy-large.postman_collection.json',
-    filename: 'sample-messy-large.postman_collection.json',
-  },
-  {
-    id: 'secrets-auth',
-    label: 'Secrets + auth sample',
-    description: 'Contains exposed secrets and varied auth schemes',
-    path: '/samples/secrets-auth.postman_collection.json',
-    filename: 'sample-secrets-auth.postman_collection.json',
-  },
-  {
-    id: 'security-issues',
-    label: 'Security issues sample',
-    description: 'Intentionally vulnerable collection with many findings',
-    path: '/samples/security-issues.postman_collection.json',
-    filename: 'sample-security-issues.postman_collection.json',
-  },
-] as const
 
 export function DropZone({
   onFile,
@@ -81,9 +47,9 @@ export function DropZone({
   savedCollections = [],
   onOpenLibrary,
   onLoadSaved,
+  samplesPath = '/samples',
 }: DropZoneProps) {
   const [drag, setDrag] = useState(false)
-  const [sampleId, setSampleId] = useState<(typeof SAMPLE_COLLECTIONS)[number]['id']>('default')
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -115,16 +81,6 @@ export function DropZone({
     },
     [onFile]
   )
-
-  const handleLoadSample = useCallback(() => {
-    const selected = SAMPLE_COLLECTIONS.find((s) => s.id === sampleId) ?? SAMPLE_COLLECTIONS[0]
-    fetch(selected.path)
-      .then((r) => r.json())
-      .then((json) => {
-        const blob = new Blob([JSON.stringify(json)], { type: 'application/json' })
-        onFile(new File([blob], selected.filename))
-      })
-  }, [onFile, sampleId])
 
   const importBlocked =
     canChoosePrivacyMode(loggingMode) &&
@@ -364,31 +320,12 @@ export function DropZone({
                         />
                       </label>
                     </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleLoadSample}
-                      disabled={importBlocked}
-                    >
-                      Preview sample
+                    <Button variant="secondary" asChild>
+                      <Link to={samplesPath}>
+                        Try sample collections
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
                     </Button>
-                  </div>
-                  <div className="w-full max-w-sm space-y-2">
-                    <Select value={sampleId} onValueChange={(v) => setSampleId(v as (typeof SAMPLE_COLLECTIONS)[number]['id'])}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Choose sample collection" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SAMPLE_COLLECTIONS.map((sample) => (
-                          <SelectItem key={sample.id} value={sample.id}>
-                            {sample.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-center text-xs text-muted-foreground">
-                      {SAMPLE_COLLECTIONS.find((s) => s.id === sampleId)?.description}
-                    </p>
                   </div>
                 </>
               )}
@@ -441,28 +378,6 @@ export function DropZone({
             </div>
           </div>
         )}
-
-        {/* Feature highlights */}
-        <div className="mt-10 grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-3">
-          <FeatureCard
-            icon={ShieldCheck}
-            title="Privacy-first"
-            description="Parsed locally, never uploaded to any server."
-            delay={200}
-          />
-          <FeatureCard
-            icon={Lightning}
-            title="Instant analysis"
-            description="Results in milliseconds, no waiting."
-            delay={400}
-          />
-          <FeatureCard
-            icon={ChartBar}
-            title="Visual insights"
-            description="Charts and security scoring at a glance."
-            delay={600}
-          />
-        </div>
       </div>
     </div>
   )

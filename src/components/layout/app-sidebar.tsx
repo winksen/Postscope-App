@@ -1,4 +1,5 @@
 import { ChartPieSlice, Shield, Gauge, CaretLeft, CaretRight, Stethoscope, FolderSimple, type Icon } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -26,15 +27,22 @@ interface AppSidebarProps {
 export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCount }: AppSidebarProps) {
   return (
     <aside className={cn("fixed left-0 top-0 z-40 flex h-screen flex-col bg-card/95 shadow-[12px_0_36px_hsl(var(--background)/0.6)] backdrop-blur-md transition-[width] duration-200", collapsed ? "w-[72px]" : "w-60")}>
-      <div className={cn("flex h-14 items-center gap-2 px-4", collapsed && "justify-center px-2")}>
-        <div className="flex h-10 w-10 items-center justify-center text-orange-400">
-          <Stethoscope className="h-8 w-8" weight="fill" />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold tracking-tight">PostScope</p>
+      <div className={cn("flex h-14 items-center px-4", collapsed && "justify-center px-2")}>
+        <Link
+          to="/"
+          className={cn(
+            "flex min-w-0 items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            collapsed && "justify-center"
+          )}
+          aria-label="PostScope home"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center text-orange-400">
+            <Stethoscope className="h-8 w-8" weight="fill" />
           </div>
-        )}
+          {!collapsed && (
+            <p className="truncate text-sm font-semibold tracking-tight">PostScope</p>
+          )}
+        </Link>
       </div>
 
       <ScrollArea className="flex-1 px-3 py-4">

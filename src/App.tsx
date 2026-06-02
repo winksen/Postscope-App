@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { fetchAppConfig, type LoggingMode } from '@/lib/deploymentConfig'
 import { LandingPage } from '@/pages/LandingPage'
 import { AnalyzeApp } from '@/pages/AnalyzeApp'
+import { SamplesApp } from '@/pages/SamplesApp'
 
 export default function App() {
   const [loggingMode, setLoggingMode] = useState<LoggingMode>('off')
@@ -29,13 +30,15 @@ export default function App() {
         {publicLandingPage ? (
           <>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/analyze" element={<AnalyzeApp loggingMode={loggingMode} />} />
+            <Route path="/analyze" element={<AnalyzeApp loggingMode={loggingMode} samplesPath="/samples" />} />
+            <Route path="/samples" element={<SamplesApp analyzePath="/analyze" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <>
-            <Route path="/" element={<AnalyzeApp loggingMode={loggingMode} />} />
+            <Route path="/" element={<AnalyzeApp loggingMode={loggingMode} samplesPath="/samples" />} />
             <Route path="/analyze" element={<Navigate to="/" replace />} />
+            <Route path="/samples" element={<SamplesApp analyzePath="/" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         )}
