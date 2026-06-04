@@ -120,7 +120,7 @@ export function LandingPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                       <Icon className="h-5 w-5 text-primary" />
                     </div>
-                    <span className="font-mono text-xs text-muted-foreground">{step}</span>
+                    <span className="text-xs text-muted-foreground">{step}</span>
                   </div>
                   <CardTitle className="text-base">{title}</CardTitle>
                 </CardHeader>

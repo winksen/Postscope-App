@@ -310,7 +310,7 @@ export function RequestsPage({
               <>
                 <div className="space-y-1">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">URL</p>
-                  <p className="break-all rounded-lg bg-muted/60 px-3 py-2 font-mono text-xs">{selected.url}</p>
+                  <p className="break-all rounded-lg bg-muted/60 px-3 py-2 text-xs">{selected.url}</p>
                 </div>
 
                 <Separator />
@@ -338,8 +338,8 @@ export function RequestsPage({
                     <ul className="space-y-1 rounded-lg bg-muted/40 p-3">
                       {parseQueryParams(selected.url).map((param) => (
                         <li key={`${param.key}-${param.value}`} className="flex items-center justify-between gap-2 text-xs">
-                          <span className="font-mono text-foreground">{param.key}</span>
-                          <span className="font-mono text-muted-foreground">{param.value || '—'}</span>
+                          <span className="text-foreground">{param.key}</span>
+                          <span className="text-muted-foreground">{param.value || '—'}</span>
                         </li>
                       ))}
                     </ul>
@@ -355,7 +355,7 @@ export function RequestsPage({
                   {selected.headers.length > 0 ? (
                     <ul className="space-y-1 rounded-lg bg-muted/40 p-3">
                       {selected.headers.map((header) => (
-                        <li key={`${header.key}-${header.value}`} className="text-xs font-mono">
+                        <li key={`${header.key}-${header.value}`} className="text-xs">
                           <span className="text-foreground">{header.key}</span>
                           <span className="text-muted-foreground">: {header.value}</span>
                         </li>
@@ -371,7 +371,7 @@ export function RequestsPage({
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Body</p>
                   {selected.bodyRaw ? (
-                    <pre className="max-h-48 overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-xs text-muted-foreground">
+                    <pre className="max-h-48 overflow-auto rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
                       {selected.bodyRaw}
                     </pre>
                   ) : (

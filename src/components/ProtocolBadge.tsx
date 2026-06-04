@@ -27,7 +27,7 @@ export function ProtocolBadge({ protocol, className, muteHttp = true }: Protocol
     <Badge
       variant="outline"
       className={cn(
-        'font-mono text-[9px] font-semibold uppercase tracking-wide transition-all duration-200',
+        'text-[9px] font-semibold uppercase tracking-wide transition-all duration-200',
         mutedHttp ? 'bg-muted/50 text-muted-foreground/80 border-border/50' : tones,
         className
       )}

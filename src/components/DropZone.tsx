@@ -332,7 +332,7 @@ export function DropZone({
             </div>
             <p className="text-center text-xs text-muted-foreground">
               Accepts{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
                 .postman_collection.json
               </code>{' '}
               and standard exports.

@@ -21,7 +21,7 @@ export function MethodBadge({ method, className }: MethodBadgeProps) {
   const m = method.toUpperCase()
   const tones = PALETTE[m] ?? 'bg-muted text-muted-foreground border-transparent'
   return (
-    <Badge className={cn('font-mono text-[10px] font-bold transition-all duration-200', tones, className)}>
+    <Badge className={cn('text-[10px] font-bold transition-all duration-200', tones, className)}>
       {m}
     </Badge>
   )

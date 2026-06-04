@@ -88,6 +88,12 @@
     @apply bg-background font-sans text-foreground antialiased;
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
+  pre,
+  code,
+  kbd,
+  samp {
+    @apply font-sans;
+  }
 }
 
 @layer utilities {

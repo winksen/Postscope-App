@@ -8,7 +8,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Elms Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        mono: ['Elms Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',

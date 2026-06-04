@@ -115,7 +115,7 @@ export function RequestSearchModal({
                       <RequestBadges request={request} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{request.name}</p>
-                        <p className="truncate font-mono text-xs text-muted-foreground">{request.url}</p>
+                        <p className="truncate text-xs text-muted-foreground">{request.url}</p>
                         {request.folderPath.length > 0 && (
                           <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
                             <FolderSimple className="h-3 w-3 shrink-0" />
@@ -135,12 +135,12 @@ export function RequestSearchModal({
           <span>{results.length} result{results.length === 1 ? '' : 's'}</span>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1">
-              <kbd className="rounded bg-background/60 px-1 py-0.5 font-mono">↑</kbd>
-              <kbd className="rounded bg-background/60 px-1 py-0.5 font-mono">↓</kbd>
+              <kbd className="rounded bg-background/60 px-1 py-0.5">↑</kbd>
+              <kbd className="rounded bg-background/60 px-1 py-0.5">↓</kbd>
               navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded bg-background/60 px-1 py-0.5 font-mono">↵</kbd>
+              <kbd className="rounded bg-background/60 px-1 py-0.5">↵</kbd>
               open
             </span>
           </div>

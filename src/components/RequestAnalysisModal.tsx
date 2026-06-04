@@ -60,7 +60,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                   <LockOpen className="h-3 w-3" /> No auth
                 </Badge>
               )}
-              <Badge variant="secondary" className="font-mono text-[10px]">
+              <Badge variant="secondary" className="text-[10px]">
                 Health {score}/100
               </Badge>
             </div>
@@ -74,7 +74,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Folder</p>
                     <CopyButton text={request.folderPath.join(' / ')} />
                   </div>
-                  <p className="mt-1 font-mono text-sm text-primary">{request.folderPath.join(' / ')}</p>
+                  <p className="mt-1 text-sm text-primary">{request.folderPath.join(' / ')}</p>
                 </div>
               )}
 
@@ -83,7 +83,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">URL</p>
                   <CopyButton text={request.url} />
                 </div>
-                <p className="mt-1 break-all font-mono text-sm text-muted-foreground">{request.url}</p>
+                <p className="mt-1 break-all text-sm text-muted-foreground">{request.url}</p>
               </div>
 
               <div>
@@ -104,7 +104,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
               {request.headers.length > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Headers</p>
-                  <ul className="mt-2 space-y-1 rounded-lg border border-border bg-muted/40 p-3 font-mono text-xs">
+                  <ul className="mt-2 space-y-1 rounded-lg border border-border bg-muted/40 p-3 text-xs">
                     {request.headers.map((h) => (
                       <li key={h.key} className="break-all text-muted-foreground group flex items-center justify-between gap-2">
                         <span>
@@ -125,7 +125,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Body</p>
                     <CopyButton text={request.bodyRaw} />
                   </div>
-                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/40 p-3 font-mono text-xs text-muted-foreground">
+                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
                     {request.bodyRaw}
                   </pre>
                 </div>
@@ -158,7 +158,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <SeverityBadge severity={f.severity} />
-                          <span className="font-mono text-[10px] text-muted-foreground">{f.category.toUpperCase()}</span>
+                          <span className="text-[10px] text-muted-foreground">{f.category.toUpperCase()}</span>
                         </div>
                         <p className="mt-2 text-sm font-medium">{f.title}</p>
                         <p className="mt-1 text-sm text-muted-foreground">{f.description}</p>

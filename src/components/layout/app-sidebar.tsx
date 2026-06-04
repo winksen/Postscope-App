@@ -1,4 +1,6 @@
-import { ChartPieSlice, Shield, Gauge, CaretLeft, CaretRight, Stethoscope, FolderSimple, type Icon } from "@phosphor-icons/react";
+import type { ElementType } from "react";
+import { ChartPieSlice, Shield, Gauge, CaretLeft, CaretRight, Stethoscope, FolderSimple } from "@phosphor-icons/react";
+import { Wrench as LucideWrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,12 +9,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-export type NavId = "overview" | "requests" | "security" | "score";
+export type NavId = "overview" | "requests" | "security" | "repair" | "score";
 
-const nav: { id: NavId; label: string; icon: Icon; badge?: number }[] = [
+type SidebarIcon = ElementType;
+
+const RepairIcon: SidebarIcon = ({ className }) => <LucideWrench className={className} />;
+
+const nav: { id: NavId; label: string; icon: SidebarIcon }[] = [
   { id: "overview", label: "Dashboard", icon: ChartPieSlice },
   { id: "requests", label: "Requests", icon: FolderSimple },
   { id: "security", label: "Security", icon: Shield },
+  { id: "repair", label: "Repair", icon: RepairIcon },
   { id: "score", label: "Score", icon: Gauge },
 ];
 
@@ -22,9 +29,10 @@ interface AppSidebarProps {
   active: NavId;
   onNav: (id: NavId) => void;
   issueCount: number;
+  repairCount?: number;
 }
 
-export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCount }: AppSidebarProps) {
+export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCount, repairCount = 0 }: AppSidebarProps) {
   return (
     <aside className={cn("fixed left-0 top-0 z-40 flex h-screen flex-col bg-card/95 shadow-[12px_0_36px_hsl(var(--background)/0.6)] backdrop-blur-md transition-[width] duration-200", collapsed ? "w-[72px]" : "w-60")}>
       <div className={cn("flex h-14 items-center px-4", collapsed && "justify-center px-2")}>
@@ -50,7 +58,8 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
           {nav.map((item) => {
             const Icon = item.icon;
             const isActive = active === item.id;
-            const badge = item.id === "security" && issueCount > 0 ? <Badge className="h-5 min-w-5 justify-center bg-white/20 px-1 text-[10px] font-semibold text-white">{issueCount > 99 ? "99+" : issueCount}</Badge> : null;
+            const count = item.id === "security" ? issueCount : item.id === "repair" ? repairCount : 0;
+            const badge = count > 0 ? <Badge className="h-5 min-w-5 justify-center bg-white/20 px-1 text-[10px] font-semibold text-white">{count > 99 ? "99+" : count}</Badge> : null;
             const btn = (
               <Button key={item.id} variant={isActive ? "secondary" : "ghost"} size="sm" className={cn("h-10 w-full justify-start gap-3.5 rounded-full text-[15px] font-medium transition-all duration-200 [&_svg]:size-6", isActive && "bg-orange-500 text-white hover:bg-orange-500", collapsed && "justify-center px-0")} onClick={() => onNav(item.id)}>
                 <Icon className={cn("shrink-0 transition-colors duration-200", isActive && "text-white")} weight={isActive ? "fill" : "regular"} />
@@ -68,7 +77,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
                   <TooltipTrigger asChild>{btn}</TooltipTrigger>
                   <TooltipContent side="right" className="flex items-center gap-2">
                     {item.label}
-                    {item.id === "security" && issueCount > 0 ? <Badge className="bg-orange-500 text-[10px] text-white">{issueCount}</Badge> : null}
+                    {count > 0 ? <Badge className="bg-orange-500 text-[10px] text-white">{count > 99 ? "99+" : count}</Badge> : null}
                   </TooltipContent>
                 </Tooltip>
               );

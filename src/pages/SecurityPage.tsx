@@ -198,7 +198,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
             </Select>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Badge variant={scoreBadgeVariant} className="font-mono text-xs tabular-nums">
+            <Badge variant={scoreBadgeVariant} className="text-xs tabular-nums">
               Score {score.total}/100
             </Badge>
           </div>
@@ -288,7 +288,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
                       <TableCell>
                         <SeverityBadge severity={f.severity} />
                       </TableCell>
-                      <TableCell className="font-mono text-xs uppercase text-muted-foreground">{f.category}</TableCell>
+                      <TableCell className="text-xs uppercase text-muted-foreground">{f.category}</TableCell>
                       <TableCell className="max-w-[320px]">
                         <span className="line-clamp-2 text-sm font-medium">{f.title}</span>
                         <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">{f.description}</span>
@@ -329,7 +329,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
               <DialogTitle className="text-xl font-semibold leading-snug">{detail.title}</DialogTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityBadge severity={detail.severity} />
-                <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                <Badge variant="outline" className="text-[10px] uppercase">
                   {detail.category}
                 </Badge>
               </div>
@@ -340,7 +340,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
               {detail.affected.length > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Affected</p>
-                  <p className="mt-1 font-mono text-sm text-primary">
+                  <p className="mt-1 text-sm text-primary">
                     {affectedLabels(detail, parsed.requests)
                       .slice(0, 8)
                       .join(', ')}

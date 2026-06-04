@@ -1,14 +1,21 @@
-import { MagnifyingGlass, SignOut, FileCode, ChartPieSlice, Shield, Gauge, FolderSimple, BookmarkSimple, type Icon } from '@phosphor-icons/react'
+import type { ElementType } from 'react'
+import { MagnifyingGlass, SignOut, FileCode, ChartPieSlice, Shield, Gauge, FolderSimple, BookmarkSimple } from '@phosphor-icons/react'
+import { Wrench as LucideWrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThemeToggle } from '@/components/theme-toggle'
 // cn removed - not needed
 import type { NavId } from './app-sidebar'
 
-const NAV_LABELS: Record<NavId, { label: string; icon: Icon }> = {
+type HeaderIcon = ElementType
+
+const RepairIcon: HeaderIcon = ({ className }) => <LucideWrench className={className} />
+
+const NAV_LABELS: Record<NavId, { label: string; icon: HeaderIcon }> = {
   overview: { label: 'Dashboard', icon: ChartPieSlice },
   requests: { label: 'Requests', icon: FolderSimple },
   security: { label: 'Security', icon: Shield },
+  repair: { label: 'Repair', icon: RepairIcon },
   score: { label: 'Score', icon: Gauge },
 }
 
@@ -71,8 +78,8 @@ export function AppHeader({
           </span>
         </button>
         <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[10px] text-muted-foreground/60 sm:flex">
-          <kbd className="rounded bg-background/40 px-1 py-0.5 font-mono text-[10px]">Ctrl</kbd>
-          <kbd className="rounded bg-background/40 px-1 py-0.5 font-mono text-[10px]">K</kbd>
+          <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">Ctrl</kbd>
+          <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">K</kbd>
         </div>
       </div>
 

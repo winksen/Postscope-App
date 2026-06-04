@@ -83,7 +83,7 @@ function CategoryBar({
           </div>
           <span className="text-muted-foreground">{CATEGORY_LABELS[keyName]}</span>
         </div>
-        <span className={cn('font-mono text-xs tabular-nums font-semibold', getScoreTone(value))}>
+        <span className={cn('text-xs tabular-nums font-semibold', getScoreTone(value))}>
           {animatedValue}/100
         </span>
       </div>

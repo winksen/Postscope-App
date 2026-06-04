@@ -11,6 +11,8 @@ export interface ParsedRequest {
   method: string;
   protocol: RequestProtocol;
   url: string;
+  /** Index path through nested Postman item arrays back to the raw collection item. */
+  itemPath: number[];
   folderPath: string[];
   auth: string;
   /** Present when Postman auth type is basic (username/password fields). */
@@ -76,6 +78,7 @@ function getBasicAuthCreds(auth: PostmanAuth | undefined): { username: string; p
 function parseItem(
   item: PostmanItem,
   folderPath: string[],
+  itemPath: number[],
   acc: {
     requests: ParsedRequest[];
     methods: Record<string, number>;
@@ -121,6 +124,7 @@ function parseItem(
       method,
       protocol,
       url,
+      itemPath,
       folderPath,
       auth,
       basicAuth,
@@ -132,7 +136,7 @@ function parseItem(
 
   if (item.item) {
     const newPath = [...folderPath, item.name];
-    item.item.forEach((child) => parseItem(child, newPath, acc));
+    item.item.forEach((child, index) => parseItem(child, newPath, [...itemPath, index], acc));
   }
 }
 
@@ -148,7 +152,7 @@ export function parseCollection(json: unknown): ParsedCollection {
     idCounts: new Map<string, number>(),
   }
 
-  col.item.forEach((item) => parseItem(item, [], acc))
+  col.item.forEach((item, index) => parseItem(item, [], [index], acc))
 
   const definedVariables = (col.variable || []).map((v) => v.key)
   const allVars = [...acc.variables, ...definedVariables]
