@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CaretRight, Lock, LockOpen, Folder, FolderOpen } from '@phosphor-icons/react'
-import { RequestBadges } from './RequestBadges'
+import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
@@ -28,10 +28,10 @@ function RequestRow({
       type="button"
       variant="ghost"
       size="sm"
-      className="h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 font-normal transition-all duration-200 hover:bg-muted/80 group"
+      className="h-auto w-full max-w-full justify-start gap-2 px-2 py-1.5 font-normal transition-all duration-200 hover:bg-muted/80 focus-visible:ring-0 focus-visible:ring-offset-0 group"
       onClick={() => onSelect(request)}
     >
-      <RequestBadges request={request} />
+      <MethodBadge method={request.method} />
       <span className="min-w-0 flex-1 truncate text-left text-sm">{request.name}</span>
       {hasAuth ? (
         <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success))] opacity-60 group-hover:opacity-100 transition-opacity" />
@@ -126,11 +126,11 @@ function FolderNode({
   }, [searchQuery])
   const total = node.requests.length + node.children.reduce((s, c) => s + c.requests.length + c.children.length, 0)
   return (
-    <div className={cn('border-l border-border/60 pl-3', depth > 0 && 'ml-1')}>
+    <div className={cn('pl-3', depth > 0 && 'ml-1')}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary group"
+        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary focus-visible:outline-none focus-visible:ring-0 group"
       >
         <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         {open ? (
@@ -147,7 +147,7 @@ function FolderNode({
           open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
-        <div className="ml-1 mt-1 space-y-0.5 border-l border-transparent pl-2">
+        <div className="ml-1 mt-1 space-y-0.5 pl-2">
           {node.requests.map((req) => (
             <RequestRow key={req.id} request={req} onSelect={onSelectRequest} />
           ))}
@@ -179,7 +179,7 @@ export function RequestTree({ parsed, findings, search = '' }: RequestTreeProps)
 
   return (
     <>
-      <ScrollArea className="h-[min(420px,calc(100vh-320px))] pr-3">
+      <ScrollArea className="h-[min(420px,calc(100vh-320px))]">
         {empty ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
             <Folder className="h-10 w-10 text-muted-foreground/40" />
@@ -189,7 +189,7 @@ export function RequestTree({ parsed, findings, search = '' }: RequestTreeProps)
         ) : (
           <div className="space-y-2">
             {filteredRoot.length > 0 && (
-              <div className="border-l border-border/60 pl-3">
+              <div className="pl-3">
                 <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   <FolderOpen className="h-3.5 w-3.5" />
                   Root

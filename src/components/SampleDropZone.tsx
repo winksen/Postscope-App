@@ -54,7 +54,7 @@ export function SampleDropZone({
             </div>
             <CardTitle className="text-2xl font-semibold">Try sample collections</CardTitle>
             <CardDescription className="text-base">
-              Explore PostScope with curated demos — parsed locally, never saved to your library.
+              Explore PostScope with curated demos. Parsed locally, never saved to your library.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -96,7 +96,7 @@ export function SampleDropZone({
               })}
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              Demo collections ship with the app — no upload or team storage involved.
+              Demo collections ship with the app. No upload or team storage involved.
             </p>
           </CardContent>
         </Card>

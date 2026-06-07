@@ -22,6 +22,7 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { RepairPageSkeleton } from '@/components/page-skeletons'
 
 type CategoryFilter = 'all' | Finding['category']
 type RiskFilter = 'all' | RepairRiskLevel
@@ -39,6 +40,7 @@ interface RepairPageProps {
   originalRawJson: string
   onApplyRepairedCollection: (rawJson: string) => Promise<RepairApplyResult>
   onResetRepairs: () => Promise<void>
+  isLoading?: boolean
 }
 
 const CATEGORY_ORDER: Finding['category'][] = ['secrets', 'variables', 'auth', 'hygiene']
@@ -142,6 +144,7 @@ export function RepairPage({
   originalRawJson,
   onApplyRepairedCollection,
   onResetRepairs,
+  isLoading = false,
 }: RepairPageProps) {
   const rawObject = useMemo(() => JSON.parse(rawJson) as unknown, [rawJson])
   const plan = useMemo(() => createRepairPlan(rawObject, parsed, findings), [rawObject, parsed, findings])
@@ -220,16 +223,18 @@ export function RepairPage({
     setLastRun(null)
   }
 
+  if (isLoading) return <RepairPageSkeleton />
+
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="animate-fade-in">
+      <div>
         <h1 className="text-2xl font-semibold tracking-tight">Repair Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Review safe collection fixes, apply only what you choose, then export the repaired JSON.
         </p>
       </div>
 
-      <Card className="animate-fade-in animate-delay-100">
+      <Card>
         <CardContent className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-center lg:p-5">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div className="rounded-lg bg-muted/40 px-3 py-2">
@@ -271,7 +276,7 @@ export function RepairPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          <Card className="animate-fade-in animate-delay-200">
+          <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
@@ -318,7 +323,7 @@ export function RepairPage({
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden animate-fade-in animate-delay-300">
+          <Card className="overflow-hidden">
             <CardHeader>
               <CardTitle className="text-base">Fix list</CardTitle>
               <CardDescription>{filteredFixes.length} repair item{filteredFixes.length === 1 ? '' : 's'} shown</CardDescription>
@@ -354,7 +359,7 @@ export function RepairPage({
           </Card>
         </div>
 
-        <Card className="h-fit animate-fade-in animate-delay-300">
+        <Card className="h-fit">
           <CardHeader>
             <CardTitle className="text-base">Impact preview</CardTitle>
             <CardDescription>No changes are made until you apply selected fixes.</CardDescription>

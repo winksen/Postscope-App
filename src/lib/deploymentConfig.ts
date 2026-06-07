@@ -71,12 +71,12 @@ export function shouldPersistSession(loggingMode: LoggingMode, storageMode: Stor
 
 export function getPrivacyModeDescription(loggingMode: LoggingMode, storageMode: StorageMode): string {
   if (loggingMode === 'on') {
-    return 'Team logging is enabled — every imported collection is saved to the app storage.'
+    return 'Team logging is enabled. Every imported collection is saved to the app storage.'
   }
   if (loggingMode === 'off') {
-    return 'Public mode — collections are analyzed in your browser and never stored on the app.'
+    return 'Public mode: collections are analyzed in your browser and never stored on the app.'
   }
   return storageMode === 'history'
     ? 'Collections are saved to the app storage so your team can browse and reopen them.'
-    : 'Incognito — your imports are not stored, but you can still browse the team library.'
+    : 'Incognito: your imports are not stored, but you can still browse the team library.'
 }

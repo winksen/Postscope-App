@@ -18,9 +18,9 @@ PostScope **parses a collection file locally in the browser**, runs a rule-based
 
 ### Limitations (by design)
 
-- **Rule-based auditor** — findings are heuristic; expect false positives and false negatives. Review recommendations before acting.
-- **No backend** — collections are not uploaded or stored on a server.
-- **Large collections** — parsing and audit yield to the browser event loop, but very large files may still feel slow on low-end devices.
+- **Rule-based auditor**: findings are heuristic; expect false positives and false negatives. Review recommendations before acting.
+- **No backend**: collections are not uploaded or stored on a server.
+- **Large collections**: parsing and audit yield to the browser event loop, but very large files may still feel slow on low-end devices.
 
 ---
 
@@ -39,17 +39,22 @@ PostScope **parses a collection file locally in the browser**, runs a rule-based
 
 Path alias: `@/` → `src/` (see `vite.config.ts`).
 
+### UI and docs
+
+- [docs/VISUAL_STYLE.md](docs/VISUAL_STYLE.md): voice, punctuation, colors, typography, and layout personality
+- [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): component patterns and Tailwind conventions
+
 ---
 
 ## Features
 
-- **Import by drag-and-drop or file picker** — accepts `.json` and typical `*.postman_collection.json` exports
-- **Collection parsing** — folders, HTTP methods, URLs, headers, bodies, auth types, `{{variable}}` usage vs. defined collection variables
+- **Import by drag-and-drop or file picker**: accepts `.json` and typical `*.postman_collection.json` exports
+- **Collection parsing**: folders, HTTP methods, URLs, headers, bodies, auth types, `{{variable}}` usage vs. defined collection variables
 - **Automated audit** with severities (critical / warning / info), categories (secrets, variables, auth, hygiene), and actionable recommendations
-- **Overview** — stat cards, method and auth distribution charts, collapsible request tree with search
-- **Security** — consolidated findings list, filtering, and per-request context where applicable
-- **Score** — numeric score, letter grade, per-category subscores, and improvement hints
-- **Responsive dashboard** — sidebar navigation, header search, analyze-another flow
+- **Overview**: stat cards, method and auth distribution charts, collapsible request tree with search
+- **Security**: consolidated findings list, filtering, and per-request context where applicable
+- **Score**: numeric score, letter grade, per-category subscores, and improvement hints
+- **Responsive dashboard**: sidebar navigation, header search, analyze-another flow
 
 ---
 
@@ -156,9 +161,9 @@ Postscope-App/
 2. Export a collection from Postman (**Collection → … → Export**) as Collection v2.1 JSON.
 3. Drop the file on the landing zone or use **Browse**.
 4. On success, use the sidebar:
-   - **Overview** — inventory and charts  
-   - **Security** — findings by severity  
-   - **Score** — grade and category breakdown  
+   - **Overview**: inventory and charts  
+   - **Security**: findings by severity  
+   - **Score**: grade and category breakdown  
 5. Use the header **search** to filter content where supported.
 6. Use **Analyze another** to clear state and import a new file.
 

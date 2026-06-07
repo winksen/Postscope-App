@@ -107,7 +107,7 @@ export function CollectionLibraryModal({
             Team library
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Collections saved on this app — visible to everyone on your team. Export a JSON file for an
+            Collections saved on this app. Visible to everyone on your team. Export a JSON file for an
             offline copy.
           </p>
         </DialogHeader>

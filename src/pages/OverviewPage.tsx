@@ -17,8 +17,7 @@ import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
-import { Skeleton } from '@/components/ui/skeleton'
-// cn removed - not needed
+import { OverviewPageSkeleton } from '@/components/page-skeletons'
 
 /** Auth / accent slice colors (blue → green → orange). */
 const DASHBOARD_ACCENT = [
@@ -67,25 +66,6 @@ function variableNamesUsedInRequests(requests: ParsedRequest[]): Set<string> {
     }
   }
   return names
-}
-
-function OverviewPageSkeleton() {
-  return (
-    <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-4 w-80 max-w-full" />
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}
-      </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Skeleton className="h-[24rem] rounded-2xl" />
-        <Skeleton className="h-[24rem] rounded-2xl" />
-      </div>
-      <Skeleton className="h-[22rem] rounded-2xl" />
-    </div>
-  )
 }
 
 export function OverviewPage({ parsed, findings, search, isLoading = false }: OverviewPageProps) {
@@ -169,7 +149,7 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="animate-fade-in">
+      <div>
         <h1 className="text-2xl font-semibold tracking-tight">Collection overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Structure, auth coverage, and request inventory for this import.
@@ -184,7 +164,6 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
           subtext={`${parsed.totalFolders} folders`}
           details={methodDetailRows}
           gradient="blue"
-          delay={0}
         />
         <StatCard
           icon={FolderOpen}
@@ -193,7 +172,6 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
           subtext={`${parsed.totalRequests} requests`}
           details={folderDetailRows}
           gradient="amber"
-          delay={100}
         />
         <StatCard
           icon={Key}
@@ -202,7 +180,6 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
           subtext={`${parsed.variables.length} unique names in collection`}
           details={variableDetailRows}
           gradient="violet"
-          delay={200}
         />
         <StatCard
           icon={Stack}
@@ -211,12 +188,11 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
           subtext={`Across ${parsed.totalRequests} requests`}
           details={authTypeRows}
           gradient="green"
-          delay={300}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="animate-fade-in animate-delay-200">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2"><ChartBar className="h-4 w-4 text-muted-foreground" />HTTP methods</CardTitle>
             <CardDescription>Distribution of verbs across the collection</CardDescription>
@@ -265,7 +241,7 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
           </CardContent>
         </Card>
 
-        <Card className="animate-fade-in animate-delay-300">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle>Authentication</CardTitle>
             <CardDescription>How requests declare auth in the collection</CardDescription>
@@ -346,7 +322,7 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
         </Card>
       </div>
 
-      <Card className="animate-fade-in animate-delay-400">
+      <Card>
         <CardHeader>
           <CardTitle>Request tree</CardTitle>
           <CardDescription>Open a request to inspect headers, body, and related findings</CardDescription>

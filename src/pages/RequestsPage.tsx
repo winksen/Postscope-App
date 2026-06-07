@@ -5,8 +5,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
-import { RequestBadges } from '@/components/RequestBadges'
+import { RequestsPageSkeleton } from '@/components/page-skeletons'
+import { MethodBadge } from '@/components/MethodBadge'
+import { ProtocolBadge } from '@/components/ProtocolBadge'
 import type { ParsedCollection, ParsedRequest } from '@/lib/parser'
 import { cn } from '@/lib/utils'
 
@@ -86,15 +87,6 @@ function filterNodes(nodes: TreeNode[], q: string): TreeNode[] {
     .filter(Boolean) as TreeNode[]
 }
 
-function firstRequest(nodes: TreeNode[]): ParsedRequest | null {
-  for (const node of nodes) {
-    if (node.requests.length > 0) return node.requests[0]
-    const child = firstRequest(node.children)
-    if (child) return child
-  }
-  return null
-}
-
 function parseQueryParams(rawUrl: string): Array<{ key: string; value: string }> {
   const manual = rawUrl.split('?')[1]
   if (!manual) return []
@@ -116,15 +108,6 @@ function parseQueryParams(rawUrl: string): Array<{ key: string; value: string }>
   }
 }
 
-function RequestsPageSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-      <Skeleton className="h-[34rem] rounded-2xl" />
-      <Skeleton className="h-[34rem] rounded-2xl" />
-    </div>
-  )
-}
-
 function RequestRow({
   request,
   selectedId,
@@ -140,17 +123,15 @@ function RequestRow({
       variant="ghost"
       size="sm"
       className={cn(
-        'h-auto w-full justify-start gap-2 rounded-lg px-2 py-2 text-left font-normal transition-colors',
-        active && 'bg-orange-500 text-white hover:bg-orange-500'
+        'min-h-10 w-full max-w-full justify-start gap-2 rounded-lg px-2.5 py-2 text-left font-normal transition-colors',
+        'focus-visible:ring-0 focus-visible:ring-offset-0',
+        'hover:bg-muted/70',
+        active && 'bg-muted/80 text-foreground hover:bg-muted/80'
       )}
       onClick={() => onSelect(request)}
     >
-      <RequestBadges
-        request={request}
-        methodClassName={active ? 'bg-white/20 text-white shadow-none' : ''}
-        protocolClassName={active ? 'bg-white/15 text-white border-white/30' : ''}
-      />
-      <span className="truncate">{request.name}</span>
+      <MethodBadge method={request.method} />
+      <span className="min-w-0 flex-1 truncate text-left leading-5">{request.name}</span>
     </Button>
   )
 }
@@ -168,7 +149,7 @@ function FolderNode({
   onSelect: (request: ParsedRequest) => void
   depth?: number
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     if (search.trim()) setOpen(true)
@@ -179,7 +160,7 @@ function FolderNode({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-sm text-muted-foreground hover:bg-muted/60"
+        className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-sm text-muted-foreground hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-0"
       >
         <CaretRight className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-90')} />
         {open ? <FolderOpen className="h-4 w-4 text-orange-400" /> : <Folder className="h-4 w-4" />}
@@ -216,19 +197,18 @@ export function RequestsPage({
   const { root, nodes } = useMemo(() => buildTree(parsed.requests), [parsed.requests])
   const filteredRoot = useMemo(() => filterRequests(root, search), [root, search])
   const filteredNodes = useMemo(() => filterNodes(nodes, search), [nodes, search])
-  const firstFiltered = filteredRoot[0] ?? firstRequest(filteredNodes)
-  const [selected, setSelected] = useState<ParsedRequest | null>(firstFiltered)
+  const [selected, setSelected] = useState<ParsedRequest | null>(null)
 
   useEffect(() => {
-    if (!selected || !requestMatches(selected, search)) {
-      setSelected(firstFiltered ?? null)
+    if (selected && !requestMatches(selected, search)) {
+      setSelected(null)
     }
-  }, [selected, search, firstFiltered])
+  }, [selected, search])
 
   useEffect(() => {
     if (focusRequestId) return
-    setSelected(firstFiltered ?? null)
-  }, [parsed, firstFiltered, focusRequestId])
+    setSelected(null)
+  }, [parsed, focusRequestId])
 
   useEffect(() => {
     if (!focusRequestId) return
@@ -248,15 +228,15 @@ export function RequestsPage({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-        <Card>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[430px_minmax(0,1fr)]">
+        <Card className="overflow-hidden">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Collection requests</CardTitle>
             <CardDescription>{parsed.totalRequests} requests</CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">
-            <ScrollArea className="h-[32rem] pr-2">
-              <div className="space-y-2">
+          <CardContent className="p-0">
+            <ScrollArea className="h-[32rem]">
+              <div className="space-y-2 px-5 pb-5">
                 {filteredRoot.length > 0 && (
                   <div className="space-y-1">
                     <p className="px-2 text-xs uppercase tracking-wide text-muted-foreground">Root</p>
@@ -289,7 +269,8 @@ export function RequestsPage({
             {selected ? (
               <>
                 <div className="flex items-center gap-2">
-                  <RequestBadges request={selected} />
+                  <MethodBadge method={selected.method} />
+                  <ProtocolBadge protocol={selected.protocol} />
                   <CardTitle className="truncate text-base">{selected.name}</CardTitle>
                 </div>
                 <CardDescription className="truncate">
@@ -339,7 +320,7 @@ export function RequestsPage({
                       {parseQueryParams(selected.url).map((param) => (
                         <li key={`${param.key}-${param.value}`} className="flex items-center justify-between gap-2 text-xs">
                           <span className="text-foreground">{param.key}</span>
-                          <span className="text-muted-foreground">{param.value || '—'}</span>
+                          <span className="text-muted-foreground">{param.value || '-'}</span>
                         </li>
                       ))}
                     </ul>

@@ -5,7 +5,7 @@ export type LoggingMode = 'on' | 'hybrid' | 'off'
 export { parseLoggingMode } from './parseLoggingMode'
 import { parseLoggingMode } from './parseLoggingMode'
 
-/** Single deployment setting — read from LOGGING_MODE in .env */
+/** Single deployment setting: read from LOGGING_MODE in .env */
 export function getLoggingMode(): LoggingMode {
   ensureAppEnv()
   return parseLoggingMode(process.env.LOGGING_MODE)

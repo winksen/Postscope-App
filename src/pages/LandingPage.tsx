@@ -21,7 +21,7 @@ const STEPS = [
   {
     step: '01',
     title: 'Import your collection',
-    description: 'Drop a Postman export or browse for a JSON file — parsing happens entirely in your browser.',
+    description: 'Drop a Postman export or browse for a JSON file. Parsing happens entirely in your browser.',
     icon: FileCode,
   },
   {
@@ -59,7 +59,7 @@ export function LandingPage() {
           </h1>
 
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg animate-fade-in">
-            PostScope audits API collections locally — security risks, structural debt, and coverage gaps
+            PostScope audits API collections locally: security risks, structural debt, and coverage gaps,
             without uploading your data to any server.
           </p>
 
@@ -104,7 +104,7 @@ export function LandingPage() {
               From export to actionable insights
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
-              Three steps to a healthier, safer API collection — no account required.
+              Three steps to a healthier, safer API collection. No account required.
             </p>
           </div>
 
@@ -141,7 +141,7 @@ export function LandingPage() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight">Ready to diagnose your APIs?</h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
-                  Drop a Postman collection and get security findings, request maps, and a health score —
+                  Drop a Postman collection and get security findings, request maps, and a health score,
                   all processed on your device.
                 </p>
               </div>
@@ -157,7 +157,7 @@ export function LandingPage() {
 
         <footer className="mx-auto mt-20 max-w-4xl border-t border-border/50 pt-8 text-center">
           <p className="text-xs text-muted-foreground">
-            PostScope — local Postman collection intelligence. Your collections never leave your browser.
+            PostScope: local Postman collection intelligence. Your collections never leave your browser.
           </p>
         </footer>
       </main>

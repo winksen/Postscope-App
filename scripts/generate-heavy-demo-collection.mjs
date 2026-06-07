@@ -260,9 +260,9 @@ function buildAcmeV3() {
 function buildAcmeV2Deprecated() {
   const p = PROFILES.deprecatedFlat
   const b = '{{baseUrl}}/v2'
-  // Mostly flat — someone exported v2 and never reorganized
+  // Mostly flat - someone exported v2 and never reorganized
   return folder(
-    'Acme Core API v2 — DEPRECATED',
+    'Acme Core API v2 - DEPRECATED',
     makeFromProfile('getUsers', p, `${b}/users`),
     makeFromProfile('getUsers_old', p, `${b}/users`),
     makeFromProfile('GET /users (duplicate)', p, `${b}/users`),
@@ -274,7 +274,7 @@ function buildAcmeV2Deprecated() {
     makeFromProfile('legacy ping', p, 'https://legacy-internal.example.net/api/ping'),
     makeFromProfile('bulk import users', p, `${b}/users/import`, { body: { csvUrl: 's3://bucket/users.csv' } }),
     folder(
-      'misc — do not delete',
+      'misc - do not delete',
       makeFromProfile('temp endpoint', p, `${b}/misc/temp-fix-441`),
       makeFromProfile('another temp', p, `${b}/misc/temp-fix-441`),
       makeFromProfile('PATCH accounts (forgot why)', p, `${b}/accounts/patch-all`, { body: { force: true } })
@@ -292,7 +292,7 @@ function buildAcmeV2Deprecated() {
 function buildMobileBff() {
   const p = PROFILES.mobileBff
   const b = '{{baseUrl}}/bff/mobile'
-  // Shallow, read-heavy — mobile team keeps everything near the root
+  // Shallow, read-heavy - mobile team keeps everything near the root
   return folder(
     'Mobile BFF (iOS + Android)',
     makeFromProfile('Home feed', p, `${b}/feed?version=3`),
@@ -360,7 +360,7 @@ function buildInternalAdmin() {
       makeFromProfile('Force password reset', p, `${b}/support/users/{{userId}}/reset-password`, { body: { notify: false } }),
       makeFromProfile('Purge user cache', p, `${b}/support/cache/purge`, { body: { userId: '{{userId}}' } })
     ),
-    makeFromProfile('Kill switch — payments', p, `${b}/ops/kill-switch/payments`, { body: { enabled: true } }),
+    makeFromProfile('Kill switch - payments', p, `${b}/ops/kill-switch/payments`, { body: { enabled: true } }),
     req('Audit export gRPC', {
       method: 'POST',
       auth: 'basic',
@@ -377,7 +377,7 @@ function buildPartnerIntegrations() {
   const b = '{{baseUrl}}/partners'
   return folder(
     'Partner Integrations',
-    // OAuth flat at top — integration guide structure
+    // OAuth flat at top - integration guide structure
     makeFromProfile('OAuth authorize', p, `${b}/oauth/authorize?client_id={{clientId}}`),
     makeFromProfile('OAuth token exchange', p, `${b}/oauth/token`, { body: { grant_type: 'authorization_code', code: '{{authCode}}' } }),
     makeFromProfile('OAuth revoke', p, `${b}/oauth/revoke`, { body: { token: '{{token}}' } }),
@@ -415,7 +415,7 @@ function buildPartnerIntegrations() {
 
 function buildLegacyMonolith() {
   const p = PROFILES.legacy
-  // Completely flat — 18 siblings, no subfolders
+  // Completely flat - 18 siblings, no subfolders
   const items = [
     req('GET /ping', { method: 'GET', auth: 'noauth', url: 'http://legacy-internal.example.net/ping' }),
     req('POST /sync/accounts', { method: 'POST', auth: 'basic', url: 'http://legacy-internal.example.net/sync/accounts', basicCreds: { username: 'batch', password: 'batch123' }, body: { full: true } }),
@@ -427,7 +427,7 @@ function buildLegacyMonolith() {
   }
   items.push(req('HEAD /ping', { method: 'HEAD', auth: 'noauth', url: 'http://legacy-internal.example.net/ping' }))
   items.push(req('OPTIONS /accounts', { method: 'OPTIONS', auth: 'noauth', url: 'http://legacy-internal.example.net/accounts/list' }))
-  return folder('Legacy Monolith — DO NOT USE', ...items)
+  return folder('Legacy Monolith - DO NOT USE', ...items)
 }
 
 function buildWebhooksMess() {
@@ -464,7 +464,7 @@ function buildScratchWip() {
   const b = '{{baseUrl}}/wip'
   return folder(
     '_scratch / WIP / untitled',
-    folder('empty folder — ignore', folder('also empty')),
+    folder('empty folder - ignore', folder('also empty')),
     makeFromProfile('does this work??', p, `${b}/test/ping`),
     makeFromProfile('DELETE ME', p, `https://api.example.com/debug/{{randomId}}`),
     folder(
@@ -508,11 +508,11 @@ function buildPossibleDuplicatesSection() {
   return folder(
     'Possible Duplicates (review queue)',
     folder(
-      'Same URL — different names',
+      'Same URL - different names',
       ...pairs.map(([name, url]) => makeFromProfile(name, p, url))
     ),
     folder(
-      'Same name — different URLs',
+      'Same name - different URLs',
       req('Health check', { method: 'GET', auth: 'noauth', url: '{{baseUrl}}/health' }),
       req('Health check', { method: 'GET', auth: 'noauth', url: '{{baseUrl}}/v3/health' }),
       req('Health check', { method: 'GET', auth: 'noauth', url: 'https://staging.api.acme-corp.io/health' }),
@@ -533,21 +533,21 @@ function buildDeepNestingSection() {
   return folder(
     'Extra Deep Nesting (stress test)',
     folder(
-      'Level 1 — migrated export',
+      'Level 1 - migrated export',
       folder(
-        'Level 2 — old team folder',
+        'Level 2 - old team folder',
         folder(
-          'Level 3 — Q4 cleanup',
+          'Level 3 - Q4 cleanup',
           folder(
-            'Level 4 — billing sub-tree',
+            'Level 4 - billing sub-tree',
             folder(
-              'Level 5 — invoices branch',
+              'Level 5 - invoices branch',
               folder(
-                'Level 6 — line items',
+                'Level 6 - line items',
                 folder(
-                  'Level 7 — tax overrides',
+                  'Level 7 - tax overrides',
                   folder(
-                    'Level 8 — jurisdiction rules',
+                    'Level 8 - jurisdiction rules',
                     makeFromProfile('Apply EU VAT rule', p, `${b}/invoices/{{invoiceId}}/tax/eu/vat`, { body: { rate: 0.2 } }),
                     makeFromProfile('Apply US sales tax rule', p, `${b}/invoices/{{invoiceId}}/tax/us/sales`, { body: { state: 'CA' } })
                   ),

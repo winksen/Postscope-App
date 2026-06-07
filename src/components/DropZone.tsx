@@ -140,7 +140,7 @@ export function DropZone({
               ) : (
                 <>
                   <ShieldCheck className="h-4 w-4" />
-                  Public mode — incognito only
+                  Public mode: incognito only
                 </>
               )}
             </div>
@@ -199,7 +199,7 @@ export function DropZone({
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-xs leading-snug text-foreground">
                       <span className="font-medium">Upload warning.</span> Files are saved to this
-                      app&apos;s storage — visible to your team, including URLs, headers, and tokens.
+                      app&apos;s storage. Visible to your team, including URLs, headers, and tokens.
                     </p>
                     <div className="flex items-center gap-2.5">
                       <Checkbox
@@ -211,7 +211,7 @@ export function DropZone({
                         htmlFor="upload-consent"
                         className="cursor-pointer text-xs font-normal leading-snug text-muted-foreground"
                       >
-                        I accept — my collection will be stored on the app and may be viewed by my team.
+                        I accept: my collection will be stored on the app and may be viewed by my team.
                       </Label>
                     </div>
                   </div>
@@ -233,7 +233,7 @@ export function DropZone({
                     <ShieldCheck className="h-6 w-6 text-muted-foreground" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
-                    <span className="font-medium">Nothing stored.</span> Incognito mode — your data is
+                    <span className="font-medium">Nothing stored.</span> Incognito mode: your data is
                     never written to the app&apos;s storage.
                   </p>
                 </div>
@@ -263,7 +263,7 @@ export function DropZone({
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
-              Drop a Postman export — parsed in your browser, never uploaded.
+              Drop a Postman export. Parsed in your browser, never uploaded.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

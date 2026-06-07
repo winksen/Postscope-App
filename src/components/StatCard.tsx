@@ -18,7 +18,6 @@ interface StatCardProps {
   trendLabel?: string
   trendPositive?: boolean
   gradient?: 'blue' | 'green' | 'amber' | 'violet' | 'rose'
-  delay?: number
 }
 
 const GRADIENTS = {
@@ -47,21 +46,13 @@ export function StatCard({
   trendLabel,
   trendPositive = true,
   gradient = 'blue',
-  delay = 0,
 }: StatCardProps) {
   const numericValue = typeof value === 'number' ? value : 0
   const { value: animatedValue } = useCountUp(numericValue, 800)
   const displayValue = typeof value === 'number' ? animatedValue : value
 
   return (
-    <Card
-      className={cn(
-        'group overflow-hidden p-6 transition-all duration-300',
-        'animate-fade-in',
-        className
-      )}
-      style={{ animationDelay: `${delay}ms` }}
-    >
+    <Card className={cn('group overflow-hidden p-6 transition-all duration-300', className)}>
       <div className="flex gap-4">
         <div
           className={cn(

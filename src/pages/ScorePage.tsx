@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Key, Link, Lock, Sparkle, CheckCircle, WarningCircle, Lightbulb, DownloadSimple } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ScorePageSkeleton } from '@/components/page-skeletons'
 
 function getProgressTone(value: number): string {
   if (value >= 90) return 'bg-[hsl(var(--chart-2))]'
@@ -75,7 +75,7 @@ function CategoryBar({
   }, [value, delay])
 
   return (
-    <div className="space-y-2 animate-fade-in" style={{ animationDelay: `${delay}ms` }}>
+    <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
           <div className={cn('flex h-7 w-7 items-center justify-center rounded-md bg-primary/10', getScoreTone(value))}>
@@ -94,11 +94,9 @@ function CategoryBar({
 
 function ActionCard({
   advice,
-  index,
   priority,
 }: {
   advice: string
-  index: number
   priority: 'P0' | 'P1' | 'P2'
 }) {
   const priorityConfig = {
@@ -113,9 +111,8 @@ function ActionCard({
   return (
     <div
       className={cn(
-        'flex gap-3 rounded-xl border bg-card px-4 py-3.5 transition-all duration-200 animate-fade-in'
+        'flex gap-3 rounded-xl border bg-card px-4 py-3.5 transition-all duration-200'
       )}
-      style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', config.color)}>
         <Icon className="h-4 w-4" />
@@ -128,22 +125,6 @@ function ActionCard({
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">{advice}</p>
       </div>
-    </div>
-  )
-}
-
-function ScorePageSkeleton() {
-  return (
-    <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-44" />
-        <Skeleton className="h-4 w-80 max-w-full" />
-      </div>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Skeleton className="h-[22rem] rounded-2xl xl:col-span-2" />
-        <Skeleton className="h-[22rem] rounded-2xl" />
-      </div>
-      <Skeleton className="h-[24rem] rounded-2xl" />
     </div>
   )
 }
@@ -195,7 +176,7 @@ export function ScorePage({ score, findings, isLoading = false }: ScorePageProps
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="animate-fade-in">
+      <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security score</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Weighted posture across secrets, variables, auth, and hygiene.
@@ -203,7 +184,7 @@ export function ScorePage({ score, findings, isLoading = false }: ScorePageProps
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2 animate-fade-in animate-delay-100">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">Overall grade</CardTitle>
             <CardDescription>Animated from zero on each import refresh</CardDescription>
@@ -213,7 +194,7 @@ export function ScorePage({ score, findings, isLoading = false }: ScorePageProps
           </CardContent>
         </Card>
 
-        <Card className="animate-fade-in animate-delay-200">
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Category mix</CardTitle>
             <CardDescription>Contribution to the headline score</CardDescription>
@@ -226,7 +207,7 @@ export function ScorePage({ score, findings, isLoading = false }: ScorePageProps
         </Card>
       </div>
 
-      <Card className="animate-fade-in animate-delay-300">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-lg">Guidance</CardTitle>
@@ -245,14 +226,14 @@ export function ScorePage({ score, findings, isLoading = false }: ScorePageProps
             </TabsList>
             <TabsContent value="summary" className="mt-4 space-y-3">
               {advice.slice(0, 3).map((a, i) => (
-                <ActionCard key={i} advice={a.text} index={i} priority={a.priority} />
+                <ActionCard key={i} advice={a.text} priority={a.priority} />
               ))}
             </TabsContent>
             <TabsContent value="detail" className="mt-4">
               <Separator className="mb-4" />
               <ul className="space-y-3">
                 {advice.map((a, i) => (
-                  <li key={i} className="flex gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 animate-fade-in" style={{ animationDelay: `${i * 100}ms` }}>
+                  <li key={i} className="flex gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
                     <span className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', a.priority === 'P0' ? 'bg-destructive' : a.priority === 'P1' ? 'bg-[hsl(var(--warning))]' : 'bg-[hsl(var(--success))]')} />
                     <div>
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 mb-1">

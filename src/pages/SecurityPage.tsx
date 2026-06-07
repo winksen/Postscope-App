@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CheckCircle, ArrowSquareOut, ShieldWarning, Warning, Info, FunnelSimple, X } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import type { Finding } from '../lib/auditor'
@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SecurityPageSkeleton } from '@/components/page-skeletons'
 import { cn } from '@/lib/utils'
 
 interface SecurityPageProps {
@@ -50,22 +50,14 @@ function SeveritySummaryCard({
   count,
   label,
   colorClass,
-  delay,
 }: {
   icon: typeof ShieldWarning
   count: number
   label: string
   colorClass: string
-  delay: number
 }) {
   return (
-    <Card
-      className={cn(
-        'flex items-center gap-4 p-4 transition-all duration-300 animate-fade-in',
-        count === 0 && 'opacity-60'
-      )}
-      style={{ animationDelay: `${delay}ms` }}
-    >
+    <Card className={cn('flex items-center gap-4 p-4 transition-all duration-300', count === 0 && 'opacity-60')}>
       <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', colorClass)}>
         <Icon className="h-5 w-5 text-white" />
       </div>
@@ -77,33 +69,11 @@ function SeveritySummaryCard({
   )
 }
 
-function SecurityPageSkeleton() {
-  return (
-    <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-52" />
-        <Skeleton className="h-4 w-80 max-w-full" />
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
-      </div>
-      <Skeleton className="h-36 rounded-2xl" />
-      <Skeleton className="h-[28rem] rounded-2xl" />
-    </div>
-  )
-}
-
 export function SecurityPage({ parsed, findings, score, search, isLoading = false }: SecurityPageProps) {
   if (isLoading) return <SecurityPageSkeleton />
   const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
   const [detail, setDetail] = useState<Finding | null>(null)
-  const [showSkeleton, setShowSkeleton] = useState(true)
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setShowSkeleton(false), 220)
-    return () => window.clearTimeout(t)
-  }, [findings])
 
   const criticalCount = findings.filter((f) => f.severity === 'critical').length
   const warningCount = findings.filter((f) => f.severity === 'warning').length
@@ -125,7 +95,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="animate-fade-in">
+      <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security findings</h1>
         <p className="text-sm text-muted-foreground">
           Audit results with filters and full recommendation detail.
@@ -139,26 +109,23 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
           count={criticalCount}
           label="Critical issues"
           colorClass="bg-destructive"
-          delay={0}
         />
         <SeveritySummaryCard
           icon={Warning}
           count={warningCount}
           label="Warnings"
           colorClass="bg-[hsl(var(--warning))]"
-          delay={100}
         />
         <SeveritySummaryCard
           icon={Info}
           count={infoCount}
           label="Info items"
           colorClass="bg-primary"
-          delay={200}
         />
       </div>
 
       {/* Compact filter bar */}
-      <Card className="animate-fade-in animate-delay-200">
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <FunnelSimple className="h-4 w-4 text-muted-foreground" />
@@ -234,7 +201,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
         )}
       </Card>
 
-      <Card className="overflow-hidden animate-fade-in animate-delay-300">
+      <Card className="overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Findings</CardTitle>
           <CardDescription>
@@ -242,7 +209,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {filtered.length === 0 && !showSkeleton ? (
+          {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
                 <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" />
@@ -253,17 +220,6 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
                   ? 'No issues detected for this collection.'
                   : 'Adjust filters or search to see more results.'}
               </p>
-            </div>
-          ) : showSkeleton ? (
-            <div className="space-y-3 p-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-8 w-16 rounded-full" />
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 flex-1" />
-                  <Skeleton className="h-8 w-24" />
-                </div>
-              ))}
             </div>
           ) : (
             <div className="overflow-x-auto border-t border-border">
@@ -278,12 +234,11 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((f, idx) => (
+                  {filtered.map((f) => (
                     <TableRow
                       key={f.id}
                       className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 group"
                       onClick={() => setDetail(f)}
-                      style={{ animationDelay: `${idx * 50}ms` }}
                     >
                       <TableCell>
                         <SeverityBadge severity={f.severity} />
@@ -294,7 +249,7 @@ export function SecurityPage({ parsed, findings, score, search, isLoading = fals
                         <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">{f.description}</span>
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">
-                        {f.affected.length ? `${f.affected.length} paths` : '—'}
+                        {f.affected.length ? `${f.affected.length} paths` : '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

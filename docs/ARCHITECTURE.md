@@ -1,4 +1,4 @@
-# PostScope — Internal Architecture
+# PostScope: Internal Architecture
 
 This document describes how the PostScope application is structured, how data flows through it, and how to extend it safely.
 
@@ -148,14 +148,14 @@ Brief skeleton flash on mount (`useEffect` timeout) for perceived loading polish
 - **`AppSidebar`:** Nav buttons; exports `NavId`; shows issue count badge on Security.
 - **`AppHeader`:** Global search, collection name display, “analyze another” and decorative controls.
 
-Layout uses **fixed** sidebar/header with `padding-left` / `left` offset derived from collapse width — no CSS-grid app shell abstraction yet.
+Layout uses **fixed** sidebar/header with `padding-left` / `left` offset derived from collapse width. No CSS-grid app shell abstraction yet.
 
 ### 4.3 Patterns
 
 - **Composition:** Pages receive data via props; no page-level data fetching.
 - **Hooks:** `useState`, `useCallback`, `useMemo`, `useEffect` used locally; no custom global hooks.
-- **Services:** Pure functions in `src/lib/` — easy to unit test; no DI container.
-- **UI library:** “shadcn-style” — copy-paste Radix wrappers in `ui/` with Tailwind + `cva` variants.
+- **Services:** Pure functions in `src/lib/`. Easy to unit test; no DI container.
+- **UI library:** “shadcn-style”: copy-paste Radix wrappers in `ui/` with Tailwind + `cva` variants.
 - **Aliasing:** `@/` → `src/` (Vite `resolve.alias`).
 
 ---
@@ -186,7 +186,7 @@ Derived data:
 |------|--------|
 | External HTTP APIs | **None** in application logic |
 | Browser APIs | `FileReader`, `JSON.parse` |
-| Third-party scripts | Google Fonts (Lexend Deca) linked from `index.html` |
+| Third-party scripts | Google Fonts (Elms Sans) linked from `index.css` |
 | npm libraries | React, Vite, Radix, Recharts, Lucide, Tailwind utilities |
 
 There is **no** `fetch`, GraphQL, or WebSocket layer today.
@@ -195,17 +195,17 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 
 ## 7. Design decisions
 
-1. **Client-only processing** — Keeps deployment simple (static hosting), avoids privacy concerns for secrets in collections, and removes backend operational cost. Trade-off: large collections only scale to browser memory/CPU limits.
+1. **Client-only processing:** Keeps deployment simple (static hosting), avoids privacy concerns for secrets in collections, and removes backend operational cost. Trade-off: large collections only scale to browser memory/CPU limits.
 
-2. **Pure-function pipeline (parse → audit → score)** — Predictable, test-friendly, and easy to reason about. Trade-off: no incremental parsing or Web Worker offload for huge files.
+2. **Pure-function pipeline (parse → audit → score):** Predictable, test-friendly, and easy to reason about. Trade-off: no incremental parsing or Web Worker offload for huge files.
 
-3. **Findings keyed by stable request `id`** — Parser assigns folder-path ids and disambiguates duplicate names in the same folder (`#2`, `#3`, …). `findingDisplay.ts` maps ids to human-readable paths in the UI.
+3. **Findings keyed by stable request `id`:** Parser assigns folder-path ids and disambiguates duplicate names in the same folder (`#2`, `#3`, …). `findingDisplay.ts` maps ids to human-readable paths in the UI.
 
-4. **In-memory navigation instead of URL routes** — Few views; state resets on full reload. Trade-off: cannot deep-link to `/security`; refresh loses import (could add session storage or query params later).
+4. **In-memory navigation instead of URL routes:** Few views; state resets on full reload. Trade-off: cannot deep-link to `/security`; refresh loses import (could add session storage or query params later).
 
-5. **Rule-based auditor vs. ML** — Deterministic rules give explainable results for compliance-minded users. Trade-off: false positives/negatives depend on rule quality only.
+5. **Rule-based auditor vs. ML:** Deterministic rules give explainable results for compliance-minded users. Trade-off: false positives/negatives depend on rule quality only.
 
-6. **Severity penalties duplicated** — `scorer.ts` and `requestFindings.ts` both encode penalty weights; they can drift if only one is updated.
+6. **Severity penalties duplicated:** `scorer.ts` and `requestFindings.ts` both encode penalty weights; they can drift if only one is updated.
 
 ---
 
@@ -215,7 +215,7 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 - **Audit coverage** is heuristic (regex, JSON body shape); non-JSON bodies and edge-case Postman features may be missed.
 - **`BASIC_AUTH_PLAINTEXT`** fires when Postman basic auth uses literal `username` / `password` fields (not `{{variables}}`).
 - **No persistence:** Refresh clears session; no export of reports.
-- **`alert` for errors** on failed parse — rough UX.
+- **`alert` for errors** on failed parse: rough UX.
 - **Large files** may block the main thread during parse/audit.
 - **Scoring model** is linear penalty sum; caps at 0–100; may not match every team’s risk model.
 
@@ -243,7 +243,7 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 
 ### 9.4 Add backend or sync (future)
 
-Introduce a thin `src/services/` layer with `fetch` wrappers; keep `parser` / `auditor` usable on both client and server if you later move analysis to Node — they are already framework-agnostic TypeScript.
+Introduce a thin `src/services/` layer with `fetch` wrappers; keep `parser` / `auditor` usable on both client and server if you later move analysis to Node. They are already framework-agnostic TypeScript.
 
 ### 9.5 Add routing
 

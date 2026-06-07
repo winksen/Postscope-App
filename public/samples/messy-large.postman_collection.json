@@ -412,7 +412,7 @@
       ]
     },
     {
-      "name": "Acme Core API v2 — DEPRECATED",
+      "name": "Acme Core API v2 - DEPRECATED",
       "item": [
         {
           "name": "getUsers",
@@ -561,7 +561,7 @@
           }
         },
         {
-          "name": "misc — do not delete",
+          "name": "misc - do not delete",
           "item": [
             {
               "name": "temp endpoint",
@@ -1176,7 +1176,7 @@
           ]
         },
         {
-          "name": "Kill switch — payments",
+          "name": "Kill switch - payments",
           "request": {
             "method": "GET",
             "auth": {
@@ -1462,7 +1462,7 @@
       ]
     },
     {
-      "name": "Legacy Monolith — DO NOT USE",
+      "name": "Legacy Monolith - DO NOT USE",
       "item": [
         {
           "name": "GET /ping",
@@ -1869,7 +1869,7 @@
       "name": "_scratch / WIP / untitled",
       "item": [
         {
-          "name": "empty folder — ignore",
+          "name": "empty folder - ignore",
           "item": [
             {
               "name": "also empty",
@@ -2001,7 +2001,7 @@
       "name": "Possible Duplicates (review queue)",
       "item": [
         {
-          "name": "Same URL — different names",
+          "name": "Same URL - different names",
           "item": [
             {
               "name": "List orders",
@@ -2150,7 +2150,7 @@
           ]
         },
         {
-          "name": "Same name — different URLs",
+          "name": "Same name - different URLs",
           "item": [
             {
               "name": "Health check",
@@ -2269,28 +2269,28 @@
       "name": "Extra Deep Nesting (stress test)",
       "item": [
         {
-          "name": "Level 1 — migrated export",
+          "name": "Level 1 - migrated export",
           "item": [
             {
-              "name": "Level 2 — old team folder",
+              "name": "Level 2 - old team folder",
               "item": [
                 {
-                  "name": "Level 3 — Q4 cleanup",
+                  "name": "Level 3 - Q4 cleanup",
                   "item": [
                     {
-                      "name": "Level 4 — billing sub-tree",
+                      "name": "Level 4 - billing sub-tree",
                       "item": [
                         {
-                          "name": "Level 5 — invoices branch",
+                          "name": "Level 5 - invoices branch",
                           "item": [
                             {
-                              "name": "Level 6 — line items",
+                              "name": "Level 6 - line items",
                               "item": [
                                 {
-                                  "name": "Level 7 — tax overrides",
+                                  "name": "Level 7 - tax overrides",
                                   "item": [
                                     {
-                                      "name": "Level 8 — jurisdiction rules",
+                                      "name": "Level 8 - jurisdiction rules",
                                       "item": [
                                         {
                                           "name": "Apply EU VAT rule",

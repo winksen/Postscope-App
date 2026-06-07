@@ -1,6 +1,8 @@
-# PostScope — Design System
+# PostScope: Design System
 
-Practical guidance for building UI that matches PostScope: **Tailwind-first**, **shadcn/ui composable primitives**, **Lexend Deca** typography, and **HSL CSS variables** for theming.
+Practical guidance for building UI that matches PostScope: **Tailwind-first**, **shadcn/ui composable primitives**, **Elms Sans** typography, and **HSL CSS variables** for theming.
+
+For voice, punctuation, and overall visual personality, see [VISUAL_STYLE.md](./VISUAL_STYLE.md).
 
 **Source of truth**
 
@@ -16,12 +18,12 @@ Practical guidance for building UI that matches PostScope: **Tailwind-first**, *
 ### Philosophy
 
 - **SaaS dashboard, minimal chrome:** Calm neutrals, one strong primary (blue), data-forward density without clutter.
-- **Composable, not rigid:** Prefer shadcn patterns—assemble `Card` + `Button` + primitives rather than one-off mega-components—unless a feature truly needs it (e.g. `StatCard`).
+- **Composable, not rigid:** Prefer shadcn patterns: assemble `Card` + `Button` + primitives rather than one-off mega-components unless a feature truly needs it (e.g. `StatCard`).
 - **Light mode first:** `darkMode: ['class']` exists in Tailwind; tokens in `:root` are light. If dark mode ships later, add `.dark { … }` variables and test every semantic color.
 
 ### Spacing & layout rules
 
-- **Page content** sits in `DashboardShell`’s `main` with `p-6 lg:p-8`—new dashboard pages should assume that padding unless full-bleed is required.
+- **Page content** sits in `DashboardShell`’s `main` with `p-6 lg:p-8`. New dashboard pages should assume that padding unless full-bleed is required.
 - **Vertical rhythm:** Stack sections with `flex flex-col gap-6 lg:gap-8` for major page blocks (see Overview / Security / Score pages).
 - **Horizontal density:** Prefer `gap-3` or `gap-4` in toolbars; `gap-6` between large cards.
 
@@ -40,9 +42,9 @@ Practical guidance for building UI that matches PostScope: **Tailwind-first**, *
 
 | Region | Implementation | Notes |
 |--------|----------------|-------|
-| Sidebar | `AppSidebar` — fixed `left-0`, `z-40`, width `w-60` or `w-[72px]` collapsed | Nav only; brand + `NavId` items |
-| Header | `AppHeader` — fixed `top-0`, `z-30`, `left` = sidebar width | Search, collection name, actions |
-| Content | `DashboardShell` `main` — `pt-14`, `paddingLeft` = sidebar width | Children wrapped in `p-6 lg:p-8` inside `main` |
+| Sidebar | `AppSidebar`, fixed `left-0`, `z-40`, width `w-60` or `w-[72px]` collapsed | Nav only; brand + `NavId` items |
+| Header | `AppHeader`, fixed `top-0`, `z-30`, `left` = sidebar width | Search, collection name, actions |
+| Content | `DashboardShell` `main`, `pt-14`, `paddingLeft` = sidebar width | Children wrapped in `p-6 lg:p-8` inside `main` |
 
 Shell background: `min-h-screen bg-muted/50`. Cards and header use `bg-card` / `bg-background/80` for contrast.
 
@@ -86,7 +88,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 - Container: `rounded-xl border border-border/80 bg-card shadow-sm`
 - Header / content padding: `p-6`; content `pt-0` to nest under header
 
-**Variants:** No CVA—use `className` on `Card` for hover (`hover:shadow-md`, `hover:border-primary/20`) like `StatCard`.
+**Variants:** No CVA; use `className` on `Card` for hover (`hover:shadow-md`, `hover:border-primary/20`) like `StatCard`.
 
 ---
 
@@ -94,12 +96,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 **When to use:** Primary actions, nav pills, icon-only tools, destructive confirmations.
 
-**Variants** (`button.tsx` — `class-variance-authority`)
+**Variants** (`button.tsx`, `class-variance-authority`)
 
 | Variant | Use |
 |---------|-----|
-| `default` | Primary CTA — `bg-primary` |
-| `secondary` | Secondary emphasis — selected nav style often matches |
+| `default` | Primary CTA, `bg-primary` |
+| `secondary` | Secondary emphasis; selected nav style often matches |
 | `destructive` | Delete / irreversible |
 | `outline` | Tertiary on busy backgrounds |
 | `ghost` | Sidebar nav, low-emphasis actions |
@@ -124,7 +126,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 **Input** (`input.tsx`): `h-9`, `rounded-md`, `border-input`, `text-sm`, `focus-visible:ring-2 focus-visible:ring-ring`.
 
-**Example — search pattern (header)**
+**Example: search pattern (header)**
 
 ```tsx
 <Input
@@ -201,7 +203,7 @@ Embed in `ScrollArea` if vertical space is constrained.
 </Dialog>
 ```
 
-**Custom layouts:** You may use `p-0` on `DialogContent` and subdivide (see `RequestAnalysisModal`)—keep header strip visually distinct (`border-b bg-muted/30`) for consistency.
+**Custom layouts:** You may use `p-0` on `DialogContent` and subdivide (see `RequestAnalysisModal`). Keep header strip visually distinct (`border-b bg-muted/30`) for consistency.
 
 ---
 
@@ -213,13 +215,13 @@ Embed in `ScrollArea` if vertical space is constrained.
 
 | Variant | Use |
 |---------|-----|
-| `default` | Strong emphasis — primary fill |
+| `default` | Strong emphasis, primary fill |
 | `secondary` | Neutral tag |
 | `destructive` | Error / critical |
 | `outline` | Subtle border context |
-| `success` | Positive / secure — uses `--success` tint |
-| `warning` | Caution — uses `--warning` tint |
-| `critical` | Soft destructive text — `bg-destructive/10 text-destructive` |
+| `success` | Positive / secure, uses `--success` tint |
+| `warning` | Caution, uses `--warning` tint |
+| `critical` | Soft destructive text, `bg-destructive/10 text-destructive` |
 
 **Example**
 
@@ -253,13 +255,13 @@ Embed in `ScrollArea` if vertical space is constrained.
 </Tabs>
 ```
 
-`TabsContent` includes `mt-6`—do not strip unless the design needs tighter spacing.
+`TabsContent` includes `mt-6`. Do not strip unless the design needs tighter spacing.
 
 ---
 
 ## 4. Typography system
 
-**Font:** Lexend Deca (`font-sans` and `font-mono` in `tailwind.config.ts`—both point to Lexend Deca; use `font-mono` for `tabular-nums` / code-like UI, not a different family).
+**Font:** Elms Sans (`font-sans` and `font-mono` in `tailwind.config.ts`; both point to Elms Sans; use `font-mono` for `tabular-nums` / code-like UI, not a different family).
 
 | Role | Classes | Notes |
 |------|---------|-------|
@@ -282,7 +284,7 @@ Embed in `ScrollArea` if vertical space is constrained.
 
 ## 5. Color system
 
-All semantic colors are **HSL components** (no `hsl()` in variables—Tailwind wraps as `hsl(var(--token))`).
+All semantic colors are **HSL components** (no `hsl()` in variables; Tailwind wraps as `hsl(var(--token))`).
 
 ### Core tokens (`:root`)
 
@@ -316,7 +318,7 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 | `--critical` | Aligns with destructive emphasis where named explicitly |
 | `--postman` | Reserved for Postman-adjacent branding accents (use sparingly) |
 
-**In Tailwind:** Prefer `bg-primary/10`, `text-destructive`, `border-border`, `text-muted-foreground`. For success/warning fills not in `theme.colors`, use arbitrary values: `bg-[hsl(var(--success)/0.12)]`, `text-[hsl(var(--warning))]`—match existing `Badge` patterns.
+**In Tailwind:** Prefer `bg-primary/10`, `text-destructive`, `border-border`, `text-muted-foreground`. For success/warning fills not in `theme.colors`, use arbitrary values: `bg-[hsl(var(--success)/0.12)]`, `text-[hsl(var(--warning))]`. Match existing `Badge` patterns.
 
 ---
 
@@ -359,7 +361,7 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 ### Focus
 
 - Standard: `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`.
-- Keep **visible focus** for keyboard users—do not remove ring without a replacement.
+- Keep **visible focus** for keyboard users. Do not remove ring without a replacement.
 
 ### Transitions
 
@@ -369,7 +371,7 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 ### Loading
 
 - Use **`Skeleton`** from `ui/skeleton.tsx`: `animate-pulse rounded-md bg-muted`.
-- Pattern: match layout of final content (e.g. table row placeholders). Security page uses a short timed skeleton before showing data—prefer **content-aware** skeletons over blank spinners.
+- Pattern: match layout of final content (e.g. table row placeholders). Security page uses a short timed skeleton before showing data. Prefer **content-aware** skeletons over blank spinners.
 
 ---
 
@@ -414,10 +416,10 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 
 ### Don’t
 
-- Add **raw `alert()`** for UX-critical flows—use `Dialog` + toast pattern when available.
+- Add **raw `alert()`** for UX-critical flows. Use `Dialog` + toast pattern when available.
 - Nest **multiple competing primaries** on one screen (one primary `Button` per logical region).
 - Replace **Radix primitives** with unstyled divs that need focus traps (dialogs, menus).
-- Hardcode **hex colors** for surfaces—extend `index.css` tokens if a new semantic is needed.
+- Hardcode **hex colors** for surfaces. Extend `index.css` tokens if a new semantic is needed.
 - Skip **`aria-label`** on icon-only `Button`s.
 
 ---
