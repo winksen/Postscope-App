@@ -181,7 +181,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
+    <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security score</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -189,7 +189,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">Overall grade</CardTitle>

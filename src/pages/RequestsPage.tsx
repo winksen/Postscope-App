@@ -289,7 +289,7 @@ export function RequestsPage({
   }, [focusRequestId, parsed.requests, onFocusRequestHandled])
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight">Requests explorer</h1>
         <p className="text-sm text-muted-foreground">
@@ -297,7 +297,7 @@ export function RequestsPage({
         </p>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 xl:grid-cols-[430px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
         <Card className="flex min-h-0 flex-col overflow-hidden">
           <CardHeader className="shrink-0 pb-3">
             <div className="flex items-start justify-between gap-3">
@@ -387,7 +387,7 @@ export function RequestsPage({
           </CardHeader>
           <CardContent className="min-h-0 flex-1 p-0">
             <ScrollArea className="h-full">
-              <div className="space-y-5 px-6 pb-6">
+              <div className="space-y-5 px-5 pb-5">
                 {!selected ? (
                   <p className="text-sm text-muted-foreground">No request selected.</p>
                 ) : (

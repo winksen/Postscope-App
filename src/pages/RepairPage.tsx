@@ -228,7 +228,7 @@ export function RepairPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
+    <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Repair Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -276,7 +276,7 @@ export function RepairPage({
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -332,7 +332,7 @@ export function RepairPage({
             </CardHeader>
             <CardContent className="p-0">
               {grouped.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                <div className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">
                     <Wrench className="h-6 w-6" />
                   </div>

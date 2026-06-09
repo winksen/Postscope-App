@@ -99,7 +99,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
   ].filter(Boolean) as { key: string; value: string; label: string }[]
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
+    <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security findings</h1>
         <p className="text-sm text-muted-foreground">
@@ -176,7 +176,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
           </div>
         </CardContent>
         {activeFilters.length > 0 && (
-          <div className="px-6 pb-4">
+          <div className="px-5 pb-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Active:</span>
               {activeFilters.map((f) => (
@@ -215,7 +215,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
         </CardHeader>
         <CardContent className="p-0">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">
+            <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
                 <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" />
               </div>

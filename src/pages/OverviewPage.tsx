@@ -11,7 +11,6 @@ import {
   YAxis,
 } from 'recharts'
 import {
-  ChartBar,
   FileText,
   FolderOpen,
   Key,
@@ -170,7 +169,7 @@ export function OverviewPage({ parsed }: OverviewPageProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
+    <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Collection overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -213,10 +212,10 @@ export function OverviewPage({ parsed }: OverviewPageProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2"><ChartBar className="h-4 w-4 text-muted-foreground" />HTTP methods</CardTitle>
+            <CardTitle>HTTP methods</CardTitle>
             <CardDescription>Distribution of verbs across the collection</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">

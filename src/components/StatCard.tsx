@@ -9,7 +9,7 @@ export interface StatCardDetail {
 }
 
 interface StatCardProps {
-  icon: ComponentType<{ className?: string }>
+  icon: ComponentType<{ className?: string; weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone' }>
   label: string
   value: string | number
   subtext?: string
@@ -61,7 +61,7 @@ export function StatCard({
           )}
           aria-hidden
         >
-          <Icon className={cn('h-7 w-7', GRADIENTS[gradient].split(' ').slice(-2).join(' '))} />
+          <Icon className={cn('h-7 w-7', GRADIENTS[gradient].split(' ').slice(-2).join(' '))} weight="fill" />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
