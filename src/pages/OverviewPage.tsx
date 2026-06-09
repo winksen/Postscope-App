@@ -10,33 +10,49 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { FileText, FolderOpen, Key, Stack, ChartBar } from '@phosphor-icons/react'
+import {
+  ChartBar,
+  FileText,
+  FolderOpen,
+  Key,
+  Stack,
+} from '@phosphor-icons/react'
 import { StatCard } from '../components/StatCard'
-import { RequestTree } from '../components/RequestTree'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
-import type { Finding } from '../lib/auditor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
-import { OverviewPageSkeleton } from '@/components/page-skeletons'
 
 /** Auth / accent slice colors (blue → green → orange). */
-const DASHBOARD_ACCENT = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
+const AUTH_COLORS: Record<string, string> = {
+  noauth: 'hsl(215 14% 64%)',
+  bearer: 'hsl(158 64% 42%)',
+  basic: 'hsl(199 89% 48%)',
+  apikey: 'hsl(38 92% 50%)',
+  oauth1: 'hsl(271 70% 55%)',
+  oauth2: 'hsl(271 70% 55%)',
+  digest: 'hsl(173 58% 40%)',
+  awsv4: 'hsl(24 90% 52%)',
+}
+
+const FALLBACK_AUTH_COLORS = [
+  'hsl(340 75% 52%)',
+  'hsl(187 72% 42%)',
+  'hsl(142 65% 40%)',
+  'hsl(285 70% 54%)',
+  'hsl(48 95% 48%)',
 ] as const
 
 /** Distinct color per HTTP verb; DELETE uses destructive red. */
 const VERB_COLORS: Record<string, string> = {
-  GET: 'hsl(var(--chart-1))',
-  POST: 'hsl(var(--chart-2))',
-  PUT: 'hsl(var(--chart-3))',
-  PATCH: 'hsl(var(--chart-4))',
-  DELETE: 'hsl(var(--destructive))',
-  HEAD: 'hsl(199 89% 46%)',
-  OPTIONS: 'hsl(271 70% 52%)',
+  GET: 'hsl(158 64% 42%)',
+  POST: 'hsl(199 89% 48%)',
+  PUT: 'hsl(38 92% 50%)',
+  PATCH: 'hsl(271 70% 55%)',
+  DELETE: 'hsl(0 72% 51%)',
+  HEAD: 'hsl(192 70% 39%)',
+  OPTIONS: 'hsl(276 72% 48%)',
   TRACE: 'hsl(173 58% 40%)',
-  CONNECT: 'hsl(25 90% 48%)',
+  CONNECT: 'hsl(24 90% 52%)',
 }
 
 const FALLBACK_VERB_HUES = [340, 187, 48, 24, 142, 285, 35, 310]
@@ -50,11 +66,13 @@ function fillForMethod(method: string, fallbackIndex: number): string {
   return `hsl(${h} 72% 44%)`
 }
 
+function fillForAuth(name: string, fallbackIndex: number): string {
+  const key = name.toLowerCase().replace(/[\s_-]+/g, '')
+  return AUTH_COLORS[key] ?? FALLBACK_AUTH_COLORS[fallbackIndex % FALLBACK_AUTH_COLORS.length]
+}
+
 interface OverviewPageProps {
   parsed: ParsedCollection
-  findings: Finding[]
-  search: string
-  isLoading?: boolean
 }
 
 function variableNamesUsedInRequests(requests: ParsedRequest[]): Set<string> {
@@ -68,8 +86,7 @@ function variableNamesUsedInRequests(requests: ParsedRequest[]): Set<string> {
   return names
 }
 
-export function OverviewPage({ parsed, findings, search, isLoading = false }: OverviewPageProps) {
-  if (isLoading) return <OverviewPageSkeleton />
+export function OverviewPage({ parsed }: OverviewPageProps) {
   const methodEntries = Object.entries(parsed.methods).sort((a, b) => b[1] - a[1])
   let verbFallbackSlot = 0
   const methodData = methodEntries.map(([method, count]) => ({
@@ -86,6 +103,11 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
   if (authPieData.length === 0) {
     authPieData.push({ name: 'noauth', value: parsed.totalRequests })
   }
+
+  const authColorData = authPieData.map((entry, index) => ({
+    ...entry,
+    fill: fillForAuth(entry.name, index),
+  }))
 
   const noauthCount = parsed.authTypes.noauth ?? 0
   const typedAuthSharePct =
@@ -261,7 +283,7 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: -28, right: 8, left: 8, bottom: 4 }}>
                   <Pie
-                    data={authPieData}
+                    data={authColorData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -276,10 +298,10 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
                     animationBegin={200}
                     animationDuration={800}
                   >
-                    {authPieData.map((_, i) => (
+                    {authColorData.map((entry, i) => (
                       <Cell
                         key={i}
-                        fill={DASHBOARD_ACCENT[i % DASHBOARD_ACCENT.length]}
+                        fill={entry.fill}
                         className="transition-all duration-200 hover:opacity-80"
                       />
                     ))}
@@ -301,11 +323,11 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-              {authPieData.map((entry, i) => (
+              {authColorData.map((entry) => (
                 <div key={entry.name} className="flex items-center gap-2 text-xs">
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: DASHBOARD_ACCENT[i % DASHBOARD_ACCENT.length] }}
+                    style={{ backgroundColor: entry.fill }}
                   />
                   <span className="capitalize text-muted-foreground">{entry.name}</span>
                   <span className="tabular-nums font-semibold text-foreground">{entry.value}</span>
@@ -321,16 +343,6 @@ export function OverviewPage({ parsed, findings, search, isLoading = false }: Ov
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Request tree</CardTitle>
-          <CardDescription>Open a request to inspect headers, body, and related findings</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RequestTree parsed={parsed} findings={findings} search={search} />
-        </CardContent>
-      </Card>
     </div>
   )
 }

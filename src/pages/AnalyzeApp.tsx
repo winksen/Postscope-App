@@ -41,7 +41,6 @@ import { createRepairPlan } from '../lib/repairEngine'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
 import type { NavId } from '../components/layout/app-sidebar'
-import { useDashboardPageLoading } from '../hooks/use-dashboard-page-loading'
 
 interface AnalyzeAppProps {
   loggingMode: LoggingMode
@@ -281,7 +280,6 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
 
   const teamLibraryVisible = shouldShowTeamLibrary(loggingMode)
   const canSave = canSaveToAppStorage(loggingMode, storageMode, uploadConsent)
-  const pageLoading = useDashboardPageLoading(active)
 
   if (!parsed) {
     return (
@@ -338,26 +336,18 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
         savingToLibrary={savingToLibrary}
         historyEnabled={teamLibraryVisible}
       >
-        {active === 'overview' && (
-          <OverviewPage parsed={parsed} findings={findings} search={search} isLoading={pageLoading} />
-        )}
+        {active === 'overview' && <OverviewPage parsed={parsed} />}
         {active === 'requests' && (
           <RequestsPage
             parsed={parsed}
+            findings={findings}
             search={search}
             focusRequestId={focusRequestId}
             onFocusRequestHandled={() => setFocusRequestId(null)}
-            isLoading={pageLoading}
           />
         )}
         {active === 'security' && (
-          <SecurityPage
-            parsed={parsed}
-            findings={findings}
-            score={score}
-            search={search}
-            isLoading={pageLoading}
-          />
+          <SecurityPage parsed={parsed} findings={findings} score={score} search={search} />
         )}
         {active === 'repair' && rawJson && (
           <RepairPage
@@ -368,10 +358,9 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
             originalRawJson={originalRawJson || rawJson}
             onApplyRepairedCollection={handleApplyRepairedCollection}
             onResetRepairs={handleResetRepairs}
-            isLoading={pageLoading}
           />
         )}
-        {active === 'score' && <ScorePage score={score} findings={findings} isLoading={pageLoading} />}
+        {active === 'score' && <ScorePage score={score} findings={findings} />}
       </DashboardShell>
 
       <RequestSearchModal

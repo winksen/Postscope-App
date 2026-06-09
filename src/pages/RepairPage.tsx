@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, Download, RotateCcw, SlidersHorizontal, Wand2, Wrench } from 'lucide-react'
+import {
+  CheckCircle as BadgeCheck,
+  DownloadSimple as Download,
+  ArrowCounterClockwise as RotateCcw,
+  SlidersHorizontal,
+  MagicWand as Wand2,
+  Wrench,
+} from '@phosphor-icons/react'
 import type { Finding } from '../lib/auditor'
 import type { ParsedCollection } from '../lib/parser'
 import { calculateScore, type ScoreBreakdown } from '../lib/scorer'
@@ -22,7 +29,6 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import { RepairPageSkeleton } from '@/components/page-skeletons'
 
 type CategoryFilter = 'all' | Finding['category']
 type RiskFilter = 'all' | RepairRiskLevel
@@ -40,7 +46,6 @@ interface RepairPageProps {
   originalRawJson: string
   onApplyRepairedCollection: (rawJson: string) => Promise<RepairApplyResult>
   onResetRepairs: () => Promise<void>
-  isLoading?: boolean
 }
 
 const CATEGORY_ORDER: Finding['category'][] = ['secrets', 'variables', 'auth', 'hygiene']
@@ -144,7 +149,6 @@ export function RepairPage({
   originalRawJson,
   onApplyRepairedCollection,
   onResetRepairs,
-  isLoading = false,
 }: RepairPageProps) {
   const rawObject = useMemo(() => JSON.parse(rawJson) as unknown, [rawJson])
   const plan = useMemo(() => createRepairPlan(rawObject, parsed, findings), [rawObject, parsed, findings])
@@ -222,8 +226,6 @@ export function RepairPage({
     await onResetRepairs()
     setLastRun(null)
   }
-
-  if (isLoading) return <RepairPageSkeleton />
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">

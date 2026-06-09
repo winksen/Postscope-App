@@ -1,6 +1,14 @@
 import type { ElementType } from "react";
-import { ChartPieSlice, Shield, Gauge, CaretLeft, CaretRight, Stethoscope, FolderSimple } from "@phosphor-icons/react";
-import { Wrench as LucideWrench } from "lucide-react";
+import {
+  CaretLeft,
+  CaretRight,
+  ChartPieSlice,
+  Gauge,
+  GearSix,
+  LockKey,
+  Stethoscope,
+  TreeStructure,
+} from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,14 +21,12 @@ export type NavId = "overview" | "requests" | "security" | "repair" | "score";
 
 type SidebarIcon = ElementType;
 
-const RepairIcon: SidebarIcon = ({ className }) => <LucideWrench className={className} />;
-
-const nav: { id: NavId; label: string; icon: SidebarIcon }[] = [
-  { id: "overview", label: "Dashboard", icon: ChartPieSlice },
-  { id: "requests", label: "Requests", icon: FolderSimple },
-  { id: "security", label: "Security", icon: Shield },
-  { id: "repair", label: "Repair", icon: RepairIcon },
-  { id: "score", label: "Score", icon: Gauge },
+const nav: { id: NavId; label: string; icon: SidebarIcon; activeIcon: SidebarIcon }[] = [
+  { id: "overview", label: "Dashboard", icon: ChartPieSlice, activeIcon: ChartPieSlice },
+  { id: "requests", label: "Requests", icon: TreeStructure, activeIcon: TreeStructure },
+  { id: "security", label: "Security", icon: LockKey, activeIcon: LockKey },
+  { id: "repair", label: "Repair", icon: GearSix, activeIcon: GearSix },
+  { id: "score", label: "Score", icon: Gauge, activeIcon: Gauge },
 ];
 
 interface AppSidebarProps {
@@ -56,8 +62,8 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="flex flex-col gap-1">
           {nav.map((item) => {
-            const Icon = item.icon;
             const isActive = active === item.id;
+            const Icon = isActive ? item.activeIcon : item.icon;
             const count = item.id === "security" ? issueCount : item.id === "repair" ? repairCount : 0;
             const badge = count > 0 ? <Badge className="h-5 min-w-5 justify-center bg-white/20 px-1 text-[10px] font-semibold text-white">{count > 99 ? "99+" : count}</Badge> : null;
             const btn = (

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CaretRight, Lock, LockOpen, Folder, FolderOpen } from '@phosphor-icons/react'
+import {
+  CaretRight,
+  Folder,
+  FolderOpen,
+  Lock,
+  LockOpen,
+} from '@phosphor-icons/react'
 import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'

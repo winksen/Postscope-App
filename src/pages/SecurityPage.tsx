@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { CheckCircle, ArrowSquareOut, ShieldWarning, Warning, Info, FunnelSimple, X } from '@phosphor-icons/react'
+import {
+  CheckCircle,
+  ArrowSquareOut,
+  FunnelSimple,
+  Info,
+  ShieldWarning,
+  Warning,
+  X,
+} from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import type { Finding } from '../lib/auditor'
 import { affectedLabels } from '../lib/findingDisplay'
@@ -18,7 +26,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { SecurityPageSkeleton } from '@/components/page-skeletons'
 import { cn } from '@/lib/utils'
 
 interface SecurityPageProps {
@@ -26,7 +33,6 @@ interface SecurityPageProps {
   findings: Finding[]
   score: ScoreBreakdown
   search: string
-  isLoading?: boolean
 }
 
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
@@ -69,8 +75,7 @@ function SeveritySummaryCard({
   )
 }
 
-export function SecurityPage({ parsed, findings, score, search, isLoading = false }: SecurityPageProps) {
-  if (isLoading) return <SecurityPageSkeleton />
+export function SecurityPage({ parsed, findings, score, search }: SecurityPageProps) {
   const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
   const [detail, setDetail] = useState<Finding | null>(null)

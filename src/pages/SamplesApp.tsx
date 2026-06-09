@@ -136,10 +136,11 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
         savingToLibrary={false}
         historyEnabled={false}
       >
-        {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} search={search} />}
+        {active === 'overview' && <OverviewPage parsed={parsed} />}
         {active === 'requests' && (
           <RequestsPage
             parsed={parsed}
+            findings={findings}
             search={search}
             focusRequestId={focusRequestId}
             onFocusRequestHandled={() => setFocusRequestId(null)}

@@ -1,6 +1,15 @@
 import type { ElementType } from 'react'
-import { MagnifyingGlass, SignOut, FileCode, ChartPieSlice, Shield, Gauge, FolderSimple, BookmarkSimple } from '@phosphor-icons/react'
-import { Wrench as LucideWrench } from 'lucide-react'
+import {
+  BookmarkSimple,
+  ChartPieSlice,
+  FileCode,
+  Gauge,
+  GearSix,
+  LockKey,
+  MagnifyingGlass,
+  SignOut,
+  TreeStructure,
+} from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -9,13 +18,11 @@ import type { NavId } from './app-sidebar'
 
 type HeaderIcon = ElementType
 
-const RepairIcon: HeaderIcon = ({ className }) => <LucideWrench className={className} />
-
 const NAV_LABELS: Record<NavId, { label: string; icon: HeaderIcon }> = {
   overview: { label: 'Dashboard', icon: ChartPieSlice },
-  requests: { label: 'Requests', icon: FolderSimple },
-  security: { label: 'Security', icon: Shield },
-  repair: { label: 'Repair', icon: RepairIcon },
+  requests: { label: 'Requests', icon: TreeStructure },
+  security: { label: 'Security', icon: LockKey },
+  repair: { label: 'Repair', icon: GearSix },
   score: { label: 'Score', icon: Gauge },
 }
 

@@ -8,9 +8,17 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Key, Link, Lock, Sparkle, CheckCircle, WarningCircle, Lightbulb, DownloadSimple } from '@phosphor-icons/react'
+import {
+  CheckCircle,
+  DownloadSimple,
+  Key,
+  Lightbulb,
+  Link,
+  Lock,
+  Sparkle,
+  WarningCircle,
+} from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import { ScorePageSkeleton } from '@/components/page-skeletons'
 
 function getProgressTone(value: number): string {
   if (value >= 90) return 'bg-[hsl(var(--chart-2))]'
@@ -45,7 +53,6 @@ const CATEGORY_LABELS: Record<keyof ScoreBreakdown['categories'], string> = {
 interface ScorePageProps {
   score: ScoreBreakdown
   findings: Finding[]
-  isLoading?: boolean
 }
 
 function CategoryBar({
@@ -129,8 +136,7 @@ function ActionCard({
   )
 }
 
-export function ScorePage({ score, findings, isLoading = false }: ScorePageProps) {
-  if (isLoading) return <ScorePageSkeleton />
+export function ScorePage({ score, findings }: ScorePageProps) {
   const advice: { text: string; priority: 'P0' | 'P1' | 'P2' }[] = []
   const critical = findings.filter((f) => f.severity === 'critical')
   const warning = findings.filter((f) => f.severity === 'warning')

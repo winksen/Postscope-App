@@ -1,4 +1,4 @@
-import { Lock, LockOpen, Copy, Check } from '@phosphor-icons/react'
+import { Check, Copy, Lock, LockOpen } from '@phosphor-icons/react'
 import { RequestBadges } from './RequestBadges'
 import { SeverityBadge } from './SeverityBadge'
 import type { ParsedRequest } from '../lib/parser'
