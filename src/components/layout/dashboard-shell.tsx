@@ -4,7 +4,6 @@ import { AppHeader } from "./app-header";
 import { cn } from "@/lib/utils";
 
 interface DashboardShellProps {
-  collectionName: string;
   issueCount: number;
   repairCount?: number;
   active: NavId;
@@ -19,16 +18,16 @@ interface DashboardShellProps {
   children: React.ReactNode;
 }
 
-export function DashboardShell({ collectionName, issueCount, repairCount = 0, active, onNav, search, onOpenSearch, onAnalyzeAnother, onSaveToLibrary, isSavedToLibrary, savingToLibrary, historyEnabled, children }: DashboardShellProps) {
+export function DashboardShell({ issueCount, repairCount = 0, active, onNav, search, onOpenSearch, onAnalyzeAnother, onSaveToLibrary, isSavedToLibrary, savingToLibrary, historyEnabled, children }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebarW = collapsed ? 72 : 240;
 
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} active={active} onNav={onNav} issueCount={issueCount} repairCount={repairCount} />
-      <AppHeader sidebarOffset={`${sidebarW}px`} collectionName={collectionName} search={search} onOpenSearch={onOpenSearch} onAnalyzeAnother={onAnalyzeAnother} onSaveToLibrary={onSaveToLibrary} isSavedToLibrary={isSavedToLibrary} savingToLibrary={savingToLibrary} historyEnabled={historyEnabled} active={active} />
-      <main className={cn("min-h-screen pt-14 transition-[padding] duration-200")} style={{ paddingLeft: sidebarW }}>
-        <div className="p-6 lg:p-8">
+      <AppHeader sidebarOffset={`${sidebarW}px`} search={search} onOpenSearch={onOpenSearch} onAnalyzeAnother={onAnalyzeAnother} onSaveToLibrary={onSaveToLibrary} isSavedToLibrary={isSavedToLibrary} savingToLibrary={savingToLibrary} historyEnabled={historyEnabled} />
+      <main className={cn("pt-14 transition-[padding] duration-200", active === "requests" ? "h-screen overflow-hidden" : "min-h-screen")} style={{ paddingLeft: sidebarW }}>
+        <div className={cn("p-6 lg:p-8", active === "requests" && "h-full overflow-hidden")}>
           {children}
         </div>
       </main>

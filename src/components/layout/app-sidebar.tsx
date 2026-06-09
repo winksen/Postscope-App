@@ -2,10 +2,10 @@ import type { ElementType } from "react";
 import {
   CaretLeft,
   CaretRight,
-  ChartPieSlice,
   Gauge,
   GearSix,
   LockKey,
+  PresentationChart,
   Stethoscope,
   TreeStructure,
 } from "@phosphor-icons/react";
@@ -22,7 +22,7 @@ export type NavId = "overview" | "requests" | "security" | "repair" | "score";
 type SidebarIcon = ElementType;
 
 const nav: { id: NavId; label: string; icon: SidebarIcon; activeIcon: SidebarIcon }[] = [
-  { id: "overview", label: "Dashboard", icon: ChartPieSlice, activeIcon: ChartPieSlice },
+  { id: "overview", label: "Dashboard", icon: PresentationChart, activeIcon: PresentationChart },
   { id: "requests", label: "Requests", icon: TreeStructure, activeIcon: TreeStructure },
   { id: "security", label: "Security", icon: LockKey, activeIcon: LockKey },
   { id: "repair", label: "Repair", icon: GearSix, activeIcon: GearSix },

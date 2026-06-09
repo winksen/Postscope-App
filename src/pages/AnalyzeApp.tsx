@@ -323,7 +323,6 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
   return (
     <>
       <DashboardShell
-        collectionName={parsed.name}
         issueCount={findings.length}
         repairCount={repairAutoFixCount}
         active={active}

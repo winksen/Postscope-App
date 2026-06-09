@@ -124,7 +124,6 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
   return (
     <>
       <DashboardShell
-        collectionName={parsed.name}
         issueCount={findings.length}
         repairCount={repairAutoFixCount}
         active={active}

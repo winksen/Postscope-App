@@ -1,34 +1,14 @@
-import type { ElementType } from 'react'
 import {
   BookmarkSimple,
-  ChartPieSlice,
-  FileCode,
-  Gauge,
-  GearSix,
-  LockKey,
   MagnifyingGlass,
   SignOut,
-  TreeStructure,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThemeToggle } from '@/components/theme-toggle'
-// cn removed - not needed
-import type { NavId } from './app-sidebar'
-
-type HeaderIcon = ElementType
-
-const NAV_LABELS: Record<NavId, { label: string; icon: HeaderIcon }> = {
-  overview: { label: 'Dashboard', icon: ChartPieSlice },
-  requests: { label: 'Requests', icon: TreeStructure },
-  security: { label: 'Security', icon: LockKey },
-  repair: { label: 'Repair', icon: GearSix },
-  score: { label: 'Score', icon: Gauge },
-}
 
 interface AppHeaderProps {
   sidebarOffset: string
-  collectionName: string
   search: string
   onOpenSearch: () => void
   onAnalyzeAnother: () => void
@@ -36,12 +16,10 @@ interface AppHeaderProps {
   isSavedToLibrary: boolean
   savingToLibrary: boolean
   historyEnabled: boolean
-  active: NavId
 }
 
 export function AppHeader({
   sidebarOffset,
-  collectionName,
   search,
   onOpenSearch,
   onAnalyzeAnother,
@@ -49,31 +27,13 @@ export function AppHeader({
   isSavedToLibrary,
   savingToLibrary,
   historyEnabled,
-  active,
 }: AppHeaderProps) {
-  const activeNav = NAV_LABELS[active]
-
   return (
     <header
       className="fixed right-0 top-0 z-30 flex h-14 items-center gap-4 bg-background/70 px-6 backdrop-blur-xl transition-[left] duration-200"
       style={{ left: sidebarOffset }}
     >
-      {/* Breadcrumb */}
-      <div className="hidden items-center gap-2 md:flex">
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <activeNav.icon className="h-3.5 w-3.5" />
-          <span className="font-medium text-foreground">{activeNav.label}</span>
-        </div>
-        <span className="text-muted-foreground/40">/</span>
-        <div className="flex items-center gap-1.5">
-          <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
-          <p className="truncate text-sm text-muted-foreground max-w-[180px] lg:max-w-xs" title={collectionName}>
-            {collectionName}
-          </p>
-        </div>
-      </div>
-
-      <div className="relative min-w-0 flex-1 max-w-md ml-auto md:ml-0">
+      <div className="relative mx-auto min-w-0 flex-1 max-w-xl">
         <button
           type="button"
           onClick={onOpenSearch}
