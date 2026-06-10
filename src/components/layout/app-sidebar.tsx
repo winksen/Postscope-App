@@ -4,6 +4,7 @@ import {
   CaretRight,
   Gauge,
   GearSix,
+  GithubLogo,
   LockKey,
   PresentationChart,
   Stethoscope,
@@ -16,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { GITHUB_REPO_URL } from "@/components/marketing/marketing-shell";
 
 export type NavId = "overview" | "requests" | "security" | "repair" | "score";
 
@@ -50,7 +52,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
           )}
           aria-label="PostScope home"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center text-orange-400">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
             <Stethoscope className="h-8 w-8" weight="fill" />
           </div>
           {!collapsed && (
@@ -65,10 +67,21 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
             const isActive = active === item.id;
             const Icon = isActive ? item.activeIcon : item.icon;
             const count = item.id === "security" ? issueCount : item.id === "repair" ? repairCount : 0;
-            const badge = count > 0 ? <Badge className="h-5 min-w-5 justify-center bg-white/20 px-1 text-[10px] font-semibold text-white">{count > 99 ? "99+" : count}</Badge> : null;
+            const badge = count > 0 ? (
+              <Badge
+                className={cn(
+                  "h-5 min-w-5 justify-center px-1 text-[10px] font-semibold",
+                  isActive
+                    ? "bg-background/20 text-background"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {count > 99 ? "99+" : count}
+              </Badge>
+            ) : null;
             const btn = (
-              <Button key={item.id} variant={isActive ? "secondary" : "ghost"} size="sm" className={cn("h-10 w-full justify-start gap-3.5 rounded-full text-[15px] font-medium transition-all duration-200 [&_svg]:size-6", isActive && "bg-orange-500 text-white hover:bg-orange-500", collapsed && "justify-center px-0")} onClick={() => onNav(item.id)}>
-                <Icon className={cn("shrink-0 transition-colors duration-200", isActive && "text-white")} weight={isActive ? "fill" : "regular"} />
+              <Button key={item.id} variant={isActive ? "secondary" : "ghost"} size="sm" className={cn("h-10 w-full justify-start gap-3.5 rounded-full text-[15px] font-medium transition-all duration-200 [&_svg]:size-6", isActive && "bg-foreground text-background hover:bg-foreground/90 hover:text-background", collapsed && "justify-center px-0")} onClick={() => onNav(item.id)}>
+                <Icon className={cn("shrink-0 transition-colors duration-200", isActive && "text-background")} weight={isActive ? "fill" : "regular"} />
                 {!collapsed && (
                   <>
                     <span className="flex-1 truncate text-left">{item.label}</span>
@@ -83,7 +96,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
                   <TooltipTrigger asChild>{btn}</TooltipTrigger>
                   <TooltipContent side="right" className="flex items-center gap-2">
                     {item.label}
-                    {count > 0 ? <Badge className="bg-orange-500 text-[10px] text-white">{count > 99 ? "99+" : count}</Badge> : null}
+                    {count > 0 ? <Badge className="bg-foreground text-[10px] text-background">{count > 99 ? "99+" : count}</Badge> : null}
                   </TooltipContent>
                 </Tooltip>
               );
@@ -94,6 +107,22 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
       </ScrollArea>
 
       <Separator className="bg-transparent" />
+      <div className="px-3 pb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(
+            "h-10 w-full justify-start gap-3.5 rounded-full text-[15px] font-medium transition-all duration-200 [&_svg]:size-6",
+            collapsed && "justify-center px-0"
+          )}
+          asChild
+        >
+          <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" aria-label="Star us on GitHub">
+            <GithubLogo className="shrink-0" weight="fill" />
+            {!collapsed && <span className="flex-1 truncate text-left">Star us on GitHub</span>}
+          </a>
+        </Button>
+      </div>
       <div className="p-2">
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>

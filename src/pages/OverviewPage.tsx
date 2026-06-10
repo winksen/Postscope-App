@@ -155,7 +155,15 @@ function maxDepth(node: StructureNode): number {
   return 1 + Math.max(...node.children.map(maxDepth))
 }
 
-function StructureBranch({ node, depth = 0 }: { node: StructureNode; depth?: number }) {
+function StructureBranch({
+  node,
+  depth = 0,
+  isLast = true,
+}: {
+  node: StructureNode
+  depth?: number
+  isLast?: boolean
+}) {
   const requestCount = totalRequests(node)
   const directRequests = node.requests.length
   const hasChildren = node.children.length > 0
@@ -164,11 +172,15 @@ function StructureBranch({ node, depth = 0 }: { node: StructureNode; depth?: num
   const levelColor = fillForTreeLevel(depth)
 
   return (
-    <div className={cn('relative', depth > 0 && 'pl-5')}>
+    <div className={cn('relative', depth > 0 && 'pl-4')}>
       {depth > 0 && (
         <>
-          <span className="absolute left-1 top-0 h-full w-px" style={{ backgroundColor: levelColor }} aria-hidden />
-          <span className="absolute left-1 top-6 h-px w-6" style={{ backgroundColor: levelColor }} aria-hidden />
+          <span
+            className={cn('absolute left-1 top-0 w-px', isLast ? 'h-6' : 'h-full')}
+            style={{ backgroundColor: levelColor }}
+            aria-hidden
+          />
+          <span className="absolute left-1 top-6 h-px w-5" style={{ backgroundColor: levelColor }} aria-hidden />
           <span
             className="absolute left-[0.0625rem] top-5 h-2 w-2 rounded-full"
             style={{ backgroundColor: levelColor }}
@@ -176,7 +188,7 @@ function StructureBranch({ node, depth = 0 }: { node: StructureNode; depth?: num
           />
         </>
       )}
-      <div className="relative flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/45">
+      <div className="relative flex min-w-0 items-center gap-3 rounded-lg px-2 py-2">
         <span
           className={cn(
             'flex h-8 w-8 shrink-0 items-center justify-center',
@@ -205,9 +217,14 @@ function StructureBranch({ node, depth = 0 }: { node: StructureNode; depth?: num
         </div>
       </div>
       {shownChildren.length > 0 && (
-        <div className="space-y-0.5">
-          {shownChildren.map((child) => (
-            <StructureBranch key={`${depth}-${child.name}`} node={child} depth={depth + 1} />
+        <div className="ml-5 space-y-0.5">
+          {shownChildren.map((child, index) => (
+            <StructureBranch
+              key={`${depth}-${child.name}`}
+              node={child}
+              depth={depth + 1}
+              isLast={index === shownChildren.length - 1 && hiddenChildren === 0}
+            />
           ))}
           {hiddenChildren > 0 && (
             <div className="pl-7 text-xs text-muted-foreground">+ {hiddenChildren} more folder branches</div>

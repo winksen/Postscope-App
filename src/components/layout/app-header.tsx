@@ -37,7 +37,7 @@ export function AppHeader({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="flex h-9 w-full items-center rounded-xl bg-muted/70 pl-9 pr-9 text-left text-sm transition-colors duration-200 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50"
+          className="flex h-9 w-full items-center rounded-xl bg-card pl-9 pr-9 text-left text-sm shadow-[0_8px_22px_hsl(var(--background)/0.28)] transition-colors duration-200 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 dark:bg-muted/70 dark:hover:bg-muted"
         >
           <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <span className={search ? 'truncate text-foreground' : 'truncate text-muted-foreground'}>
@@ -70,7 +70,12 @@ export function AppHeader({
           </Tooltip>
         )}
 
-        <Button variant="secondary" size="sm" className="gap-2" onClick={onAnalyzeAnother}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="gap-2 bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background dark:bg-foreground dark:text-background dark:hover:bg-foreground/90"
+          onClick={onAnalyzeAnother}
+        >
           <SignOut className="h-4 w-4" />
           <span className="hidden sm:inline">New collection</span>
         </Button>

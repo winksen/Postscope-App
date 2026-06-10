@@ -206,17 +206,20 @@ function FolderNode({
   const total = requestCountForNode(node)
 
   return (
-    <div className={cn('pl-2 pr-1.5', depth > 0 && 'ml-1')}>
+    <div className={cn('pr-1.5', depth > 0 && 'ml-1 pl-2')}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="group flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-0"
+        className={cn(
+          'group flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-xl py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-0',
+          depth === 0 ? 'px-0' : 'px-2.5'
+        )}
       >
         <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         {open ? (
-          <FolderOpen className="h-4 w-4 shrink-0 text-primary/70" />
+          <FolderOpen className="h-4 w-4 shrink-0 text-primary/70" weight="fill" />
         ) : (
-          <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Folder className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" />
         )}
         <span className="truncate font-medium">{node.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground">({total})</span>
@@ -277,9 +280,8 @@ export function RequestsPage({
   }, [selected, search])
 
   useEffect(() => {
-    if (focusRequestId) return
     setSelected(null)
-  }, [parsed, focusRequestId])
+  }, [parsed])
 
   useEffect(() => {
     if (!focusRequestId) return
@@ -332,7 +334,7 @@ export function RequestsPage({
                 {filteredRoot.length > 0 && (
                   <div className="pl-2 pr-1.5">
                     <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      <FolderOpen className="h-3.5 w-3.5" />
+                      <FolderOpen className="h-3.5 w-3.5" weight="fill" />
                       Root
                     </span>
                     <div className="mt-2 space-y-1">
