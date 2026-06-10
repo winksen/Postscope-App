@@ -7,6 +7,7 @@ import {
   MagicWand as Wand2,
   Wrench,
 } from '@phosphor-icons/react'
+import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
 import type { ParsedCollection } from '../lib/parser'
 import { calculateScore, type ScoreBreakdown } from '../lib/scorer'
@@ -88,7 +89,7 @@ function FixRow({
   const isManual = fix.status === 'manual'
 
   return (
-    <div className="grid gap-4 border-t border-border px-4 py-4 first:border-t-0 sm:grid-cols-[auto_minmax(0,1fr)] sm:px-5">
+    <div className="grid gap-4 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:px-5">
       <Checkbox
         className="mt-1"
         checked={!isManual && selected}
@@ -120,11 +121,11 @@ function FixRow({
 
         {(fix.beforeSnippet || fix.afterSnippet) && (
           <div className="grid gap-2 lg:grid-cols-2">
-            <div className="min-w-0 rounded-lg border border-border bg-muted/40 px-3 py-2">
+            <div className="min-w-0 rounded-lg bg-muted/45 px-3 py-2">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Before</p>
               <p className="break-words text-xs text-muted-foreground">{fix.beforeSnippet || 'Not available'}</p>
             </div>
-            <div className="min-w-0 rounded-lg border border-border bg-background px-3 py-2">
+            <div className="min-w-0 rounded-lg bg-card px-3 py-2 shadow-[0_8px_22px_hsl(var(--background)/0.2)] dark:shadow-none">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">After</p>
               <p className="break-words text-xs text-foreground">{fix.afterSnippet || 'Manual guidance only'}</p>
             </div>
@@ -236,43 +237,71 @@ export function RepairPage({
         </p>
       </div>
 
-      <Card>
-        <CardContent className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-center lg:p-5">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded-lg bg-muted/40 px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Available fixes</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{plan.autoFixCount}</p>
-            </div>
-            <div className="rounded-lg bg-muted/40 px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Selected</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{selectedFixes.length}</p>
-            </div>
-            <div className="rounded-lg bg-muted/40 px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Manual items</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{plan.manualCount}</p>
-            </div>
-            <div className="rounded-lg bg-muted/40 px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Estimated score</p>
-              <p className={cn('mt-1 text-xl font-semibold tabular-nums', scoreTone(estimatedScore.total))}>
-                {estimatedScore.total}/100
-              </p>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={Wrench}
+          label="Available fixes"
+          value={plan.autoFixCount}
+          subtext="Auto-fixable repairs"
+          details={[
+            { label: 'Manual items', value: plan.manualCount },
+            { label: 'Total suggestions', value: plan.fixes.length },
+          ]}
+          gradient="blue"
+        />
+        <StatCard
+          icon={BadgeCheck}
+          label="Selected fixes"
+          value={selectedFixes.length}
+          subtext="Ready to apply"
+          details={[
+            { label: 'Default safe fixes', value: plan.defaultSelectedFixIds.length },
+            { label: 'Filtered items', value: filteredFixes.length },
+          ]}
+          gradient="green"
+        />
+        <StatCard
+          icon={SlidersHorizontal}
+          label="Manual items"
+          value={plan.manualCount}
+          subtext="Guidance only"
+          details={[
+            { label: 'Categories shown', value: grouped.length },
+            { label: 'Applied before', value: lastRun?.applied.length ?? 0 },
+          ]}
+          gradient="violet"
+        />
+        <StatCard
+          icon={Wand2}
+          label="Estimated score"
+          value={`${estimatedScore.total}/100`}
+          subtext={`Current score ${score.total}/100`}
+          details={[
+            { label: 'Critical', value: `${beforeCounts.critical} -> ${estimatedCounts.critical}` },
+            { label: 'Warnings', value: `${beforeCounts.warning} -> ${estimatedCounts.warning}` },
+          ]}
+          gradient={estimatedScore.total >= 90 ? 'green' : estimatedScore.total >= 55 ? 'amber' : 'rose'}
+        />
+      </div>
 
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Button className="gap-2" disabled={selectedFixes.length === 0 || applying} onClick={() => void handleApply()}>
-              <Wand2 className="h-4 w-4" />
-              {applying ? 'Applying...' : 'Apply selected'}
-            </Button>
-            <Button variant="outline" className="gap-2" disabled={!hasRepairsApplied && !lastRun} onClick={handleExport}>
-              <Download className="h-4 w-4" />
-              Export repaired
-            </Button>
-            <Button variant="secondary" className="gap-2" disabled={!hasRepairsApplied && !lastRun} onClick={() => void handleReset()}>
-              <RotateCcw className="h-4 w-4" />
-              Reset repairs
-            </Button>
-          </div>
+      <Card>
+        <CardContent className="flex flex-wrap gap-2 p-4 lg:justify-end lg:p-5">
+          <Button
+            className="gap-2 bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+            disabled={selectedFixes.length === 0 || applying}
+            onClick={() => void handleApply()}
+          >
+            <Wand2 className="h-4 w-4" weight="fill" />
+            {applying ? 'Applying...' : 'Apply selected'}
+          </Button>
+          <Button variant="secondary" className="gap-2" disabled={!hasRepairsApplied && !lastRun} onClick={handleExport}>
+            <Download className="h-4 w-4" weight="fill" />
+            Export repaired
+          </Button>
+          <Button variant="secondary" className="gap-2" disabled={!hasRepairsApplied && !lastRun} onClick={() => void handleReset()}>
+            <RotateCcw className="h-4 w-4" weight="fill" />
+            Reset repairs
+          </Button>
         </CardContent>
       </Card>
 
@@ -281,14 +310,14 @@ export function RepairPage({
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" weight="fill" />
                 <CardTitle className="text-base">Selection controls</CardTitle>
               </div>
               <CardDescription>Choose fixes deliberately; manual guidance stays visible but disabled.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-end gap-3">
-              <Button variant="outline" size="sm" className="gap-2" onClick={selectSafeFixes}>
-                <BadgeCheck className="h-4 w-4" />
+              <Button variant="secondary" size="sm" className="gap-2" onClick={selectSafeFixes}>
+                <BadgeCheck className="h-4 w-4" weight="fill" />
                 Select all safe fixes
               </Button>
               <Button variant="ghost" size="sm" onClick={clearSelection}>
@@ -334,15 +363,15 @@ export function RepairPage({
               {grouped.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">
-                    <Wrench className="h-6 w-6" />
+                    <Wrench className="h-6 w-6" weight="fill" />
                   </div>
                   <p className="text-sm font-medium">No repairs match this view</p>
                   <p className="max-w-sm text-sm text-muted-foreground">Adjust filters or review the Security page for remaining guidance.</p>
                 </div>
               ) : (
                 grouped.map((group) => (
-                  <section key={group.category} className="border-t border-border first:border-t-0">
-                    <div className="flex items-center justify-between bg-muted/30 px-5 py-3">
+                  <section key={group.category}>
+                    <div className="flex items-center justify-between bg-muted/35 px-5 py-3">
                       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{CATEGORY_LABELS[group.category]}</h2>
                       <Badge variant="secondary" className="tabular-nums">{group.fixes.length}</Badge>
                     </div>
@@ -388,7 +417,7 @@ export function RepairPage({
 
             <div className="grid grid-cols-3 gap-2 text-center">
               {(['critical', 'warning', 'info'] as const).map((severity) => (
-                <div key={severity} className="rounded-lg border border-border px-2 py-2">
+                <div key={severity} className="rounded-lg bg-muted/35 px-2 py-2">
                   <p className="text-[10px] uppercase text-muted-foreground">{severity}</p>
                   <p className="mt-1 text-sm tabular-nums">
                     {beforeCounts[severity]} {'->'} {estimatedCounts[severity]}
@@ -401,7 +430,7 @@ export function RepairPage({
               <>
                 <Separator />
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success)/0.08)] px-3 py-2">
+                  <div className="rounded-lg bg-[hsl(var(--success)/0.08)] px-3 py-2">
                     <p className="text-xs font-medium text-[hsl(var(--success))]">Applied {lastRun.applied.length} fix group{lastRun.applied.length === 1 ? '' : 's'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Actual score moved from {lastRun.beforeScore}/100 to {lastRun.afterScore}/100 after re-analysis.

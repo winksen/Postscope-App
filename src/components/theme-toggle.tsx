@@ -27,7 +27,11 @@ export function ThemeToggle({
           onClick={toggleTheme}
           aria-label="Toggle theme"
         >
-          {resolvedTheme === 'dark' ? <SunDim className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {resolvedTheme === 'dark' ? (
+            <SunDim className="h-4 w-4" weight="fill" />
+          ) : (
+            <Moon className="h-4 w-4" weight="fill" />
+          )}
         </Button>
       </TooltipTrigger>
       <TooltipContent>Toggle theme</TooltipContent>

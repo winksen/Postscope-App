@@ -55,7 +55,7 @@ export function FeatureCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-        <IconComponent className="h-5 w-5 text-primary" />
+        <IconComponent className="h-5 w-5 text-primary" weight="fill" />
       </div>
       <div>
         <p className="text-sm font-semibold">{title}</p>
@@ -88,7 +88,7 @@ export function MarketingHeader({ actions }: MarketingHeaderProps) {
         className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="PostScope home"
       >
-        <div className="flex h-10 w-10 items-center justify-center text-orange-400">
+        <div className="flex h-10 w-10 items-center justify-center text-muted-foreground">
           <Stethoscope className="h-8 w-8" weight="fill" />
         </div>
         <p className="text-sm font-semibold tracking-tight">PostScope</p>

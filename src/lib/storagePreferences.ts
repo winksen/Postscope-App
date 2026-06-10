@@ -15,18 +15,8 @@ function migrateLegacyPreference(): StorageMode | null {
 }
 
 export function getStorageMode(): StorageMode {
-  try {
-    const stored = localStorage.getItem(STORAGE_MODE_KEY)
-    if (stored === 'history' || stored === 'incognito') return stored
-
-    const migrated = migrateLegacyPreference()
-    if (migrated) {
-      setStorageMode(migrated)
-      return migrated
-    }
-  } catch {
-    /* ignore */
-  }
+  void STORAGE_MODE_KEY
+  void migrateLegacyPreference
   return 'incognito'
 }
 

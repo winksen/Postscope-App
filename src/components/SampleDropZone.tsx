@@ -56,7 +56,7 @@ export function SampleDropZone({
         <Card className="w-full max-w-3xl border-border shadow-sm animate-fade-in-scale">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-              <Flask className="h-7 w-7 text-primary" />
+              <Flask className="h-7 w-7 text-primary" weight="fill" />
             </div>
             <CardTitle className="text-2xl font-semibold">Try sample collections</CardTitle>
             <CardDescription className="text-base">
@@ -80,7 +80,7 @@ export function SampleDropZone({
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <FileCode className="h-5 w-5 text-primary" />
+                        <FileCode className="h-5 w-5 text-primary" weight="fill" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold">{sample.label}</p>
@@ -94,7 +94,7 @@ export function SampleDropZone({
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
                         Open sample
-                        <ArrowRight className="h-3.5 w-3.5" />
+                        <ArrowRight className="h-3.5 w-3.5" weight="fill" />
                       </span>
                     )}
                   </button>
@@ -108,10 +108,14 @@ export function SampleDropZone({
         </Card>
 
         <div className="mt-6 animate-fade-in">
-          <Button variant="secondary" asChild>
+          <Button
+            variant="secondary"
+            className="bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background"
+            asChild
+          >
             <Link to={analyzePath}>
               Analyze your own collection
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="ml-2 h-4 w-4" weight="fill" />
             </Link>
           </Button>
         </div>

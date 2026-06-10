@@ -9,6 +9,7 @@ import {
   X,
 } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
+import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
 import { affectedLabels } from '../lib/findingDisplay'
 import type { ParsedCollection } from '../lib/parser'
@@ -26,7 +27,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
 
 interface SecurityPageProps {
   parsed: ParsedCollection
@@ -51,30 +51,6 @@ function findingMatchesQuery(f: Finding, q: string, requests: ParsedCollection['
   )
 }
 
-function SeveritySummaryCard({
-  icon: Icon,
-  count,
-  label,
-  colorClass,
-}: {
-  icon: typeof ShieldWarning
-  count: number
-  label: string
-  colorClass: string
-}) {
-  return (
-    <Card className={cn('flex items-center gap-4 p-4 transition-all duration-300', count === 0 && 'opacity-60')}>
-      <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', colorClass)}>
-        <Icon className="h-5 w-5 text-white" />
-      </div>
-      <div>
-        <p className="text-2xl font-semibold tabular-nums tracking-tight">{count}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
-      </div>
-    </Card>
-  )
-}
-
 export function SecurityPage({ parsed, findings, score, search }: SecurityPageProps) {
   const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
@@ -83,6 +59,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
   const criticalCount = findings.filter((f) => f.severity === 'critical').length
   const warningCount = findings.filter((f) => f.severity === 'warning').length
   const infoCount = findings.filter((f) => f.severity === 'info').length
+  const affectedRequests = new Set(findings.flatMap((finding) => finding.affected)).size
 
   const filtered = findings.filter((f) => {
     if (severityFilter !== 'all' && f.severity !== severityFilter) return false
@@ -107,25 +84,39 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
         </p>
       </div>
 
-      {/* Severity Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SeveritySummaryCard
+        <StatCard
           icon={ShieldWarning}
-          count={criticalCount}
+          value={criticalCount}
           label="Critical issues"
-          colorClass="bg-destructive"
+          subtext={criticalCount > 0 ? 'Needs immediate review' : 'No critical findings'}
+          details={[
+            { label: 'Affected requests', value: affectedRequests },
+            { label: 'Total findings', value: findings.length },
+          ]}
+          gradient={criticalCount > 0 ? 'rose' : 'green'}
         />
-        <SeveritySummaryCard
+        <StatCard
           icon={Warning}
-          count={warningCount}
+          value={warningCount}
           label="Warnings"
-          colorClass="bg-[hsl(var(--warning))]"
+          subtext={warningCount > 0 ? 'Recommended cleanup' : 'No warnings found'}
+          details={[
+            { label: 'Visible rows', value: filtered.length },
+            { label: 'Current score', value: `${score.total}/100` },
+          ]}
+          gradient={warningCount > 0 ? 'amber' : 'green'}
         />
-        <SeveritySummaryCard
+        <StatCard
           icon={Info}
-          count={infoCount}
+          value={infoCount}
           label="Info items"
-          colorClass="bg-primary"
+          subtext={infoCount > 0 ? 'Low-risk hygiene notes' : 'No info items'}
+          details={[
+            { label: 'Categories', value: new Set(findings.map((finding) => finding.category)).size },
+            { label: 'Requests', value: parsed.totalRequests },
+          ]}
+          gradient="blue"
         />
       </div>
 
@@ -133,7 +124,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <FunnelSimple className="h-4 w-4 text-muted-foreground" />
+            <FunnelSimple className="h-4 w-4 text-muted-foreground" weight="fill" />
             <CardTitle className="text-base">Filters</CardTitle>
           </div>
           <CardDescription>Narrow the table by severity and category</CardDescription>
@@ -186,10 +177,10 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                     if (f.key === 'severity') setSeverityFilter('all')
                     if (f.key === 'category') setCategoryFilter('all')
                   }}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
                 >
                   {f.label}
-                  <X className="h-3 w-3" />
+                  <X className="h-3 w-3" weight="fill" />
                 </button>
               ))}
               <button
@@ -217,7 +208,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
-                <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" />
+                <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" weight="fill" />
               </div>
               <p className="text-lg font-medium">Nothing to show</p>
               <p className="max-w-md text-sm text-muted-foreground">
@@ -227,7 +218,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto border-t border-border">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -242,7 +233,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                   {filtered.map((f) => (
                     <TableRow
                       key={f.id}
-                      className="cursor-pointer transition-colors duration-150 hover:bg-muted/50 group"
+                      className="cursor-pointer transition-colors duration-150 hover:bg-muted/45 group"
                       onClick={() => setDetail(f)}
                     >
                       <TableCell>
@@ -260,14 +251,14 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="gap-1 text-muted-foreground opacity-60 group-hover:opacity-100 hover:text-primary transition-opacity"
+                          className="gap-1 text-muted-foreground opacity-60 transition-opacity hover:text-foreground group-hover:opacity-100"
                           onClick={(e) => {
                             e.stopPropagation()
                             setDetail(f)
                           }}
                         >
                           View
-                          <ArrowSquareOut className="h-3.5 w-3.5" />
+                          <ArrowSquareOut className="h-3.5 w-3.5" weight="fill" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -281,8 +272,8 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         {detail ? (
-          <DialogContent className="max-w-lg gap-0 overflow-hidden p-0 border-l-4 border-l-destructive">
-            <DialogHeader className="space-y-3 border-b border-border bg-muted/30 p-6 text-left">
+          <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+            <DialogHeader className="space-y-3 bg-card p-6 text-left">
               <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Finding detail
               </DialogDescription>
@@ -300,7 +291,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
               {detail.affected.length > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Affected</p>
-                  <p className="mt-1 text-sm text-primary">
+                  <p className="mt-1 text-sm text-foreground">
                     {affectedLabels(detail, parsed.requests)
                       .slice(0, 8)
                       .join(', ')}
@@ -308,7 +299,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                   </p>
                 </div>
               )}
-              <div className="rounded-lg border border-border bg-muted/50 p-4">
+              <div className="rounded-lg bg-muted/45 p-4">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Recommendation</p>
                 <p className="mt-2 text-sm">{detail.recommendation}</p>
               </div>

@@ -38,15 +38,15 @@ Do **not** use the em dash character (Unicode U+2014) anywhere in the project: U
 
 PostScope is a **SaaS-style dashboard** with a **light-first** palette and optional **dark mode** (`class` on `html`, see `use-theme.tsx`).
 
-- **Minimal chrome:** Neutral backgrounds, cards for modules, one restrained primary (slate blue-gray).
+- **Minimal chrome:** Neutral backgrounds, cards for modules, and restrained foreground/muted active states.
 - **Data-forward:** Metrics, charts, and findings should dominate; decoration stays subtle.
 - **Two surfaces:**
   - **Marketing** (`LandingPage`, samples entry): centered hero, soft blobs, frosted cards (`bg-card/60`, `backdrop-blur-sm`).
-  - **Dashboard** (`DashboardShell`): fixed sidebar + header, `bg-muted/50` page wash, `p-6 lg:p-8` content padding.
+  - **Dashboard** (`DashboardShell`): fixed sidebar + header, darker light-mode `background` page wash, `p-6 lg:p-8` content padding.
 
 ### Postman relationship
 
-Postman orange (`text-orange-400` on marketing hero) is a **reference accent only**, used sparingly so users recognize the workflow. PostScope primary tokens stay neutral; do not rebuild the Postman orange brand across the app.
+Postman orange (`text-orange-400` on marketing hero copy only) is a **reference accent**. Do not use orange for sidebar active states, dashboard navigation, logo icons, focus states, or operational UI.
 
 ---
 
@@ -64,15 +64,17 @@ Semantic colors are **HSL components** in CSS variables (no raw hex in component
 | `success`, `warning`, `critical` | Severity and positive states (arbitrary `hsl(var(--…))` where needed) |
 | `chart-1` … `chart-5` | Recharts series (muted neutrals + destructive for emphasis) |
 
-**Light mode:** Cool gray base (`220` hue family), high legibility, soft borders.
+**Light mode:** Cool gray base (`220` hue family) with a slightly darker page background so white/card surfaces stand out. Use `bg-card` for search bars, notices, saved lists, and modal rows that need clear separation.
 
 **Dark mode:** Deeper `background`, lifted `card`, brighter `primary` for contrast.
 
 **Rules**
 
-- Prefer Tailwind semantic classes: `bg-primary/10`, `text-muted-foreground`, `border-border`.
+- Prefer Tailwind semantic classes: `bg-card`, `bg-muted/40`, `text-muted-foreground`, `border-border`.
 - Use opacity modifiers (`/10`, `/60`) for tinted surfaces, not new hex values.
 - Severity colors must stay consistent with `SeverityBadge` and security views.
+- Active navigation and major inverted CTAs use `bg-foreground text-background`, not orange.
+- Focus and hover borders should use neutral `ring` / `border-ring` unless a severity state is being edited.
 
 ---
 
@@ -112,9 +114,9 @@ Use `tabular-nums` for scores and counts. Use `tracking-tight` on headings. Do n
 | Context | Library |
 |---------|---------|
 | Marketing landing | Phosphor (`@phosphor-icons/react`) |
-| Dashboard and analyzer | Lucide (`lucide-react`) |
+| Dashboard and analyzer | Phosphor (`@phosphor-icons/react`) |
 
-Keep icon size aligned with text: `h-4 w-4` inline with buttons, `h-5 w-5` in feature tiles, `h-7 w-7` for hero icons.
+Use Phosphor icons everywhere. Prefer `weight="fill"` for navigation, summary cards, feature tiles, marketing icons, and dashboard action icons. Keep icon size aligned with text: `h-4 w-4` inline with buttons, `h-5 w-5` in feature tiles, `h-7 w-7` for hero icons.
 
 ---
 
@@ -122,15 +124,16 @@ Keep icon size aligned with text: `h-4 w-4` inline with buttons, `h-5 w-5` in fe
 
 ### Buttons
 
-- Primary: solid `bg-primary` for main CTAs (`Analyze a collection`, `Open analyzer`).
-- Secondary: `variant="secondary"` for alternate paths (`Try a sample collection`).
+- Primary: solid neutral/inverted treatment for high-emphasis CTAs when they sit on light marketing or upload pages (`bg-foreground text-background`).
+- Secondary: `variant="secondary"` for alternate paths and selected segmented controls.
 - Destructive: only for irreversible actions.
 
 ### Cards
 
 - Default dashboard module surface: `Card` + `CardHeader` / `CardContent`.
 - Hover polish: `transition-shadow duration-200 hover:shadow-md` where appropriate (`StatCard`).
-- Import zone: dashed `border-2`, centered content, large icon in `rounded-2xl bg-muted`.
+- Import zone: card surface with an inner drop surface, centered content, large filled icon in `rounded-2xl bg-muted`. Avoid dashed outlines.
+- Dashboard metric rows should use shared `StatCard` patterns before one-off mini-stat blocks.
 
 ### Badges
 
@@ -162,7 +165,7 @@ Use `-` or short words (`None`, `N/A`) for missing field values, never an em das
 2. Colors come from CSS variables / Tailwind tokens.
 3. Typography follows the scale above (Elms Sans, `tracking-tight` headings).
 4. Layout matches marketing or dashboard shell conventions.
-5. Icons match the surface (Phosphor vs Lucide).
+5. Icons use Phosphor, usually `weight="fill"` for visible UI.
 6. Severity and method colors reuse existing badge components.
 
 ---

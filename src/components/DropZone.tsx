@@ -106,50 +106,50 @@ export function DropZone({
       <MarketingHeader />
 
       <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
-        <div className="mb-6 w-full max-w-xl animate-fade-in">
+        <div className="mb-6 w-full max-w-3xl animate-fade-in">
           <p className="mb-3 text-center text-sm font-medium text-foreground">
             {canChoosePrivacyMode(loggingMode) ? 'Privacy mode' : 'Deployment mode'}
           </p>
 
           {canChoosePrivacyMode(loggingMode) ? (
-            <div className="flex gap-2 rounded-full bg-muted/50 p-1">
-              <button
-                type="button"
-                onClick={() => onStorageModeChange('history')}
-                className={cn(
-                  'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
-                  storageMode === 'history'
-                    ? 'bg-secondary text-secondary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <ClockCounterClockwise className="h-4 w-4" />
-                Save to history
-              </button>
+            <div className="flex gap-2 rounded-full bg-card p-1 shadow-[0_8px_24px_hsl(var(--background)/0.3)] dark:bg-muted/50 dark:shadow-none">
               <button
                 type="button"
                 onClick={() => onStorageModeChange('incognito')}
                 className={cn(
                   'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
                   storageMode === 'incognito'
-                    ? 'bg-secondary text-secondary-foreground'
+                    ? 'bg-secondary text-secondary-foreground shadow-sm dark:shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <EyeSlash className="h-4 w-4" />
+                <EyeSlash className="h-4 w-4" weight="fill" />
                 Incognito
+              </button>
+              <button
+                type="button"
+                onClick={() => onStorageModeChange('history')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
+                  storageMode === 'history'
+                    ? 'bg-secondary text-secondary-foreground shadow-sm dark:shadow-none'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <ClockCounterClockwise className="h-4 w-4" weight="fill" />
+                Save to history
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 rounded-full bg-muted/50 px-4 py-2.5 text-sm font-medium text-secondary-foreground">
               {isTeamLoggingRequired(loggingMode) ? (
                 <>
-                  <CloudArrowUp className="h-4 w-4" />
+                  <CloudArrowUp className="h-4 w-4" weight="fill" />
                   Team logging enabled
                 </>
               ) : (
                 <>
-                  <ShieldCheck className="h-4 w-4" />
+                  <ShieldCheck className="h-4 w-4" weight="fill" />
                   Public mode: incognito only
                 </>
               )}
@@ -181,9 +181,9 @@ export function DropZone({
                 transition={fadeTransition}
                 className="overflow-hidden"
               >
-                <div className="flex w-full items-center gap-4 rounded-xl bg-muted/50 px-4 py-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-                    <CloudArrowUp className="h-6 w-6 text-muted-foreground" />
+                <div className="flex w-full items-center gap-4 rounded-xl bg-card px-4 py-3 shadow-[0_8px_22px_hsl(var(--background)/0.25)] dark:bg-muted/50 dark:shadow-none">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted/80">
+                    <CloudArrowUp className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
                     <span className="font-medium">Mandatory logging.</span> Imported collections are
@@ -202,9 +202,9 @@ export function DropZone({
                 transition={fadeTransition}
                 className="overflow-hidden"
               >
-                <div className="flex w-full items-center gap-4 rounded-xl bg-muted/50 px-4 py-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-                    <Warning className="h-6 w-6 text-muted-foreground" />
+                <div className="flex w-full items-center gap-4 rounded-xl bg-card px-4 py-3 shadow-[0_8px_22px_hsl(var(--background)/0.25)] dark:bg-muted/50 dark:shadow-none">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted/80">
+                    <Warning className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-xs leading-snug text-foreground">
@@ -238,9 +238,9 @@ export function DropZone({
                 transition={fadeTransition}
                 className="overflow-hidden"
               >
-                <div className="flex w-full items-center gap-4 rounded-xl bg-muted/50 px-4 py-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-                    <ShieldCheck className="h-6 w-6 text-muted-foreground" />
+                <div className="flex w-full items-center gap-4 rounded-xl bg-card px-4 py-3 shadow-[0_8px_22px_hsl(var(--background)/0.25)] dark:bg-muted/50 dark:shadow-none">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted/80">
+                    <ShieldCheck className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
                     <span className="font-medium">Nothing stored.</span> Incognito mode: your data is
@@ -255,11 +255,11 @@ export function DropZone({
         {/* Main drop card */}
         <Card
           className={cn(
-            'w-full max-w-xl border-2 border-dashed shadow-sm transition-all duration-300',
+            'w-full max-w-3xl bg-card shadow-sm transition-all duration-300',
             'animate-fade-in-scale',
             drag
-              ? 'border-primary/60 bg-primary/[0.03] shadow-lg'
-              : 'border-border hover:border-primary/30'
+              ? 'bg-primary/[0.03] shadow-lg'
+              : 'hover:bg-card/95'
           )}
 
         >
@@ -267,7 +267,7 @@ export function DropZone({
             <div
               className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted transition-transform duration-300"
             >
-              <FileCode className="h-7 w-7 text-primary" />
+              <FileCode className="h-7 w-7 text-primary" weight="fill" />
             </div>
             <CardTitle className="text-2xl font-semibold">
               <span>Import a collection</span>
@@ -301,12 +301,13 @@ export function DropZone({
                       drag && 'animate-pulse-glow'
                     )}
                   >
-                    <UploadSimple
-                      className={cn(
-                        'h-8 w-8 text-muted-foreground transition-all duration-300',
-                        drag && 'text-primary'
-                      )}
-                    />
+                      <UploadSimple
+                        className={cn(
+                          'h-8 w-8 text-muted-foreground transition-all duration-300',
+                          drag && 'text-primary'
+                        )}
+                        weight="fill"
+                      />
                   </div>
                   <p className="text-center text-sm text-muted-foreground">
                     {importBlocked ? (
@@ -330,12 +331,6 @@ export function DropZone({
                         />
                       </label>
                     </Button>
-                    <Button variant="secondary" asChild>
-                      <Link to={samplesPath}>
-                        Try sample collections
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
                   </div>
                 </>
               )}
@@ -350,8 +345,21 @@ export function DropZone({
           </CardContent>
         </Card>
 
+        <div className="mt-6 animate-fade-in">
+          <Button
+            variant="secondary"
+            className="bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background"
+            asChild
+          >
+            <Link to={samplesPath}>
+              Try sample collections
+              <ArrowRight className="ml-2 h-4 w-4" weight="fill" />
+            </Link>
+          </Button>
+        </div>
+
         {savedCollections.length > 0 && onLoadSaved && (
-          <div className="mt-6 w-full max-w-xl animate-fade-in">
+          <div className="mt-6 w-full max-w-3xl animate-fade-in">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-sm font-medium text-muted-foreground">Recently saved</p>
               {onOpenLibrary && (
@@ -367,10 +375,10 @@ export function DropZone({
                   type="button"
                   onClick={() => onLoadSaved(item.id)}
                   disabled={loading}
-                  className="flex w-full items-center gap-3 rounded-xl bg-muted/40 px-4 py-3 text-left transition-colors hover:bg-muted/70 disabled:opacity-60"
+                  className="flex w-full items-center gap-3 rounded-xl bg-card px-4 py-3 text-left shadow-[0_8px_22px_hsl(var(--background)/0.25)] transition-colors hover:bg-card/85 disabled:opacity-60 dark:bg-muted/40 dark:shadow-none dark:hover:bg-muted/70"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <FileCode className="h-4 w-4 text-primary" />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/80">
+                    <FileCode className="h-4 w-4 text-primary" weight="fill" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.name}</p>
@@ -378,7 +386,7 @@ export function DropZone({
                       <span>{item.requestCount} requests</span>
                       <span aria-hidden>·</span>
                       <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
+                        <Clock className="h-3 w-3" weight="fill" />
                         {formatSavedAt(item.savedAt)}
                       </span>
                     </p>
