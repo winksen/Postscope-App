@@ -335,7 +335,7 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
         savingToLibrary={savingToLibrary}
         historyEnabled={teamLibraryVisible}
       >
-        {active === 'overview' && <OverviewPage parsed={parsed} />}
+        {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}
         {active === 'requests' && (
           <RequestsPage
             parsed={parsed}
