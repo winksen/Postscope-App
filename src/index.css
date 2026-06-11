@@ -1,4 +1,50 @@
-@import url('https://fonts.googleapis.com/css2?family=Elms+Sans:wght@300;400;500;600;700;800&display=swap');
+@font-face {
+  font-family: 'Elms Sans';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/elms-sans-300.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Elms Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/elms-sans-400.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Elms Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/elms-sans-500.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Elms Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/elms-sans-600.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Elms Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/elms-sans-700.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Elms Sans';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/elms-sans-800.ttf') format('truetype');
+}
 
 @tailwind base;
 @tailwind components;

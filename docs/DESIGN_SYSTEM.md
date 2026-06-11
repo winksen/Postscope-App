@@ -1,6 +1,6 @@
 # PostScope: Design System
 
-Practical guidance for building UI that matches PostScope: **Tailwind-first**, **shadcn/ui composable primitives**, **Elms Sans** typography, and **HSL CSS variables** for theming.
+Practical guidance for building UI that matches PostScope: **Tailwind-first**, **shadcn/ui composable primitives**, offline-safe **Elms Sans** typography, and **HSL CSS variables** for theming.
 
 For voice, punctuation, and overall visual personality, see [VISUAL_STYLE.md](./VISUAL_STYLE.md).
 
@@ -261,7 +261,7 @@ Embed in `ScrollArea` if vertical space is constrained.
 
 ## 4. Typography system
 
-**Font:** Elms Sans (`font-sans` and `font-mono` in `tailwind.config.ts`; both point to Elms Sans; use `font-mono` for `tabular-nums` / code-like UI, not a different family).
+**Font:** Elms Sans (`font-sans` and `font-mono` in `tailwind.config.ts`; both point to Elms Sans with system fallbacks; font files are vendored under `public/fonts` for offline use).
 
 | Role | Classes | Notes |
 |------|---------|-------|

@@ -175,13 +175,19 @@ If parsing fails, confirm the file is valid JSON and a Postman collection (schem
 
 ## Deployment
 
-The output is a **static SPA** after `npm run build`.
+For internal and offline deployments, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-- **General:** Deploy the `dist/` folder to any static host (S3 + CloudFront, Azure Static Web Apps, GitHub Pages, etc.).
-- **Vercel / Netlify:** Connect the repo; set build command to `npm run build` and publish directory to `dist`.
-- Ensure the host serves `index.html` for client-side routes if you add routing later (current app uses in-memory tab state only).
+PostScope can run from source with `npm run build && npm run start`, or as a single Docker image. The Docker path includes the production web bundle, the app server, and runtime dependencies so the image can be pulled or loaded and then run without internet access.
 
-No environment variables are required for the stock build.
+Key runtime settings:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `3010` | App server port |
+| `LOGGING_MODE` | `off` | `off`, `hybrid`, or `on` collection storage behavior |
+| `PUBLIC_LANDING_PAGE` | `false` | Whether `/` shows the public landing page instead of the analyzer |
+
+No API keys are required for the stock app.
 
 ---
 

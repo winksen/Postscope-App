@@ -84,7 +84,7 @@ Semantic colors are **HSL components** in CSS variables (no raw hex in component
 
 | Role | Implementation |
 |------|----------------|
-| Family | **Elms Sans** (Google Fonts in `index.css`; `font-sans` and `font-mono` both map to Elms Sans) |
+| Family | **Elms Sans** (`font-sans` and `font-mono` both map to Elms Sans; files are served locally from `public/fonts`) |
 | Page title | `text-2xl font-semibold tracking-tight` |
 | Marketing hero | `text-4xl` … `text-6xl font-semibold tracking-tight` |
 | Body | `text-sm` default; `text-base` for marketing leads |

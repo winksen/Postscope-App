@@ -189,7 +189,7 @@ Derived data:
 |------|--------|
 | External HTTP APIs | **None** in application logic |
 | Browser APIs | `FileReader`, `JSON.parse` |
-| Third-party scripts | Google Fonts (Elms Sans) linked from `index.css` |
+| Third-party scripts | None required for the stock offline build; Elms Sans font files are served locally from `public/fonts` |
 | npm libraries | React, Vite, Radix, Recharts, Lucide, Tailwind utilities |
 
 There is **no** `fetch`, GraphQL, or WebSocket layer today.
