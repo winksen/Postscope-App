@@ -5,6 +5,7 @@ export type { LoggingMode }
 export { parseLoggingMode }
 
 export interface AppConfig {
+  appVersion: string
   loggingMode: LoggingMode
   publicLandingPage: boolean
 }
@@ -22,6 +23,7 @@ export async function fetchAppConfig(): Promise<AppConfig> {
   if (!res.ok) throw new Error('Failed to load app config')
   const body = (await res.json()) as Partial<AppConfig>
   return {
+    appVersion: typeof body.appVersion === 'string' ? body.appVersion : 'unknown',
     loggingMode: parseLoggingMode(body.loggingMode),
     publicLandingPage: parseBooleanFlag(body.publicLandingPage),
   }

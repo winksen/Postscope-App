@@ -200,6 +200,27 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
     [applyCollectionJson, loggingMode, storageMode, uploadConsent]
   )
 
+  const handleJsonText = useCallback(
+    (raw: string) => {
+      if (
+        canChoosePrivacyMode(loggingMode) &&
+        storageMode === 'history' &&
+        !canSaveToAppStorage(loggingMode, storageMode, uploadConsent)
+      ) {
+        alert('Accept the upload warning before saving a collection to app history.')
+        return
+      }
+      setLandingLoading(true)
+      void applyCollectionJson(raw)
+        .catch((e) => {
+          console.error(e)
+          alert('Failed to parse collection. Ensure it is a valid Postman collection JSON.')
+        })
+        .finally(() => setLandingLoading(false))
+    },
+    [applyCollectionJson, loggingMode, storageMode, uploadConsent]
+  )
+
   const handleAnalyzeAnother = useCallback(() => {
     clearCollectionSession()
     setParsed(null)
@@ -287,6 +308,7 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
       <>
         <DropZone
           onFile={handleFile}
+          onJsonText={handleJsonText}
           loading={landingLoading || restoringSession}
           loggingMode={loggingMode}
           storageMode={storageMode}

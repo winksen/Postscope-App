@@ -184,6 +184,7 @@ Key runtime settings:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `3010` | App server port |
+| `APP_VERSION` | package version | Release/build identifier exposed by `/api/config` |
 | `LOGGING_MODE` | `off` | `off`, `hybrid`, or `on` collection storage behavior |
 | `PUBLIC_LANDING_PAGE` | `false` | Whether `/` shows the public landing page instead of the analyzer |
 

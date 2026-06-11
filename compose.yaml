@@ -1,0 +1,21 @@
+services:
+  postscope:
+    image: postscope:${POSTSCOPE_VERSION:-0.0.1}
+    build:
+      context: .
+      args:
+        APP_VERSION: ${POSTSCOPE_VERSION:-0.0.1}
+    container_name: postscope
+    restart: unless-stopped
+    ports:
+      - "${POSTSCOPE_HOST:-127.0.0.1}:${POSTSCOPE_PORT:-3010}:3010"
+    environment:
+      APP_VERSION: ${POSTSCOPE_VERSION:-0.0.1}
+      LOGGING_MODE: ${LOGGING_MODE:-hybrid}
+      PUBLIC_LANDING_PAGE: ${PUBLIC_LANDING_PAGE:-false}
+      PORT: 3010
+    volumes:
+      - postscope-data:/app/data
+
+volumes:
+  postscope-data:

@@ -5,6 +5,7 @@ import {
   listCollections,
   saveCollection,
 } from './libraryStore'
+import { getAppVersion } from './appVersion'
 import { isPublicLandingEnabled } from './landingConfig'
 import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConfig'
 
@@ -25,6 +26,7 @@ async function readBody(req: IncomingMessage): Promise<string> {
 export async function handleConfigApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
   if (url.pathname !== '/api/config' || req.method !== 'GET') return false
   sendJson(res, 200, {
+    appVersion: getAppVersion(),
     loggingMode: getLoggingMode(),
     publicLandingPage: isPublicLandingEnabled(),
   })

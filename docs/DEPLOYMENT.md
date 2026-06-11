@@ -13,8 +13,9 @@ The deployment work in this repository is scoped to these actions and configurat
 | Docker packaging | Add `Dockerfile` | Builds the React app, copies the Node server, exposes port `3010`, and declares `/app/data` for persistent app storage. |
 | Build hygiene | Add `.dockerignore` | Keeps local `node_modules`, `dist`, `.env`, and `data/` out of Docker build context so local secrets and saved collections are not baked into the image. |
 | Offline readiness | Vendor Elms Sans font assets | The app serves fonts from `public/fonts`, so the browser does not need Google Fonts during offline use. |
-| Runtime configuration | Use environment variables | `LOGGING_MODE`, `PUBLIC_LANDING_PAGE`, and `PORT` configure the same image for public, internal, or shared-history deployments. |
-| Documentation | Add this guide and README link | Gives operators source, Docker, offline transfer, persistence, upgrade, and verification steps. |
+| Runtime configuration | Use environment variables | `LOGGING_MODE`, `PUBLIC_LANDING_PAGE`, `PORT`, and `APP_VERSION` configure and identify a deployed build. |
+| Repeatable operations | Add `compose.yaml` | Keeps image tag, environment, port binding, restart policy, and persistent volume in one file. |
+| Documentation | Add this guide and README link | Gives operators source, Docker, offline transfer, persistence, update, upgrade, and verification steps. |
 
 ## Deployment Model
 
@@ -32,6 +33,7 @@ Set these variables on the container or host process:
 | Variable | Default | Values | Purpose |
 |----------|---------|--------|---------|
 | `PORT` | `3010` | Any available TCP port inside the container/process | Port the Node server listens on. |
+| `APP_VERSION` | Package version or image build arg | Release or build identifier, for example `0.0.2` or `2026.06.11-security.1` | Exposed by `/api/config` so operators can confirm which build is running. |
 | `LOGGING_MODE` | `off` | `off`, `hybrid`, `on` | Controls whether uploaded collections are stored in app filesystem storage. |
 | `PUBLIC_LANDING_PAGE` | `false` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows marketing landing page at `/` when true; for internal deployments, keep false so users land on the analyzer. |
 
@@ -77,6 +79,14 @@ Build the image:
 
 ```bash
 docker build -t postscope:0.0.1 .
+```
+
+Or build with an explicit version label:
+
+```bash
+docker build \
+  --build-arg APP_VERSION=0.0.1 \
+  -t postscope:0.0.1 .
 ```
 
 Run without shared server-side history:
@@ -140,6 +150,32 @@ PUBLIC_LANDING_PAGE=false
 
 Do not put secrets in this file. The stock app does not require API keys.
 
+## Option 3: Run With Docker Compose
+
+`compose.yaml` is included for repeatable local operations. It uses a named volume for shared history and binds the app to `127.0.0.1` by default.
+
+Create a local Compose env file:
+
+```env
+POSTSCOPE_VERSION=0.0.1
+POSTSCOPE_HOST=127.0.0.1
+POSTSCOPE_PORT=3010
+LOGGING_MODE=hybrid
+PUBLIC_LANDING_PAGE=false
+```
+
+Build and start:
+
+```bash
+docker compose --env-file postscope.env up -d --build
+```
+
+Run from an image that was already loaded on the host:
+
+```bash
+docker compose --env-file postscope.env up -d
+```
+
 ## Offline And Air-Gapped Shipping
 
 Yes, PostScope can be shipped as a single offline-runnable Docker image.
@@ -187,6 +223,81 @@ Artifacts needed on the offline host:
 The Docker build context intentionally excludes local `.env` files and `data/`, so private saved collections are not included in the image by accident.
 
 Font files under `public/fonts` are part of the app bundle and are copied into the image. Browsers load them from the PostScope host, not from Google Fonts.
+
+## Keeping Offline Deployments Up To Date
+
+For hosts that must stay offline, do not update by running `git pull`, `npm install`, or `docker pull` on the offline host. Use a connected build or release machine, produce a complete artifact, then transfer that artifact into the offline environment.
+
+Recommended update channel:
+
+1. On a connected maintainer machine, pull the latest repository changes.
+2. Build a new image with a unique immutable tag.
+3. Export the image to a tar file.
+4. Create a checksum file for transfer validation.
+5. Move the tar and checksum to the offline host through your approved transfer process.
+6. Verify the checksum on the offline host.
+7. Load the image.
+8. Replace the running container while reusing the same `/app/data` volume.
+9. Check `/api/config` to confirm the running `appVersion`.
+
+Connected build machine:
+
+```bash
+git pull
+docker build \
+  --build-arg APP_VERSION=0.0.2 \
+  -t postscope:0.0.2 .
+docker save postscope:0.0.2 -o postscope-0.0.2.tar
+sha256sum postscope-0.0.2.tar > postscope-0.0.2.tar.sha256
+```
+
+Windows PowerShell checksum:
+
+```powershell
+Get-FileHash .\postscope-0.0.2.tar -Algorithm SHA256
+```
+
+Offline host:
+
+```bash
+sha256sum -c postscope-0.0.2.tar.sha256
+docker load -i postscope-0.0.2.tar
+docker stop postscope
+docker rm postscope
+docker run -d \
+  --name postscope \
+  --restart unless-stopped \
+  -p 3010:3010 \
+  -e APP_VERSION=0.0.2 \
+  -e LOGGING_MODE=hybrid \
+  -e PUBLIC_LANDING_PAGE=false \
+  -v postscope-data:/app/data \
+  postscope:0.0.2
+curl http://localhost:3010/api/config
+```
+
+Expected version signal:
+
+```json
+{"appVersion":"0.0.2","loggingMode":"hybrid","publicLandingPage":false}
+```
+
+Compose update flow:
+
+1. Load the new image tar on the offline host.
+2. Change `POSTSCOPE_VERSION` in `postscope.env`.
+3. Run `docker compose --env-file postscope.env up -d`.
+
+Example:
+
+```bash
+docker load -i postscope-0.0.2.tar
+sed -i 's/POSTSCOPE_VERSION=0.0.1/POSTSCOPE_VERSION=0.0.2/' postscope.env
+docker compose --env-file postscope.env up -d
+curl http://localhost:3010/api/config
+```
+
+If the offline host cannot run Docker, ship a full source release only when it also includes a prebuilt `dist/` directory and an offline dependency cache or vendored `node_modules` suitable for the target OS and CPU architecture. The Docker image path is safer because it packages the runtime and dependencies together.
 
 ## Pulling From An Internal Registry
 
@@ -277,7 +388,7 @@ curl http://localhost:3010/api/config
 Expected response for the recommended internal mode:
 
 ```json
-{"loggingMode":"hybrid","publicLandingPage":false}
+{"appVersion":"0.0.1","loggingMode":"hybrid","publicLandingPage":false}
 ```
 
 Then open:
