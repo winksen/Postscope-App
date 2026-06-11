@@ -6,6 +6,7 @@ import { CollectionLibraryModal } from '../components/CollectionLibraryModal'
 import { OverviewPage } from './OverviewPage'
 import { RequestsPage } from './RequestsPage'
 import { SecurityPage } from './SecurityPage'
+import { HygienePage } from './HygienePage'
 import { ScorePage } from './ScorePage'
 import { RepairPage } from './RepairPage'
 import { analyzeCollection } from '../lib/analyzeCollection'
@@ -310,6 +311,8 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
   }
 
   const score = calculateScore(parsed, findings)
+  const securityFindings = findings.filter((finding) => finding.category !== 'hygiene')
+  const hygieneFindings = findings.filter((finding) => finding.category === 'hygiene')
   const isSavedToLibrary = currentLibraryId != null
   let repairAutoFixCount = 0
   if (rawJson) {
@@ -323,7 +326,8 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
   return (
     <>
       <DashboardShell
-        issueCount={findings.length}
+        issueCount={securityFindings.length}
+        hygieneCount={hygieneFindings.length}
         repairCount={repairAutoFixCount}
         active={active}
         onNav={setActive}
@@ -346,7 +350,10 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
           />
         )}
         {active === 'security' && (
-          <SecurityPage parsed={parsed} findings={findings} score={score} search={search} />
+          <SecurityPage parsed={parsed} findings={securityFindings} score={score} search={search} />
+        )}
+        {active === 'hygiene' && (
+          <HygienePage parsed={parsed} findings={hygieneFindings} search={search} />
         )}
         {active === 'repair' && rawJson && (
           <RepairPage

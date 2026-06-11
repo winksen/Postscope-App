@@ -40,6 +40,7 @@ PostScope is a **SaaS-style dashboard** with a **light-first** palette and optio
 
 - **Minimal chrome:** Neutral backgrounds, cards for modules, and restrained foreground/muted active states.
 - **Data-forward:** Metrics, charts, and findings should dominate; decoration stays subtle.
+- **Separated review lanes:** Security pages show security-impact categories (`secrets`, `auth`, `variables`). Hygiene pages show maintainability notes (`hygiene`) such as missing descriptions.
 - **Two surfaces:**
   - **Marketing** (`LandingPage`, samples entry): centered hero, soft blobs, frosted cards (`bg-card/60`, `backdrop-blur-sm`).
   - **Dashboard** (`DashboardShell`): fixed sidebar + header, darker light-mode `background` page wash, `p-6 lg:p-8` content padding.
@@ -75,6 +76,7 @@ Semantic colors are **HSL components** in CSS variables (no raw hex in component
 - Severity colors must stay consistent with `SeverityBadge` and security views.
 - Active navigation and major inverted CTAs use `bg-foreground text-background`, not orange.
 - Focus and hover borders should use neutral `ring` / `border-ring` unless a severity state is being edited.
+- Do not label hygiene-only issues as security findings in page titles, request detail sections, or sidebar counts.
 
 ---
 

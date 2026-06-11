@@ -7,6 +7,7 @@ import {
   GithubLogo,
   LockKey,
   PresentationChart,
+  Sparkle,
   Stethoscope,
   TreeStructure,
 } from "@phosphor-icons/react";
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { GITHUB_REPO_URL } from "@/components/marketing/marketing-shell";
 
-export type NavId = "overview" | "requests" | "security" | "repair" | "score";
+export type NavId = "overview" | "requests" | "security" | "hygiene" | "repair" | "score";
 
 type SidebarIcon = ElementType;
 
@@ -27,6 +28,7 @@ const nav: { id: NavId; label: string; icon: SidebarIcon; activeIcon: SidebarIco
   { id: "overview", label: "Dashboard", icon: PresentationChart, activeIcon: PresentationChart },
   { id: "requests", label: "Requests", icon: TreeStructure, activeIcon: TreeStructure },
   { id: "security", label: "Security", icon: LockKey, activeIcon: LockKey },
+  { id: "hygiene", label: "Hygiene", icon: Sparkle, activeIcon: Sparkle },
   { id: "repair", label: "Repair", icon: GearSix, activeIcon: GearSix },
   { id: "score", label: "Score", icon: Gauge, activeIcon: Gauge },
 ];
@@ -37,10 +39,11 @@ interface AppSidebarProps {
   active: NavId;
   onNav: (id: NavId) => void;
   issueCount: number;
+  hygieneCount?: number;
   repairCount?: number;
 }
 
-export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCount, repairCount = 0 }: AppSidebarProps) {
+export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCount, hygieneCount = 0, repairCount = 0 }: AppSidebarProps) {
   return (
     <aside className={cn("fixed left-0 top-0 z-40 flex h-screen flex-col bg-card/95 shadow-[12px_0_36px_hsl(var(--background)/0.6)] backdrop-blur-md transition-[width] duration-200", collapsed ? "w-[72px]" : "w-60")}>
       <div className={cn("flex h-14 items-center px-4", collapsed && "justify-center px-2")}>
@@ -66,7 +69,7 @@ export function AppSidebar({ collapsed, onToggleCollapse, active, onNav, issueCo
           {nav.map((item) => {
             const isActive = active === item.id;
             const Icon = isActive ? item.activeIcon : item.icon;
-            const count = item.id === "security" ? issueCount : item.id === "repair" ? repairCount : 0;
+            const count = item.id === "security" ? issueCount : item.id === "hygiene" ? hygieneCount : item.id === "repair" ? repairCount : 0;
             const badge = count > 0 ? (
               <Badge
                 className={cn(

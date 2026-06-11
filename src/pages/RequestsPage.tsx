@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { MethodBadge } from '@/components/MethodBadge'
 import { RequestBadges } from '@/components/RequestBadges'
 import { SeverityBadge } from '@/components/SeverityBadge'
@@ -159,7 +158,7 @@ function RequestRow({
     <button
       type="button"
       className={cn(
-        'group flex min-h-9 w-[calc(100%-0.5rem)] max-w-full items-center justify-start gap-2 rounded-2xl px-2.5 py-1.5 text-left font-normal transition-colors duration-200',
+        'group flex min-h-9 w-full max-w-full items-center justify-start gap-2 overflow-hidden rounded-2xl px-2.5 py-1.5 text-left font-normal transition-colors duration-200',
         'focus-visible:outline-none focus-visible:ring-0',
         'hover:bg-muted/55',
         active && 'bg-muted/65 text-foreground hover:bg-muted/65'
@@ -167,7 +166,7 @@ function RequestRow({
       onClick={() => onSelect(request)}
     >
       <MethodBadge method={request.method} />
-      <span className="min-w-0 flex-1 truncate text-left text-sm leading-5">{request.name}</span>
+      <span className="block w-0 min-w-0 flex-1 truncate text-left text-sm leading-5">{request.name}</span>
     </button>
   )
 }
@@ -206,22 +205,22 @@ function FolderNode({
   const total = requestCountForNode(node)
 
   return (
-    <div className={cn('pr-1.5', depth > 0 && 'ml-1 pl-2')}>
+    <div className={cn('max-w-full overflow-hidden', depth > 0 && 'ml-1 pl-2')}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'group flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-xl py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-0',
+          'group flex w-full max-w-full items-center gap-2 overflow-hidden rounded-xl py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-0',
           depth === 0 ? 'px-0' : 'px-2.5'
         )}
       >
         <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         {open ? (
-          <FolderOpen className="h-4 w-4 shrink-0 text-primary/70" weight="fill" />
+          <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" />
         ) : (
           <Folder className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" />
         )}
-        <span className="truncate font-medium">{node.name}</span>
+        <span className="block w-0 min-w-0 flex-1 truncate font-medium">{node.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground">({total})</span>
       </button>
       <div
@@ -230,7 +229,7 @@ function FolderNode({
           open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
-        <div className="ml-1 mt-1 space-y-1 pl-1.5 pr-1.5">
+        <div className="ml-1 mt-1 max-w-full space-y-1 overflow-hidden pl-1.5 pr-1.5">
           {node.requests.map((request) => (
             <RequestRow key={request.id} request={request} selectedId={selectedId} onSelect={onSelect} />
           ))}
@@ -269,6 +268,14 @@ export function RequestsPage({
   const selectedFindings = useMemo(
     () => (selected ? findingsForRequest(selected, findings) : []),
     [selected, findings]
+  )
+  const selectedSecurityFindings = useMemo(
+    () => selectedFindings.filter((finding) => finding.category !== 'hygiene'),
+    [selectedFindings]
+  )
+  const selectedHygieneFindings = useMemo(
+    () => selectedFindings.filter((finding) => finding.category === 'hygiene'),
+    [selectedFindings]
   )
   const selectedScore = selected ? requestHealthScore(selectedFindings) : 0
   const selectedQueryParams = useMemo(() => (selected ? parseQueryParams(selected.url) : []), [selected])
@@ -330,7 +337,7 @@ export function RequestsPage({
           </CardHeader>
           <CardContent className="min-h-0 flex-1 p-0">
             <ScrollArea className="h-full">
-              <div className="space-y-2 px-5 pb-10">
+              <div className="box-border max-w-full space-y-2 overflow-hidden px-5 pb-10">
                 {filteredRoot.length > 0 && (
                   <div className="pl-2 pr-1.5">
                     <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -366,20 +373,24 @@ export function RequestsPage({
         </Card>
 
         <Card className="flex min-h-0 flex-col overflow-hidden">
-          <CardHeader className="shrink-0 pb-4">
+          <CardHeader className="shrink-0 pb-3">
             {selected ? (
-              <>
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <RequestBadges request={selected} muteHttp={false} />
-                  <Badge variant="secondary" className="text-[10px]">
-                    Health {selectedScore}/100
-                  </Badge>
-                  <CardTitle className="truncate text-base">{selected.name}</CardTitle>
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <RequestBadges
+                      request={selected}
+                      muteHttp={false}
+                      methodClassName="h-7 px-3 text-xs"
+                      protocolClassName="h-7 border-transparent bg-zinc-700 px-3 text-[10px] text-white hover:bg-zinc-700"
+                    />
+                    <CardTitle className="min-w-0 flex-1 truncate text-lg">{selected.name}</CardTitle>
+                  </div>
                 </div>
-                <CardDescription className="truncate">
-                  {selected.folderPath.length ? selected.folderPath.join(' / ') : 'Root'}
-                </CardDescription>
-              </>
+                <Badge className="h-7 shrink-0 rounded-full bg-zinc-700 px-3 text-xs text-white hover:bg-zinc-700">
+                  Health {selectedScore}/100
+                </Badge>
+              </div>
             ) : (
               <>
                 <CardTitle className="text-base">Request details</CardTitle>
@@ -389,73 +400,77 @@ export function RequestsPage({
           </CardHeader>
           <CardContent className="min-h-0 flex-1 p-0">
             <ScrollArea className="h-full">
-              <div className="space-y-5 px-5 pb-5">
+              <div className="space-y-4 px-5 pb-5">
                 {!selected ? (
                   <p className="text-sm text-muted-foreground">No request selected.</p>
                 ) : (
                   <>
-                    <div className="space-y-1">
-                      <div className="group">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Folder</p>
-                          {selected.folderPath.length > 0 && <CopyButton text={selected.folderPath.join(' / ')} />}
+                    <div className="space-y-3">
+                      <div className="group min-w-0 rounded-lg bg-muted/35 px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Path</p>
+                          <CopyButton text={selected.folderPath.length ? selected.folderPath.join(' / ') : 'Root'} />
                         </div>
-                        <p className="mt-1 text-sm text-primary">
+                        <p className="mt-1 truncate text-sm text-foreground">
                           {selected.folderPath.length ? selected.folderPath.join(' / ') : 'Root'}
+                        </p>
+                      </div>
+
+                      <div className="group min-w-0 rounded-lg bg-muted/35 px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">URL</p>
+                          <CopyButton text={selected.url} />
+                        </div>
+                        <p className="mt-1 truncate text-sm text-foreground">{selected.url}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-lg bg-muted/35 px-3 py-2.5">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Auth</p>
+                        {selected.auth !== 'noauth' ? (
+                          <Badge className="mt-2 gap-1 bg-[hsl(var(--success))] text-white">
+                            <Lock className="h-3.5 w-3.5" weight="fill" />
+                            {selected.auth}
+                          </Badge>
+                        ) : (
+                          <Badge className="mt-2 gap-1 bg-destructive text-white">
+                            <LockOpen className="h-3.5 w-3.5" weight="fill" />
+                            No auth
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg bg-muted/35 px-3 py-2.5">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Params</p>
+                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">
+                          {selectedQueryParams.length}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/35 px-3 py-2.5">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Headers</p>
+                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">
+                          {selected.headers.length}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/35 px-3 py-2.5">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Body</p>
+                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">
+                          {selected.bodyRaw ? 1 : 0}
                         </p>
                       </div>
                     </div>
 
-                    <div className="group space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">URL</p>
-                        <CopyButton text={selected.url} />
-                      </div>
-                      <p className="break-all rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">{selected.url}</p>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Auth</p>
-                      {selected.auth !== 'noauth' ? (
-                        <Badge variant="success" className="gap-1">
-                          <Lock className="h-3.5 w-3.5" />
-                          {selected.auth}
-                        </Badge>
-                      ) : (
-                        <Badge variant="critical" className="gap-1">
-                          <LockOpen className="h-3.5 w-3.5" />
-                          No auth
-                        </Badge>
-                      )}
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
-                      {selected.hasDescription ? (
-                        <span className="inline-flex items-center gap-1 text-sm text-[hsl(var(--success))]">
-                          <Check className="h-3.5 w-3.5" /> Present
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-sm text-[hsl(var(--warning))]">
-                          <LockOpen className="h-3.5 w-3.5" /> Missing
-                        </span>
-                      )}
-                    </div>
-
-                    <Separator />
-
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Query params</p>
                       {selectedQueryParams.length > 0 ? (
-                        <ul className="space-y-1 rounded-lg bg-muted/40 p-3">
+                        <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 sm:grid-cols-2">
                           {selectedQueryParams.map((param) => (
-                            <li key={`${param.key}-${param.value}`} className="flex items-center justify-between gap-2 text-xs">
-                              <span className="text-foreground">{param.key}</span>
-                              <span className="text-muted-foreground">{param.value || '-'}</span>
+                            <li key={`${param.key}-${param.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs">
+                              <span className="min-w-0 truncate text-foreground">{param.key}</span>
+                              <span className="min-w-0 truncate text-muted-foreground">{param.value || '-'}</span>
                             </li>
                           ))}
                         </ul>
@@ -464,15 +479,13 @@ export function RequestsPage({
                       )}
                     </div>
 
-                    <Separator />
-
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Headers</p>
                       {selected.headers.length > 0 ? (
-                        <ul className="space-y-1 rounded-lg bg-muted/40 p-3">
+                        <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 lg:grid-cols-2">
                           {selected.headers.map((header) => (
-                            <li key={`${header.key}-${header.value}`} className="group flex items-center justify-between gap-2 text-xs">
-                              <span className="break-all text-muted-foreground">
+                            <li key={`${header.key}-${header.value}`} className="group flex min-w-0 items-center justify-between gap-2 text-xs">
+                              <span className="min-w-0 truncate text-muted-foreground">
                                 <span className="text-foreground">{header.key}</span>: {header.value}
                               </span>
                               <CopyButton text={`${header.key}: ${header.value}`} />
@@ -484,15 +497,13 @@ export function RequestsPage({
                       )}
                     </div>
 
-                    <Separator />
-
                     <div className="space-y-2">
                       <div className="group flex items-center justify-between">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Body</p>
                         {selected.bodyRaw && <CopyButton text={selected.bodyRaw} />}
                       </div>
                       {selected.bodyRaw ? (
-                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/35 p-3 text-xs text-muted-foreground">
                           {selected.bodyRaw}
                         </pre>
                       ) : (
@@ -500,29 +511,27 @@ export function RequestsPage({
                       )}
                     </div>
 
-                    <Separator />
-
                     <div className="space-y-3">
                       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Security findings ({selectedFindings.length})
+                        Security findings ({selectedSecurityFindings.length})
                       </p>
-                      {selectedFindings.length === 0 ? (
-                        <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4">
-                          <Check className="h-5 w-5 text-[hsl(var(--success))]" />
-                          <p className="text-sm text-[hsl(var(--success))]">No issues flagged for this request.</p>
+                      {selectedSecurityFindings.length === 0 ? (
+                        <div className="flex items-center gap-2 rounded-lg bg-[hsl(var(--success))] px-3 py-2 text-white">
+                          <Check className="h-5 w-5" weight="fill" />
+                          <p className="text-sm font-medium">No security issues flagged for this request.</p>
                         </div>
                       ) : (
                         <ul className="space-y-3">
-                          {selectedFindings.map((finding) => (
+                          {selectedSecurityFindings.map((finding) => (
                             <li
                               key={finding.id}
                               className={cn(
-                                'rounded-xl border p-4 transition-all duration-200',
+                                'rounded-xl p-4 transition-all duration-200',
                                 finding.severity === 'critical'
-                                  ? 'border-destructive/20 bg-destructive/5'
+                                  ? 'bg-destructive/5'
                                   : finding.severity === 'warning'
-                                    ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
-                                    : 'border-border bg-card'
+                                    ? 'bg-[hsl(var(--warning))]/5'
+                                    : 'bg-muted/35'
                               )}
                             >
                               <div className="flex flex-wrap items-center gap-2">
@@ -537,6 +546,27 @@ export function RequestsPage({
                         </ul>
                       )}
                     </div>
+
+                    {selectedHygieneFindings.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Hygiene notes ({selectedHygieneFindings.length})
+                        </p>
+                        <ul className="space-y-3">
+                          {selectedHygieneFindings.map((finding) => (
+                            <li key={finding.id} className="rounded-xl bg-muted/35 p-4 transition-all duration-200">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <SeverityBadge severity={finding.severity} />
+                                <span className="text-[10px] text-muted-foreground">{finding.category.toUpperCase()}</span>
+                              </div>
+                              <p className="mt-2 text-sm font-medium">{finding.title}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">{finding.description}</p>
+                              <p className="mt-2 text-xs italic text-muted-foreground">{finding.recommendation}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

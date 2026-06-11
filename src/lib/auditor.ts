@@ -246,6 +246,66 @@ function runInfoChecks(parsed: ParsedCollection): Finding[] {
     })
   }
 
+  const requestsByFolderAndName = new Map<string, string[]>()
+  for (const request of parsed.requests) {
+    const key = `${request.folderPath.join('/')}::${request.name.trim().toLowerCase()}`
+    const ids = requestsByFolderAndName.get(key) ?? []
+    ids.push(request.id)
+    requestsByFolderAndName.set(key, ids)
+  }
+  const duplicateNameIds = [...requestsByFolderAndName.values()].filter((ids) => ids.length > 1).flat()
+  if (duplicateNameIds.length > 0) {
+    findings.push({
+      id: 'DUPLICATE_REQUEST_NAMES-1',
+      severity: 'info',
+      category: 'hygiene',
+      title: 'Duplicate request names',
+      description: `${duplicateNameIds.length} request(s) share a name with another request in the same folder.`,
+      affected: duplicateNameIds,
+      recommendation: 'Rename duplicate requests so search results, repair previews, and team reviews are easier to scan.',
+    })
+  }
+
+  const placeholderNamePattern = /^(new request|untitled|request|copy of\b|copy\b)/i
+  const placeholderNames = parsed.requests.filter((request) => placeholderNamePattern.test(request.name.trim()))
+  if (placeholderNames.length > 0) {
+    findings.push({
+      id: 'PLACEHOLDER_REQUEST_NAMES-1',
+      severity: 'info',
+      category: 'hygiene',
+      title: 'Placeholder request names',
+      description: `${placeholderNames.length} request(s) appear to use placeholder or copied names.`,
+      affected: placeholderNames.map((request) => request.id),
+      recommendation: 'Use action-oriented names that describe the endpoint purpose, such as “Create user” or “List invoices”.',
+    })
+  }
+
+  const looseRootRequests = parsed.requests.filter((request) => request.folderPath.length === 0)
+  if (looseRootRequests.length > 0 && parsed.totalFolders > 1) {
+    findings.push({
+      id: 'ROOT_LEVEL_REQUESTS-1',
+      severity: 'info',
+      category: 'hygiene',
+      title: 'Loose root-level requests',
+      description: `${looseRootRequests.length} request(s) sit at the collection root while the rest of the collection uses folders.`,
+      affected: looseRootRequests.map((request) => request.id),
+      recommendation: 'Move root-level requests into the closest functional folder so the collection tree stays predictable.',
+    })
+  }
+
+  const deepNestedRequests = parsed.requests.filter((request) => request.folderPath.length >= 5)
+  if (deepNestedRequests.length > 0) {
+    findings.push({
+      id: 'DEEP_FOLDER_NESTING-1',
+      severity: 'info',
+      category: 'hygiene',
+      title: 'Deep folder nesting',
+      description: `${deepNestedRequests.length} request(s) are nested five or more folders deep.`,
+      affected: deepNestedRequests.map((request) => request.id),
+      recommendation: 'Flatten very deep branches where possible, or split large areas into clearer top-level product domains.',
+    })
+  }
+
   return findings
 }
 

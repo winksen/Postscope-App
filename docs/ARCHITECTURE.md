@@ -12,7 +12,7 @@ PostScope is a **single-page React application** that runs entirely in the brows
 
 1. **Parses** the file into a normalized in-memory model (`ParsedCollection`).
 2. **Audits** that model with deterministic rules and produces a list of **findings** (security, variables, auth, hygiene).
-3. **Scores** the collection from those findings and presents **Overview**, **Security**, and **Score** views.
+3. **Scores** the collection from those findings and presents **Overview**, **Security**, **Hygiene**, and **Score** views.
 
 No network calls are required for core functionality; collection data is not sent to a backend.
 
@@ -37,13 +37,13 @@ The **UI layer** (`App.tsx`, pages, components) is largely presentational: it re
 |-------|----------|------|
 | Bootstrap | `src/main.tsx` | `createRoot`, global styles, `TooltipProvider` |
 | App shell / orchestration | `src/App.tsx` | File ingest, parse/audit/score pipeline, “which page” selection |
-| Pages | `src/pages/*.tsx` | Full-width views: Overview, Security, Score |
+| Pages | `src/pages/*.tsx` | Full-width views: Overview, Requests, Security, Hygiene, Repair, Score |
 | Feature components | `src/components/*.tsx` | Drop zone, request tree, modals, badges, charts |
 | Layout | `src/components/layout/` | `DashboardShell`, `AppSidebar`, `AppHeader` |
 | Design system | `src/components/ui/` | Radix-based primitives (buttons, dialogs, tables, …) |
 | Domain types | `src/types/postman.ts` | TypeScript shapes for raw Postman JSON |
 
-**Routing:** There is no React Router. Navigation is a **string union** `NavId`: `'overview' | 'security' | 'score'`, held in `App` and toggled from the sidebar.
+**Routing:** Dashboard navigation is an in-memory **string union** `NavId`, held by the app shell and toggled from the sidebar. Security-impact findings and hygiene findings are split into separate pages, but scoring and repair still receive the full finding list.
 
 ### 2.2 Backend
 
@@ -66,6 +66,7 @@ flowchart LR
     DS[DashboardShell]
     OV[OverviewPage]
     SEC[SecurityPage]
+    HYG[HygienePage]
     SC[ScorePage]
   end
   F --> D
@@ -112,7 +113,8 @@ The tree builds a folder hierarchy from `ParsedRequest.folderPath`, filters by s
 
 | | Purpose | How it works | Main files |
 |---|--------|--------------|------------|
-| Security | Review audit results | Local state for severity/category filters + dialog detail; merges header `search` with `findingMatchesQuery` | `SecurityPage.tsx`, `SeverityBadge.tsx` |
+| Security | Review security-impact audit results | Local state for severity/category filters + dialog detail; excludes `hygiene`; merges header `search` with `findingMatchesQuery` | `SecurityPage.tsx`, `SeverityBadge.tsx` |
+| Hygiene | Review maintainability notes | Local state for severity filter + dialog detail; shows only `hygiene` findings such as missing descriptions | `HygienePage.tsx`, `SeverityBadge.tsx` |
 
 Brief skeleton flash on mount (`useEffect` timeout) for perceived loading polish.
 
@@ -145,7 +147,7 @@ Brief skeleton flash on mount (`useEffect` timeout) for perceived loading polish
 ### 4.2 Layout system
 
 - **`DashboardShell`:** Owns **sidebar collapse** local state (`collapsed`), computes width, positions fixed sidebar + header + padded `main`.
-- **`AppSidebar`:** Nav buttons; exports `NavId`; shows issue count badge on Security.
+- **`AppSidebar`:** Nav buttons; exports `NavId`; shows separate count badges for Security, Hygiene, and Repair.
 - **`AppHeader`:** Global search, collection name display, “analyze another” and decorative controls.
 
 Layout uses **fixed** sidebar/header with `padding-left` / `left` offset derived from collapse width. No CSS-grid app shell abstraction yet.
@@ -171,6 +173,7 @@ Layout uses **fixed** sidebar/header with `padding-left` / `left` offset derived
 | `landingLoading: boolean` | `App` | Drop zone loading indicator |
 | Sidebar `collapsed` | `DashboardShell` | Pure UI preference |
 | Security filters, detail dialog | `SecurityPage` | Local only |
+| Hygiene filters, detail dialog | `HygienePage` | Local only |
 
 **No React Context** for domain data. **`TooltipProvider`** wraps the app in `main.tsx` for Radix tooltips.
 

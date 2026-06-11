@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ScoreGauge } from '../components/ScoreGauge'
+import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
 import type { ScoreBreakdown } from '../lib/scorer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import {
   CheckCircle,
   DownloadSimple,
+  Gauge,
   Key,
   Lightbulb,
   Link,
@@ -85,8 +87,8 @@ function CategoryBar({
     <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
-          <div className={cn('flex h-7 w-7 items-center justify-center rounded-md bg-primary/10', getScoreTone(value))}>
-            <Icon className="h-3.5 w-3.5" />
+          <div className={cn('flex h-7 w-7 items-center justify-center rounded-md bg-muted', getScoreTone(value))}>
+            <Icon className="h-3.5 w-3.5" weight="fill" />
           </div>
           <span className="text-muted-foreground">{CATEGORY_LABELS[keyName]}</span>
         </div>
@@ -107,22 +109,18 @@ function ActionCard({
   priority: 'P0' | 'P1' | 'P2'
 }) {
   const priorityConfig = {
-    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive border-destructive/20' },
-    P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/20' },
-    P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20' },
+    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive' },
+    P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]' },
+    P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]' },
   }
 
   const config = priorityConfig[priority]
   const Icon = config.icon
 
   return (
-    <div
-      className={cn(
-        'flex gap-3 rounded-xl border bg-card px-4 py-3.5 transition-all duration-200'
-      )}
-    >
-      <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', config.color)}>
-        <Icon className="h-4 w-4" />
+    <div className="flex gap-3 rounded-xl bg-card px-4 py-3.5 shadow-[0_8px_22px_hsl(var(--background)/0.2)] transition-all duration-200 dark:shadow-none">
+      <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', config.color)}>
+        <Icon className="h-4 w-4" weight="fill" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
@@ -140,6 +138,9 @@ export function ScorePage({ score, findings }: ScorePageProps) {
   const advice: { text: string; priority: 'P0' | 'P1' | 'P2' }[] = []
   const critical = findings.filter((f) => f.severity === 'critical')
   const warning = findings.filter((f) => f.severity === 'warning')
+  const info = findings.filter((f) => f.severity === 'info')
+  const bestCategory = Object.entries(score.categories).sort((a, b) => b[1] - a[1])[0]
+  const weakestCategory = Object.entries(score.categories).sort((a, b) => a[1] - b[1])[0]
 
   if (critical.length > 0) {
     advice.push({ text: 'Fix hardcoded secrets and tokens immediately. Use {{variables}} for all sensitive values.', priority: 'P0' })
@@ -189,6 +190,53 @@ export function ScorePage({ score, findings }: ScorePageProps) {
         </p>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={Gauge}
+          label="Overall score"
+          value={`${score.total}/100`}
+          subtext={`Grade ${score.grade}`}
+          details={[
+            { label: 'Summary', value: score.summary },
+            { label: 'Findings', value: findings.length },
+          ]}
+          gradient={score.total >= 90 ? 'green' : score.total >= 55 ? 'amber' : 'rose'}
+        />
+        <StatCard
+          icon={WarningCircle}
+          label="Risk items"
+          value={critical.length + warning.length}
+          subtext={`${critical.length} critical / ${warning.length} warnings`}
+          details={[
+            { label: 'Info items', value: info.length },
+            { label: 'Advice items', value: advice.length },
+          ]}
+          gradient={critical.length > 0 ? 'rose' : warning.length > 0 ? 'amber' : 'green'}
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Strongest area"
+          value={bestCategory ? `${bestCategory[1]}/100` : '0/100'}
+          subtext={bestCategory ? CATEGORY_LABELS[bestCategory[0] as keyof ScoreBreakdown['categories']] : 'No category'}
+          details={[
+            { label: 'Secrets', value: score.categories.secrets },
+            { label: 'Auth', value: score.categories.auth },
+          ]}
+          gradient="green"
+        />
+        <StatCard
+          icon={Lightbulb}
+          label="Focus area"
+          value={weakestCategory ? `${weakestCategory[1]}/100` : '0/100'}
+          subtext={weakestCategory ? CATEGORY_LABELS[weakestCategory[0] as keyof ScoreBreakdown['categories']] : 'No category'}
+          details={[
+            { label: 'Variables', value: score.categories.variables },
+            { label: 'Hygiene', value: score.categories.hygiene },
+          ]}
+          gradient={weakestCategory && weakestCategory[1] >= 90 ? 'green' : 'amber'}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader>
@@ -219,8 +267,8 @@ export function ScorePage({ score, findings }: ScorePageProps) {
             <CardTitle className="text-lg">Guidance</CardTitle>
             <CardDescription>What to do next based on this run</CardDescription>
           </div>
-          <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
-            <DownloadSimple className="h-3.5 w-3.5" />
+          <Button variant="secondary" size="sm" className="gap-2" onClick={handleExport}>
+            <DownloadSimple className="h-3.5 w-3.5" weight="fill" />
             Export
           </Button>
         </CardHeader>
@@ -239,7 +287,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
               <Separator className="mb-4" />
               <ul className="space-y-3">
                 {advice.map((a, i) => (
-                  <li key={i} className="flex gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                  <li key={i} className="flex gap-3 rounded-lg bg-muted/35 px-4 py-3">
                     <span className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', a.priority === 'P0' ? 'bg-destructive' : a.priority === 'P1' ? 'bg-[hsl(var(--warning))]' : 'bg-[hsl(var(--success))]')} />
                     <div>
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 mb-1">
