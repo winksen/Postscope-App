@@ -36,6 +36,9 @@ Set these variables on the container or host process:
 | `APP_VERSION` | Package version or image build arg | Release or build identifier, for example `0.0.2` or `2026.06.11-security.1` | Exposed by `/api/config` so operators can confirm which build is running. |
 | `LOGGING_MODE` | `off` | `off`, `hybrid`, `on` | Controls whether uploaded collections are stored in app filesystem storage. |
 | `PUBLIC_LANDING_PAGE` | `false` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows marketing landing page at `/` when true; for internal deployments, keep false so users land on the analyzer. |
+| `SHOW_GITHUB_LINK` | `true` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows or hides the analyzer sidebar GitHub link. Set to `false` for closed internal networks. |
+| `SHOW_FEEDBACK_LINK` | `true` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows or hides the analyzer sidebar feedback link. Set to `false` for closed internal networks. |
+| `FEEDBACK_URL` | GitHub issue form | Absolute URL | External form opened by the analyzer sidebar feedback link. |
 
 Logging modes:
 

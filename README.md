@@ -187,6 +187,9 @@ Key runtime settings:
 | `APP_VERSION` | package version | Release/build identifier exposed by `/api/config` |
 | `LOGGING_MODE` | `off` | `off`, `hybrid`, or `on` collection storage behavior |
 | `PUBLIC_LANDING_PAGE` | `false` | Whether `/` shows the public landing page instead of the analyzer |
+| `SHOW_GITHUB_LINK` | `true` | Whether the analyzer sidebar shows the GitHub link |
+| `SHOW_FEEDBACK_LINK` | `true` | Whether the analyzer sidebar shows the feedback link |
+| `FEEDBACK_URL` | GitHub issue form | External feedback form URL opened from the sidebar |
 
 No API keys are required for the stock app.
 

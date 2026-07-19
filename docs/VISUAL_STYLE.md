@@ -75,6 +75,7 @@ Semantic colors are **HSL components** in CSS variables (no raw hex in component
 - Use opacity modifiers (`/10`, `/60`) for tinted surfaces, not new hex values.
 - Severity colors must stay consistent with `SeverityBadge` and security views.
 - Active navigation and major inverted CTAs use `bg-foreground text-background`, not orange.
+- Analyzer sidebar menu items are compact: `h-9`, `text-sm`, and `size-5` icons. Footer links follow the same scale.
 - Focus and hover borders should use neutral `ring` / `border-ring` unless a severity state is being edited.
 - Do not label hygiene-only issues as security findings in page titles, request detail sections, or sidebar counts.
 

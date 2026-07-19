@@ -19,7 +19,6 @@ import {
   getSavedCollection,
   listSavedCollections,
   saveToLibrary,
-  findLibraryIdForContent,
   type SavedCollectionMeta,
 } from '../lib/collectionLibrary'
 import {
@@ -46,9 +45,18 @@ import type { NavId } from '../components/layout/app-sidebar'
 interface AnalyzeAppProps {
   loggingMode: LoggingMode
   samplesPath?: string
+  showGitHubLink?: boolean
+  showFeedbackLink?: boolean
+  feedbackUrl?: string
 }
 
-export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeAppProps) {
+export function AnalyzeApp({
+  loggingMode,
+  samplesPath = '/samples',
+  showGitHubLink = true,
+  showFeedbackLink = true,
+  feedbackUrl = 'https://github.com/winksen/Postscope-App/issues/new',
+}: AnalyzeAppProps) {
   const [parsed, setParsed] = useState<ParsedCollection | null>(null)
   const [findings, setFindings] = useState<Finding[]>([])
   const [rawJson, setRawJson] = useState<string | null>(null)
@@ -141,10 +149,8 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
           await refreshSavedCollections()
         } catch (e) {
           console.error(e)
-          setCurrentLibraryId(await findLibraryIdForContent(raw))
+          setCurrentLibraryId(null)
         }
-      } else if (shouldShowTeamLibrary(loggingMode)) {
-        setCurrentLibraryId(await findLibraryIdForContent(raw))
       } else {
         setCurrentLibraryId(null)
       }
@@ -360,6 +366,9 @@ export function AnalyzeApp({ loggingMode, samplesPath = '/samples' }: AnalyzeApp
         isSavedToLibrary={teamLibraryVisible && isSavedToLibrary}
         savingToLibrary={savingToLibrary}
         historyEnabled={teamLibraryVisible}
+        showGitHubLink={showGitHubLink}
+        showFeedbackLink={showFeedbackLink}
+        feedbackUrl={feedbackUrl}
       >
         {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}
         {active === 'requests' && (

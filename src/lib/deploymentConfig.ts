@@ -8,6 +8,9 @@ export interface AppConfig {
   appVersion: string
   loggingMode: LoggingMode
   publicLandingPage: boolean
+  showGitHubLink: boolean
+  showFeedbackLink: boolean
+  feedbackUrl: string
 }
 
 function parseBooleanFlag(value: unknown): boolean {
@@ -26,6 +29,12 @@ export async function fetchAppConfig(): Promise<AppConfig> {
     appVersion: typeof body.appVersion === 'string' ? body.appVersion : 'unknown',
     loggingMode: parseLoggingMode(body.loggingMode),
     publicLandingPage: parseBooleanFlag(body.publicLandingPage),
+    showGitHubLink: body.showGitHubLink !== false,
+    showFeedbackLink: body.showFeedbackLink !== false,
+    feedbackUrl:
+      typeof body.feedbackUrl === 'string' && body.feedbackUrl.trim()
+        ? body.feedbackUrl
+        : 'https://github.com/winksen/Postscope-App/issues/new',
   }
 }
 

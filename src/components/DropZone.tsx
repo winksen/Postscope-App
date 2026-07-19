@@ -144,6 +144,7 @@ export function DropZone({
     !uploadConsent
 
   const privacyDescription = getPrivacyModeDescription(loggingMode, storageMode)
+  const remainingSavedCount = Math.max(savedCollections.length - 5, 0)
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
@@ -323,12 +324,19 @@ export function DropZone({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-1 rounded-full bg-muted/50 p-1">
+            <div className="relative mx-auto grid w-full max-w-md grid-cols-2 gap-1 rounded-full bg-muted/50 p-1">
+              <motion.span
+                className="absolute bottom-1 top-1 rounded-full bg-secondary shadow-sm"
+                animate={{ left: mode === 'file' ? '0.25rem' : 'calc(50% + 0.125rem)' }}
+                transition={fadeTransition}
+                style={{ width: 'calc(50% - 0.375rem)' }}
+                aria-hidden
+              />
               <button
                 type="button"
                 className={cn(
-                  'flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200',
-                  mode === 'file' ? 'bg-secondary text-secondary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  'relative z-10 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200',
+                  mode === 'file' ? 'text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
                 )}
                 onClick={() => {
                   setMode('file')
@@ -341,8 +349,8 @@ export function DropZone({
               <button
                 type="button"
                 className={cn(
-                  'flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200',
-                  mode === 'paste' ? 'bg-secondary text-secondary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  'relative z-10 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200',
+                  mode === 'paste' ? 'text-secondary-foreground' : 'text-muted-foreground hover:text-foreground'
                 )}
                 onClick={() => {
                   setMode('paste')
@@ -354,101 +362,115 @@ export function DropZone({
               </button>
             </div>
 
-            {mode === 'file' ? (
-              <div
-                onDrop={importBlocked ? undefined : handleDrop}
-                onDragOver={importBlocked ? undefined : handleDragOver}
-                onDragLeave={importBlocked ? undefined : handleDragLeave}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-muted/30 px-8 py-12 transition-all duration-300',
-                  drag && !importBlocked && 'border-primary/20 bg-primary/[0.06]',
-                  importBlocked && 'opacity-60'
-                )}
-              >
-                {loading ? (
-                  <div className="flex w-full flex-col gap-3">
-                    <Skeleton className="mx-auto h-12 w-12 rounded-full" />
-                    <Skeleton className="h-4 w-[75%] max-w-xs self-center" />
-                    <Skeleton className="h-4 w-full max-w-sm self-center" />
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      className={cn(
-                        'flex h-16 w-16 items-center justify-center rounded-2xl bg-muted transition-all duration-300',
-                        drag && 'animate-pulse-glow'
-                      )}
-                    >
-                        <UploadSimple
-                          className={cn(
-                            'h-8 w-8 text-muted-foreground transition-all duration-300',
-                            drag && 'text-primary'
-                          )}
-                          weight="fill"
-                        />
+            <AnimatePresence mode="wait" initial={false}>
+              {mode === 'file' ? (
+                <motion.div
+                  key="upload-file"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={fadeTransition}
+                  onDrop={importBlocked ? undefined : handleDrop}
+                  onDragOver={importBlocked ? undefined : handleDragOver}
+                  onDragLeave={importBlocked ? undefined : handleDragLeave}
+                  className={cn(
+                    'flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-muted/30 px-8 py-12 transition-all duration-300',
+                    drag && !importBlocked && 'border-primary/20 bg-primary/[0.06]',
+                    importBlocked && 'opacity-60'
+                  )}
+                >
+                  {loading ? (
+                    <div className="flex w-full flex-col gap-3">
+                      <Skeleton className="mx-auto h-12 w-12 rounded-full" />
+                      <Skeleton className="h-4 w-[75%] max-w-xs self-center" />
+                      <Skeleton className="h-4 w-full max-w-sm self-center" />
                     </div>
-                    <p className="text-center text-sm text-muted-foreground">
-                      {importBlocked ? (
-                        <>Accept the upload warning above to import a collection.</>
-                      ) : (
-                        <>
-                          <span className="font-medium text-foreground">Drag & drop</span> your JSON here
-                        </>
-                      )}
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <Button asChild variant="default" className="shadow-sm" disabled={importBlocked}>
-                        <label className={cn('cursor-pointer', importBlocked && 'pointer-events-none opacity-50')}>
-                          Browse files
-                          <input
-                            type="file"
-                            accept=".json,.postman_collection.json"
-                            onChange={handleFileInput}
-                            className="hidden"
-                            disabled={importBlocked}
+                  ) : (
+                    <>
+                      <div
+                        className={cn(
+                          'flex h-16 w-16 items-center justify-center rounded-2xl bg-muted transition-all duration-300',
+                          drag && 'animate-pulse-glow'
+                        )}
+                      >
+                          <UploadSimple
+                            className={cn(
+                              'h-8 w-8 text-muted-foreground transition-all duration-300',
+                              drag && 'text-primary'
+                            )}
+                            weight="fill"
                           />
-                        </label>
-                      </Button>
+                      </div>
+                      <p className="text-center text-sm text-muted-foreground">
+                        {importBlocked ? (
+                          <>Accept the upload warning above to import a collection.</>
+                        ) : (
+                          <>
+                            <span className="font-medium text-foreground">Drag & drop</span> your JSON here
+                          </>
+                        )}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button asChild variant="default" className="shadow-sm" disabled={importBlocked}>
+                          <label className={cn('cursor-pointer', importBlocked && 'pointer-events-none opacity-50')}>
+                            Browse files
+                            <input
+                              type="file"
+                              accept=".json,.postman_collection.json"
+                              onChange={handleFileInput}
+                              className="hidden"
+                              disabled={importBlocked}
+                            />
+                          </label>
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="paste-json"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={fadeTransition}
+                  className={cn('space-y-3 rounded-xl bg-muted/30 p-4', importBlocked && 'opacity-60')}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Paste collection JSON</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Paste the full Postman export. It is checked locally before import.
+                      </p>
                     </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className={cn('space-y-3 rounded-xl bg-muted/30 p-4', importBlocked && 'opacity-60')}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Paste collection JSON</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Paste the full Postman export. It is checked locally before import.
-                    </p>
+                    <ClipboardText className="h-5 w-5 shrink-0 text-muted-foreground" weight="fill" />
                   </div>
-                  <ClipboardText className="h-5 w-5 shrink-0 text-muted-foreground" weight="fill" />
-                </div>
-                <textarea
-                  value={pasteText}
-                  onChange={(event) => {
-                    setPasteText(event.target.value)
-                    if (entryError) setEntryError(null)
-                  }}
-                  disabled={importBlocked || loading}
-                  placeholder='{"info":{"name":"My collection"},"item":[...]}'
-                  className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-none transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
-                />
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    Requires a valid Postman collection with `info` and `item`.
-                  </p>
-                  <Button
-                    type="button"
-                    className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+                  <textarea
+                    value={pasteText}
+                    onChange={(event) => {
+                      setPasteText(event.target.value)
+                      if (entryError) setEntryError(null)
+                    }}
                     disabled={importBlocked || loading}
-                    onClick={handlePasteImport}
-                  >
-                    Import pasted JSON
-                  </Button>
-                </div>
-              </div>
-            )}
+                    placeholder='{"info":{"name":"My collection"},"item":[...]}'
+                    className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-none transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      Requires a valid Postman collection with `info` and `item`.
+                    </p>
+                    <Button
+                      type="button"
+                      className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
+                      disabled={importBlocked || loading}
+                      onClick={handlePasteImport}
+                    >
+                      Import pasted JSON
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {entryError && (
               <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
@@ -489,7 +511,7 @@ export function DropZone({
               )}
             </div>
             <div className="space-y-2">
-              {savedCollections.slice(0, 4).map((item) => (
+              {savedCollections.slice(0, 5).map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -498,7 +520,7 @@ export function DropZone({
                   className="flex w-full items-center gap-3 rounded-xl bg-card px-4 py-3 text-left shadow-[0_8px_22px_hsl(var(--background)/0.25)] transition-colors hover:bg-card/85 disabled:opacity-60 dark:bg-muted/40 dark:shadow-none dark:hover:bg-muted/70"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/80">
-                    <FileCode className="h-4 w-4 text-primary" weight="fill" />
+                    <FileCode className="h-4 w-4 text-muted-foreground" weight="fill" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.name}</p>
@@ -514,6 +536,11 @@ export function DropZone({
                 </button>
               ))}
             </div>
+            {remainingSavedCount > 0 && (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                +{remainingSavedCount} more saved collection{remainingSavedCount === 1 ? '' : 's'} in the full library.
+              </p>
+            )}
           </div>
         )}
       </div>

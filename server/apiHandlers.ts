@@ -6,6 +6,7 @@ import {
   saveCollection,
 } from './libraryStore'
 import { getAppVersion } from './appVersion'
+import { getExternalLinksConfig } from './externalLinksConfig'
 import { isPublicLandingEnabled } from './landingConfig'
 import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConfig'
 
@@ -29,6 +30,7 @@ export async function handleConfigApi(req: IncomingMessage, res: ServerResponse,
     appVersion: getAppVersion(),
     loggingMode: getLoggingMode(),
     publicLandingPage: isPublicLandingEnabled(),
+    ...getExternalLinksConfig(),
   })
   return true
 }

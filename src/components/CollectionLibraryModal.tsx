@@ -97,13 +97,13 @@ export function CollectionLibraryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-xl gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="space-y-3 border-b border-border bg-gradient-to-r from-muted/50 to-transparent p-6 pb-4 text-left">
+      <DialogContent className="max-h-[85vh] w-[min(60rem,calc(100vw-3rem))] max-w-none gap-0 overflow-hidden p-0">
+        <DialogHeader className="space-y-3 bg-card p-6 pb-4 text-left">
           <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             App storage
           </DialogDescription>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Books className="h-5 w-5 text-orange-400" weight="fill" />
+            <Books className="h-5 w-5 text-muted-foreground" weight="fill" />
             Team library
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -112,15 +112,15 @@ export function CollectionLibraryModal({
           </p>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[min(52vh,420px)]">
-          <div className="space-y-2 p-4">
+        <ScrollArea className="max-h-[min(58vh,520px)]">
+          <div className="space-y-2 px-6 py-4">
             {loading ? (
               [...Array(3)].map((_, i) => (
                 <Skeleton key={i} className="h-[72px] rounded-xl" />
               ))
             ) : collections.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
-                <FolderOpen className="h-10 w-10 text-muted-foreground/60" />
+              <div className="flex flex-col items-center gap-3 rounded-xl bg-muted/35 px-6 py-10 text-center">
+                <FolderOpen className="h-10 w-10 text-muted-foreground/60" weight="fill" />
                 <div>
                   <p className="text-sm font-medium">No saved collections yet</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -137,12 +137,12 @@ export function CollectionLibraryModal({
                   <div
                     key={item.id}
                     className={cn(
-                      'flex items-start gap-3 rounded-xl border bg-card p-3 transition-colors',
-                      isActive ? 'border-orange-400/40 bg-orange-500/5' : 'border-border'
+                      'flex items-start gap-3 rounded-xl bg-card p-3 shadow-[0_8px_22px_hsl(var(--background)/0.22)] transition-colors dark:shadow-none',
+                      isActive && 'bg-muted/45'
                     )}
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <FileCode className="h-5 w-5 text-primary" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/80">
+                      <FileCode className="h-5 w-5 text-muted-foreground" weight="fill" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -162,7 +162,7 @@ export function CollectionLibraryModal({
                           </p>
                         </div>
                         {isActive && (
-                          <span className="shrink-0 rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-medium text-orange-400">
+                          <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-medium text-background">
                             Open
                           </span>
                         )}
@@ -184,7 +184,7 @@ export function CollectionLibraryModal({
                           disabled={isBusy}
                           onClick={() => void handleExport(item)}
                         >
-                          <DownloadSimple className="h-3.5 w-3.5" />
+                          <DownloadSimple className="h-3.5 w-3.5" weight="fill" />
                           Export
                         </Button>
                         <Button
@@ -194,7 +194,7 @@ export function CollectionLibraryModal({
                           disabled={isBusy}
                           onClick={() => void handleDelete(item)}
                         >
-                          <Trash className="h-3.5 w-3.5" />
+                          <Trash className="h-3.5 w-3.5" weight="fill" />
                           Remove
                         </Button>
                       </div>

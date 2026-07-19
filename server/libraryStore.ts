@@ -70,10 +70,9 @@ export async function saveCollection(
 
   await ensureDir()
   const contentHash = hashContent(rawJson)
-  const existing = (await listCollections()).find((item) => item.contentHash === contentHash)
 
   const record: StoredCollection = {
-    id: existing?.id ?? crypto.randomUUID(),
+    id: crypto.randomUUID(),
     name,
     rawJson,
     requestCount,
