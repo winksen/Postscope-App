@@ -1,4 +1,5 @@
 import { ensureAppEnv } from './loadEnv'
+import { sanitizeExternalUrl } from './runtimeConfig'
 
 const DEFAULT_FEEDBACK_URL = 'https://github.com/winksen/Postscope-App/issues/new'
 
@@ -13,6 +14,6 @@ export function getExternalLinksConfig() {
   return {
     showGitHubLink: parseEnabledFlag(process.env.SHOW_GITHUB_LINK),
     showFeedbackLink: parseEnabledFlag(process.env.SHOW_FEEDBACK_LINK),
-    feedbackUrl: process.env.FEEDBACK_URL?.trim() || DEFAULT_FEEDBACK_URL,
+    feedbackUrl: sanitizeExternalUrl(process.env.FEEDBACK_URL?.trim(), DEFAULT_FEEDBACK_URL),
   }
 }

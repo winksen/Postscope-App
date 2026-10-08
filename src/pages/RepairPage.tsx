@@ -30,6 +30,7 @@ import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toaster'
 
 type CategoryFilter = 'all' | Finding['category']
 type RiskFilter = 'all' | RepairRiskLevel
@@ -57,9 +58,10 @@ const CATEGORY_LABELS: Record<Finding['category'], string> = {
   hygiene: 'Hygiene',
 }
 
-function riskVariant(risk: RepairRiskLevel): 'success' | 'warning' | 'outline' {
+function riskVariant(risk: RepairRiskLevel): 'success' | 'warning' | 'critical' | 'outline' {
   if (risk === 'low') return 'success'
   if (risk === 'medium') return 'warning'
+  if (risk === 'high') return 'critical'
   return 'outline'
 }
 
@@ -151,6 +153,7 @@ export function RepairPage({
   onApplyRepairedCollection,
   onResetRepairs,
 }: RepairPageProps) {
+  const { notify } = useToast()
   const rawObject = useMemo(() => JSON.parse(rawJson) as unknown, [rawJson])
   const plan = useMemo(() => createRepairPlan(rawObject, parsed, findings), [rawObject, parsed, findings])
   const [selected, setSelected] = useState<Set<string>>(() => new Set(plan.defaultSelectedFixIds))
@@ -214,6 +217,9 @@ export function RepairPage({
         beforeScore: score.total,
         afterScore: next.score.total,
       })
+    } catch (error) {
+      console.error(error)
+      notify({ variant: 'error', title: 'Repairs could not be applied', description: error instanceof Error ? error.message : undefined })
     } finally {
       setApplying(false)
     }
@@ -347,6 +353,7 @@ export function RepairPage({
                     <SelectItem value="all">All risk</SelectItem>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
                     <SelectItem value="manual">Manual</SelectItem>
                   </SelectContent>
                 </Select>

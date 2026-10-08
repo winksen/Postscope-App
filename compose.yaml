@@ -14,8 +14,20 @@ services:
       LOGGING_MODE: ${LOGGING_MODE:-hybrid}
       PUBLIC_LANDING_PAGE: ${PUBLIC_LANDING_PAGE:-false}
       PORT: 3010
+      # Optional hardening (see docs/SECURITY.md). Leave empty to disable.
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-}
+      LIBRARY_ALLOW_DELETE: ${LIBRARY_ALLOW_DELETE:-true}
+      LIBRARY_REDACT_SECRETS: ${LIBRARY_REDACT_SECRETS:-false}
+      LIBRARY_MAX_ITEMS: ${LIBRARY_MAX_ITEMS:-0}
+      LIBRARY_RETENTION_DAYS: ${LIBRARY_RETENTION_DAYS:-0}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
     volumes:
       - postscope-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   postscope-data:

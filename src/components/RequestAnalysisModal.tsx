@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { MaskedText, SecretValue } from './SecretValue'
 
 interface RequestAnalysisModalProps {
   request: ParsedRequest | null
@@ -110,7 +111,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                         <span>
                           <span className="text-primary">{h.key}</span>
                           <span className="text-muted-foreground">: </span>
-                          {h.value}
+                          <SecretValue name={h.key} value={h.value} />
                         </span>
                         <CopyButton text={`${h.key}: ${h.value}`} />
                       </li>
@@ -125,9 +126,12 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Body</p>
                     <CopyButton text={request.bodyRaw} />
                   </div>
-                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                    {request.bodyRaw}
-                  </pre>
+                  <div className="mt-2">
+                    <MaskedText
+                      text={request.bodyRaw}
+                      className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+                    />
+                  </div>
                 </div>
               )}
 

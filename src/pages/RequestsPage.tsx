@@ -21,6 +21,7 @@ import type { ParsedCollection, ParsedRequest } from '@/lib/parser'
 import type { Finding } from '@/lib/auditor'
 import { findingsForRequest, requestHealthScore } from '@/lib/requestFindings'
 import { cn } from '@/lib/utils'
+import { MaskedText, SecretValue } from '@/components/SecretValue'
 
 interface RequestsPageProps {
   parsed: ParsedCollection
@@ -470,7 +471,7 @@ export function RequestsPage({
                           {selectedQueryParams.map((param) => (
                             <li key={`${param.key}-${param.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs">
                               <span className="min-w-0 truncate text-foreground">{param.key}</span>
-                              <span className="min-w-0 truncate text-muted-foreground">{param.value || '-'}</span>
+                              <span className="min-w-0 truncate text-muted-foreground">{param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}</span>
                             </li>
                           ))}
                         </ul>
@@ -486,7 +487,7 @@ export function RequestsPage({
                           {selected.headers.map((header) => (
                             <li key={`${header.key}-${header.value}`} className="group flex min-w-0 items-center justify-between gap-2 text-xs">
                               <span className="min-w-0 truncate text-muted-foreground">
-                                <span className="text-foreground">{header.key}</span>: {header.value}
+                                <span className="text-foreground">{header.key}</span>: <SecretValue name={header.key} value={header.value} />
                               </span>
                               <CopyButton text={`${header.key}: ${header.value}`} />
                             </li>
@@ -503,9 +504,10 @@ export function RequestsPage({
                         {selected.bodyRaw && <CopyButton text={selected.bodyRaw} />}
                       </div>
                       {selected.bodyRaw ? (
-                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/35 p-3 text-xs text-muted-foreground">
-                          {selected.bodyRaw}
-                        </pre>
+                        <MaskedText
+                          text={selected.bodyRaw}
+                          className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/35 p-3 text-xs text-muted-foreground"
+                        />
                       ) : (
                         <p className="text-sm text-muted-foreground">No request body.</p>
                       )}

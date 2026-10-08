@@ -7,6 +7,7 @@ import {
   Sparkle,
 } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
+import { FindingEvidence } from '../components/FindingEvidence'
 import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
 import { affectedLabels } from '../lib/findingDisplay'
@@ -230,6 +231,7 @@ export function HygienePage({ parsed, findings, search }: HygienePageProps) {
                   </p>
                 </div>
               )}
+              <FindingEvidence finding={detail} requests={parsed.requests} />
               <div className="rounded-lg bg-muted/45 p-4">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Recommendation</p>
                 <p className="mt-2 text-sm">{detail.recommendation}</p>

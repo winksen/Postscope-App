@@ -4,12 +4,14 @@ import './index.css'
 import App from './App'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/hooks/use-theme'
+import { ToastProvider } from '@/components/ui/toaster'
+import { readStorage } from '@/lib/safeStorage'
 
 const THEME_KEY = 'postscope-theme'
 
 function applyInitialTheme() {
   const root = document.documentElement
-  const storedTheme = localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'system' | null
+  const storedTheme = readStorage(THEME_KEY) as 'light' | 'dark' | 'system' | null
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const shouldUseDark = storedTheme === 'dark' || (storedTheme !== 'light' && prefersDark)
   root.classList.toggle('dark', shouldUseDark)
@@ -21,7 +23,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <TooltipProvider delayDuration={200}>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </TooltipProvider>
     </ThemeProvider>
   </StrictMode>

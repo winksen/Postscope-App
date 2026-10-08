@@ -1,48 +1,60 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { fetchAppConfig, type LoggingMode } from '@/lib/deploymentConfig'
+import { DEFAULT_APP_CONFIG, fetchAppConfig, type AppConfig } from '@/lib/deploymentConfig'
 import { LandingPage } from '@/pages/LandingPage'
 import { AnalyzeApp } from '@/pages/AnalyzeApp'
 import { SamplesApp } from '@/pages/SamplesApp'
 
 export default function App() {
-  const [loggingMode, setLoggingMode] = useState<LoggingMode>('off')
-  const [publicLandingPage, setPublicLandingPage] = useState(false)
-  const [showGitHubLink, setShowGitHubLink] = useState(true)
-  const [showFeedbackLink, setShowFeedbackLink] = useState(true)
-  const [feedbackUrl, setFeedbackUrl] = useState('https://github.com/winksen/Postscope-App/issues/new')
+  const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG)
   const [configLoaded, setConfigLoaded] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     void fetchAppConfig()
-      .then(({ loggingMode: mode, publicLandingPage: landing, showGitHubLink: githubLink, showFeedbackLink: feedbackLink, feedbackUrl: configuredFeedbackUrl }) => {
-        setLoggingMode(mode)
-        setPublicLandingPage(landing)
-        setShowGitHubLink(githubLink)
-        setShowFeedbackLink(feedbackLink)
-        setFeedbackUrl(configuredFeedbackUrl)
+      .then((loaded) => {
+        if (!cancelled) setConfig(loaded)
       })
+      // Falls back to privacy-first defaults (incognito, no landing page) when the server is unreachable.
       .catch((e) => console.error(e))
-      .finally(() => setConfigLoaded(true))
+      .finally(() => {
+        if (!cancelled) setConfigLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (!configLoaded) {
     return <div className="min-h-screen bg-background" />
   }
 
+  const analyzer = (
+    <AnalyzeApp
+      loggingMode={config.loggingMode}
+      samplesPath="/samples"
+      showGitHubLink={config.showGitHubLink}
+      showFeedbackLink={config.showFeedbackLink}
+      feedbackUrl={config.feedbackUrl}
+      appVersion={config.appVersion}
+      libraryAllowDelete={config.libraryAllowDelete}
+      auditPolicy={config.auditPolicy}
+    />
+  )
+
   return (
     <BrowserRouter>
       <Routes>
-        {publicLandingPage ? (
+        {config.publicLandingPage ? (
           <>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/analyze" element={<AnalyzeApp loggingMode={loggingMode} samplesPath="/samples" showGitHubLink={showGitHubLink} showFeedbackLink={showFeedbackLink} feedbackUrl={feedbackUrl} />} />
+            <Route path="/analyze" element={analyzer} />
             <Route path="/samples" element={<SamplesApp analyzePath="/analyze" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <>
-            <Route path="/" element={<AnalyzeApp loggingMode={loggingMode} samplesPath="/samples" showGitHubLink={showGitHubLink} showFeedbackLink={showFeedbackLink} feedbackUrl={feedbackUrl} />} />
+            <Route path="/" element={analyzer} />
             <Route path="/analyze" element={<Navigate to="/" replace />} />
             <Route path="/samples" element={<SamplesApp analyzePath="/" />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,8 +1,13 @@
 import type { StorageMode } from './storagePreferences'
 import { parseLoggingMode, type LoggingMode } from './parseLoggingMode'
+import { sanitizeAuditOptions, type AuditOptions } from './auditor'
 
 export type { LoggingMode }
 export { parseLoggingMode }
+
+export const DEFAULT_FEEDBACK_URL = 'https://github.com/winksen/Postscope-App/issues/new'
+export const DEFAULT_MAX_COLLECTION_BYTES = 15_000_000
+const CONFIG_TIMEOUT_MS = 8_000
 
 export interface AppConfig {
   appVersion: string
@@ -11,6 +16,25 @@ export interface AppConfig {
   showGitHubLink: boolean
   showFeedbackLink: boolean
   feedbackUrl: string
+  /** Largest collection the server will store; also used as the client-side import guard. */
+  maxCollectionBytes: number
+  libraryAllowDelete: boolean
+  libraryRedactSecrets: boolean
+  /** Team audit policy defaults (disabled rules, severity overrides). */
+  auditPolicy: AuditOptions
+}
+
+export const DEFAULT_APP_CONFIG: AppConfig = {
+  appVersion: 'unknown',
+  loggingMode: 'off',
+  publicLandingPage: false,
+  showGitHubLink: true,
+  showFeedbackLink: true,
+  feedbackUrl: DEFAULT_FEEDBACK_URL,
+  maxCollectionBytes: DEFAULT_MAX_COLLECTION_BYTES,
+  libraryAllowDelete: true,
+  libraryRedactSecrets: false,
+  auditPolicy: {},
 }
 
 function parseBooleanFlag(value: unknown): boolean {
@@ -20,21 +44,40 @@ function parseBooleanFlag(value: unknown): boolean {
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on'
 }
 
-/** Fetch deployment config from the app server (LOGGING_MODE, PUBLIC_LANDING_PAGE). */
+/** Only http(s) links are rendered, so a bad config value can never become a `javascript:` URL. */
+export function sanitizeHttpUrl(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : fallback
+  } catch {
+    return fallback
+  }
+}
+
+/** Fetch deployment config from the app server (LOGGING_MODE, PUBLIC_LANDING_PAGE, policies). */
 export async function fetchAppConfig(): Promise<AppConfig> {
-  const res = await fetch('/api/config')
-  if (!res.ok) throw new Error('Failed to load app config')
-  const body = (await res.json()) as Partial<AppConfig>
-  return {
-    appVersion: typeof body.appVersion === 'string' ? body.appVersion : 'unknown',
-    loggingMode: parseLoggingMode(body.loggingMode),
-    publicLandingPage: parseBooleanFlag(body.publicLandingPage),
-    showGitHubLink: body.showGitHubLink !== false,
-    showFeedbackLink: body.showFeedbackLink !== false,
-    feedbackUrl:
-      typeof body.feedbackUrl === 'string' && body.feedbackUrl.trim()
-        ? body.feedbackUrl
-        : 'https://github.com/winksen/Postscope-App/issues/new',
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT_MS)
+  try {
+    const res = await fetch('/api/config', { signal: controller.signal, credentials: 'same-origin' })
+    if (!res.ok) throw new Error('Failed to load app config')
+    const body = (await res.json()) as Partial<AppConfig>
+    const maxBytes = Number(body.maxCollectionBytes)
+    return {
+      appVersion: typeof body.appVersion === 'string' ? body.appVersion : 'unknown',
+      loggingMode: parseLoggingMode(body.loggingMode),
+      publicLandingPage: parseBooleanFlag(body.publicLandingPage),
+      showGitHubLink: body.showGitHubLink !== false,
+      showFeedbackLink: body.showFeedbackLink !== false,
+      feedbackUrl: sanitizeHttpUrl(body.feedbackUrl, DEFAULT_FEEDBACK_URL),
+      maxCollectionBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : DEFAULT_MAX_COLLECTION_BYTES,
+      libraryAllowDelete: body.libraryAllowDelete !== false,
+      libraryRedactSecrets: body.libraryRedactSecrets === true,
+      auditPolicy: sanitizeAuditOptions(body.auditPolicy),
+    }
+  } finally {
+    clearTimeout(timer)
   }
 }
 

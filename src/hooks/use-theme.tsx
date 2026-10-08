@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { readStorage, writeStorage } from '@/lib/safeStorage'
 
 type Theme = 'light' | 'dark' | 'system'
 const STORAGE_KEY = 'postscope-theme'
 
 function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'system'
-  return (localStorage.getItem(STORAGE_KEY) as Theme) || 'system'
+  const stored = readStorage(STORAGE_KEY)
+  return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
 }
 
 function resolveTheme(theme: Theme): 'light' | 'dark' {
@@ -59,7 +61,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (t: Theme) => {
     setThemeState(t)
-    localStorage.setItem(STORAGE_KEY, t)
+    writeStorage(STORAGE_KEY, t)
   }
 
   const toggleTheme = () => {

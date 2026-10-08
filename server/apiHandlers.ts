@@ -1,7 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
+  LibraryError,
+  checkLibraryWritable,
   deleteCollection,
   getCollection,
+  isValidCollectionId,
   listCollections,
   saveCollection,
 } from './libraryStore'
@@ -9,54 +12,121 @@ import { getAppVersion } from './appVersion'
 import { getExternalLinksConfig } from './externalLinksConfig'
 import { isPublicLandingEnabled } from './landingConfig'
 import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConfig'
+import { HttpError, readJsonBody, sendJson } from './http'
+import { checkRateLimit, isSameOriginRequest } from './security'
+import { getAuditPolicy, getMaxCollectionBytes, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
+import { errorFields, log } from './logger'
+import { redactCollection } from '../src/lib/redaction'
 
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json')
-  res.end(JSON.stringify(body))
+const startedAt = Date.now()
+
+function requestIdOf(res: ServerResponse): string | undefined {
+  const value = res.getHeader('X-Request-Id')
+  return typeof value === 'string' ? value : undefined
 }
 
-async function readBody(req: IncomingMessage): Promise<string> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+function sendError(res: ServerResponse, error: unknown): void {
+  if (error instanceof HttpError || error instanceof LibraryError) {
+    sendJson(res, error.status, { error: error.message }, error instanceof HttpError ? error.headers : {})
+    return
   }
-  return Buffer.concat(chunks).toString('utf8')
+  const requestId = requestIdOf(res)
+  log.error('Unhandled API error', { requestId, ...errorFields(error) })
+  // Never echo internal error messages (paths, stack details) to clients.
+  sendJson(res, 500, { error: 'Unexpected server error.', requestId })
+}
+
+function isReadMethod(method: string | undefined): boolean {
+  return method === 'GET' || method === 'HEAD'
 }
 
 export async function handleConfigApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
-  if (url.pathname !== '/api/config' || req.method !== 'GET') return false
+  if (url.pathname !== '/api/config') return false
+  if (!isReadMethod(req.method)) {
+    sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'GET, HEAD' })
+    return true
+  }
   sendJson(res, 200, {
     appVersion: getAppVersion(),
     loggingMode: getLoggingMode(),
     publicLandingPage: isPublicLandingEnabled(),
     ...getExternalLinksConfig(),
+    maxCollectionBytes: getMaxCollectionBytes(),
+    libraryAllowDelete: isLibraryDeleteAllowed(),
+    libraryRedactSecrets: isLibraryRedactionEnabled(),
+    auditPolicy: getAuditPolicy(),
   })
   return true
 }
 
+/** Liveness/readiness probe. Exempt from auth so container orchestrators can call it. */
+export async function handleHealthApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
+  if (url.pathname !== '/api/health') return false
+  if (!isReadMethod(req.method)) {
+    sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'GET, HEAD' })
+    return true
+  }
+  const storageEnabled = isUploadAllowed()
+  const storageWritable = storageEnabled ? await checkLibraryWritable() : null
+  const healthy = storageWritable !== false
+  sendJson(res, healthy ? 200 : 503, {
+    status: healthy ? 'ok' : 'degraded',
+    version: getAppVersion(),
+    uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+    storage: storageEnabled ? (storageWritable ? 'writable' : 'unwritable') : 'disabled',
+  })
+  return true
+}
+
+interface SaveBody {
+  rawJson?: unknown
+  name?: unknown
+  requestCount?: unknown
+}
+
 export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
-  if (!url.pathname.startsWith('/api/collections')) return false
+  if (url.pathname !== '/api/collections' && !url.pathname.startsWith('/api/collections/')) return false
 
   const idMatch = url.pathname.match(/^\/api\/collections\/([^/]+)$/)
-  const id = idMatch?.[1] ? decodeURIComponent(idMatch[1]) : null
+  let id: string | null = null
+  if (idMatch) {
+    try {
+      id = decodeURIComponent(idMatch[1])
+    } catch {
+      sendJson(res, 400, { error: 'Invalid collection id.' })
+      return true
+    }
+  } else if (url.pathname !== '/api/collections') {
+    sendJson(res, 404, { error: 'Not found' })
+    return true
+  }
+
+  if (id !== null && !isValidCollectionId(id)) {
+    sendJson(res, 400, { error: 'Invalid collection id.' })
+    return true
+  }
 
   try {
-    if (req.method === 'GET' && !id) {
-      if (!isLibraryVisible()) {
-        sendJson(res, 200, { collections: [] })
+    const mutating = req.method === 'POST' || req.method === 'DELETE'
+    if (mutating) {
+      if (!isSameOriginRequest(req)) {
+        sendJson(res, 403, { error: 'Cross-site request blocked.' })
         return true
       }
-      sendJson(res, 200, { collections: await listCollections() })
+      const retryAfter = checkRateLimit(req, 'write')
+      if (retryAfter) {
+        sendJson(res, 429, { error: 'Too many requests. Slow down and try again.' }, { 'Retry-After': String(retryAfter) })
+        return true
+      }
+    }
+
+    if (isReadMethod(req.method) && !id) {
+      sendJson(res, 200, { collections: isLibraryVisible() ? await listCollections() : [] })
       return true
     }
 
-    if (req.method === 'GET' && id) {
-      if (!isLibraryVisible()) {
-        sendJson(res, 404, { error: 'Collection not found' })
-        return true
-      }
-      const collection = await getCollection(id)
+    if (isReadMethod(req.method) && id) {
+      const collection = isLibraryVisible() ? await getCollection(id) : null
       if (!collection) {
         sendJson(res, 404, { error: 'Collection not found' })
         return true
@@ -71,18 +141,17 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
         return true
       }
 
-      const body = JSON.parse(await readBody(req)) as {
-        rawJson?: string
-        name?: string
-        requestCount?: number
-      }
-
-      if (!body.rawJson || !body.name || typeof body.requestCount !== 'number') {
-        sendJson(res, 400, { error: 'rawJson, name, and requestCount are required' })
+      // rawJson is a JSON string inside JSON, so escaping can roughly double its size on the wire.
+      const body = await readJsonBody<SaveBody>(req, getMaxCollectionBytes() * 2 + 1_000_000)
+      if (!body || typeof body !== 'object' || typeof body.rawJson !== 'string' || !body.rawJson) {
+        sendJson(res, 400, { error: 'rawJson is required.' })
         return true
       }
 
-      sendJson(res, 201, await saveCollection(body.rawJson, body.name, body.requestCount))
+      const meta = await saveCollection(body.rawJson, typeof body.name === 'string' ? body.name : '', undefined, {
+        transform: isLibraryRedactionEnabled() ? redactCollection : undefined,
+      })
+      sendJson(res, meta.deduplicated ? 200 : 201, meta)
       return true
     }
 
@@ -91,16 +160,19 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
         sendJson(res, 403, { error: 'Collection removal is disabled in public mode.' })
         return true
       }
+      if (!isLibraryDeleteAllowed()) {
+        sendJson(res, 403, { error: 'Collection removal is disabled by the operator.' })
+        return true
+      }
       const removed = await deleteCollection(id)
       sendJson(res, removed ? 200 : 404, { ok: removed })
       return true
     }
 
-    sendJson(res, 405, { error: 'Method not allowed' })
+    sendJson(res, 405, { error: 'Method not allowed' }, { Allow: id ? 'GET, HEAD, DELETE' : 'GET, HEAD, POST' })
     return true
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unexpected server error'
-    sendJson(res, 500, { error: message })
+    sendError(res, error)
     return true
   }
 }

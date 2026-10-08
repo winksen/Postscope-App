@@ -1,11 +1,28 @@
 import {
   BookmarkSimple,
+  DownloadSimple,
+  FileCode,
+  FileText,
   MagnifyingGlass,
+  ShieldCheck,
   SignOut,
+  SlidersHorizontal,
+  TreeStructure,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { cn } from '@/lib/utils'
+
+export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'sanitized'
 
 interface AppHeaderProps {
   sidebarOffset: string
@@ -16,6 +33,9 @@ interface AppHeaderProps {
   isSavedToLibrary: boolean
   savingToLibrary: boolean
   historyEnabled: boolean
+  onExport?: (format: ExportFormat) => void
+  onOpenRules?: () => void
+  customRulesActive?: boolean
 }
 
 export function AppHeader({
@@ -27,6 +47,9 @@ export function AppHeader({
   isSavedToLibrary,
   savingToLibrary,
   historyEnabled,
+  onExport,
+  onOpenRules,
+  customRulesActive = false,
 }: AppHeaderProps) {
   return (
     <header
@@ -52,6 +75,56 @@ export function AppHeader({
 
       <div className="flex items-center gap-1">
         <ThemeToggle />
+
+        {onOpenRules && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('relative text-muted-foreground hover:text-foreground', customRulesActive && 'text-foreground')}
+                onClick={onOpenRules}
+                aria-label="Audit rules"
+              >
+                <SlidersHorizontal className="h-4 w-4" weight="fill" />
+                {customRulesActive && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-orange-400" aria-hidden />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{customRulesActive ? 'Audit rules (customized)' : 'Audit rules'}</TooltipContent>
+          </Tooltip>
+        )}
+
+        {onExport && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" aria-label="Export">
+                    <DownloadSimple className="h-4 w-4" weight="fill" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Export</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Findings report</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => onExport('markdown')}>
+                <FileText weight="fill" /> Markdown (.md)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport('json')}>
+                <FileCode weight="fill" /> JSON (.json)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport('sarif')}>
+                <TreeStructure weight="fill" /> SARIF for CI (.sarif)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Collection</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => onExport('sanitized')}>
+                <ShieldCheck weight="fill" /> Sanitized copy (secrets removed)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {historyEnabled && !isSavedToLibrary && onSaveToLibrary && (
           <Tooltip>

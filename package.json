@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3010",
-    "build": "tsc -b && vite build",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "start": "tsx server/index.ts",
-    "preview": "vite preview --port 3010"
+    "preview": "vite preview --port 3010",
+    "test": "node scripts/run-tests.mjs",
+    "scan": "tsx cli/postscope.ts",
+    "audit:deps": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -24,27 +28,31 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.16.0",
+    "react-router-dom": "^7.18.4",
     "recharts": "^2.14.1",
-    "tailwind-merge": "^3.5.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^22.20.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.29",
     "tailwindcss": "^3.4.15",
+    "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.4",
     "typescript": "~5.6.2",
     "vite": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=20.6"
   }
 }

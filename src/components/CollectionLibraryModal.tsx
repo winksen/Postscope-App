@@ -27,6 +27,7 @@ import {
   type SavedCollectionMeta,
 } from '@/lib/collectionLibrary'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/toaster'
 
 interface CollectionLibraryModalProps {
   open: boolean
@@ -34,6 +35,8 @@ interface CollectionLibraryModalProps {
   onOpenChange: (open: boolean) => void
   onLoad: (id: string) => void
   onLibraryChange?: () => void
+  /** Operators can disable removal (LIBRARY_ALLOW_DELETE=false) to keep an audit trail. */
+  allowDelete?: boolean
 }
 
 export function CollectionLibraryModal({
@@ -42,15 +45,21 @@ export function CollectionLibraryModal({
   onOpenChange,
   onLoad,
   onLibraryChange,
+  allowDelete = true,
 }: CollectionLibraryModalProps) {
+  const { notify } = useToast()
   const [collections, setCollections] = useState<SavedCollectionMeta[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       setCollections(await listSavedCollections())
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'The library could not be loaded.')
     } finally {
       setLoading(false)
     }
@@ -76,6 +85,9 @@ export function CollectionLibraryModal({
     try {
       const record = await getSavedCollection(meta.id)
       if (record) downloadCollectionJson(record.name, record.rawJson)
+      else notify({ variant: 'error', title: 'Collection not found', description: 'It may have been removed by a teammate.' })
+    } catch (error) {
+      notify({ variant: 'error', title: 'Export failed', description: error instanceof Error ? error.message : undefined })
     } finally {
       setBusyId(null)
     }
@@ -90,6 +102,8 @@ export function CollectionLibraryModal({
       await removeFromLibrary(meta.id)
       await refresh()
       onLibraryChange?.()
+    } catch (error) {
+      notify({ variant: 'error', title: 'Could not remove collection', description: error instanceof Error ? error.message : undefined })
     } finally {
       setBusyId(null)
     }
@@ -118,6 +132,13 @@ export function CollectionLibraryModal({
               [...Array(3)].map((_, i) => (
                 <Skeleton key={i} className="h-[72px] rounded-xl" />
               ))
+            ) : loadError ? (
+              <div className="flex flex-col items-center gap-3 rounded-xl bg-destructive/10 px-6 py-8 text-center">
+                <p className="text-sm font-medium text-destructive">{loadError}</p>
+                <Button size="sm" variant="secondary" onClick={() => void refresh()}>
+                  Try again
+                </Button>
+              </div>
             ) : collections.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-xl bg-muted/35 px-6 py-10 text-center">
                 <FolderOpen className="h-10 w-10 text-muted-foreground/60" weight="fill" />
@@ -187,16 +208,18 @@ export function CollectionLibraryModal({
                           <DownloadSimple className="h-3.5 w-3.5" weight="fill" />
                           Export
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-destructive"
-                          disabled={isBusy}
-                          onClick={() => void handleDelete(item)}
-                        >
-                          <Trash className="h-3.5 w-3.5" weight="fill" />
-                          Remove
-                        </Button>
+                        {allowDelete && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-destructive"
+                            disabled={isBusy}
+                            onClick={() => void handleDelete(item)}
+                          >
+                            <Trash className="h-3.5 w-3.5" weight="fill" />
+                            Remove
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

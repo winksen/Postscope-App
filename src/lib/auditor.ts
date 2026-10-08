@@ -1,249 +1,619 @@
-import type { ParsedCollection } from './parser'
+import type { ParsedCollection, ParsedRequest, KeyValue } from './parser'
+import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
+import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
+import { secretFieldsFor } from './authSchemes'
+import { extractVariableNames, isVariableOrEmpty } from './variables'
+import {
+  evidencePreview,
+  findSecretPatterns,
+  isLikelySecretValue,
+  isSensitiveHeader,
+  isSensitiveKey,
+  redactSecretsInText,
+} from './secretPatterns'
+
+export interface FindingEvidence {
+  /** Parser request id, when the evidence belongs to one request. */
+  requestId?: string
+  /** Human-readable location, e.g. `header Authorization` or `collection variable apiKey`. */
+  location: string
+  /** Masked preview. Never contains the full secret value. */
+  preview?: string
+}
 
 export interface Finding {
+  /** Unique within one audit run; equals the rule id. */
   id: string;
-  severity: 'critical' | 'warning' | 'info';
-  category: 'secrets' | 'variables' | 'auth' | 'hygiene';
+  ruleId: RuleId;
+  severity: Severity;
+  category: FindingCategory;
   title: string;
   description: string;
   /** Stable request ids from the parser (not display names). */
   affected: string[];
   recommendation: string;
+  evidence?: FindingEvidence[];
+  cwe?: string;
+  owasp?: string;
 }
 
-const SECRET_KEY_REGEX = /passw|password|passwd/i
-const API_KEY_REGEX = /api.?key|x-api-key|apikey/i
-const BODY_SECRET_REGEX = /secret|client_secret|access_token/i
-const BEARER_OR_BASIC_REGEX = /^(Bearer|Basic)\s+.+$/i
-const VARIABLE_PATTERN = /\{\{\w+\}\}/
-
-function isVariable(value: string): boolean {
-  return VARIABLE_PATTERN.test(value) || value.trim() === ''
+export interface AuditOptions {
+  /** Rule ids to skip entirely. */
+  disabledRules?: readonly string[]
+  /** Per-rule severity overrides (team policy or personal preference). */
+  severityOverrides?: Partial<Record<string, Severity>>
 }
 
-function runCriticalChecks(parsed: ParsedCollection): Finding[] {
-  const findings: Finding[] = []
-  const affectedByRule = new Map<string, string[]>()
+const MAX_EVIDENCE_PER_FINDING = 100
 
-  for (const req of parsed.requests) {
-    for (const h of req.headers) {
-      if (SECRET_KEY_REGEX.test(h.key) && !isVariable(h.value) && h.value) {
-        const key = 'HARDCODED_PASSWORD'
-        if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.id)
-      }
-      if (h.key.toLowerCase() === 'authorization' && !isVariable(h.value) && h.value && BEARER_OR_BASIC_REGEX.test(h.value)) {
-        const key = 'HARDCODED_TOKEN'
-        if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.id)
-      }
-      if (API_KEY_REGEX.test(h.key) && !isVariable(h.value) && h.value) {
-        const key = 'HARDCODED_API_KEY'
-        if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.id)
-      }
+const HEADER_PASSWORD_KEY = /passw|password|passwd/i
+const API_KEY_HEADER = /api.?key|x-api-key|apikey/i
+const PASSWORD_FIELD = /passw/i
+const BODY_SECRET_FIELD = /secret|access_?token|refresh_?token|id_?token|api_?key|apikey|private_?key|client_?assertion/i
+const LEGACY_BODY_SECRET = /secret|client_secret|access_token/i
+export const AUTH_HEADER_SCHEME = /^(Bearer|Basic|Token|Digest|Hawk|ApiKey|Api-Key|JWT|AWS4-HMAC-SHA256|SharedKey|OAuth)\s+\S+/i
+export const TOKEN_HEADER = /^(x-(auth|access|session|refresh)-token|x-amz-security-token|private-token)$/i
+export const SESSION_COOKIE = /(?:^|;\s*)([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i
+const QUERY_SECRET_KEY =
+  /^(access_?token|auth_?token|id_?token|refresh_?token|token|api_?key|apikey|x-api-key|secret|client_?secret|password|passwd|pwd|session_?id|sessionid|sid|sig|signature|private_?key|x-amz-(signature|security-token|credential))$/i
+const URL_CREDENTIALS = /^[a-z][a-z0-9+.-]*:\/\/([^\s/@:{}]+):([^\s/@]+)@/i
+const SCRIPT_SET_CALL = /pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`]+)\1\s*,\s*(['"`])([^'"`]*)\3/g
+const SCRIPT_LITERAL_ASSIGNMENT = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([^'"`\n]{6,})\2/g
+const SCRIPT_LITERAL_PROPERTY = /['"]?([A-Za-z_$][\w$-]*)['"]?\s*:\s*(['"`])([^'"`\n]{6,})\2/g
+const SCRIPT_CONSOLE_CALL = /console\.(?:log|info|debug|warn|error|trace)\s*\(([^)\n]*)\)/g
+const SENSITIVE_IDENTIFIER = /(token|password|passwd|secret|api_?key|apikey|authorization|credential|cookie|bearer)/i
+const RESPONSE_JSON_SECRET =
+  /"(access_token|accessToken|refresh_token|refreshToken|id_token|idToken|token|password|client_secret|clientSecret|api_key|apiKey|secret|session_id|sessionId)"\s*:\s*"([^"\\]{8,})"/g
+const URL_VARIABLE_PREFIX = /^\{\{\s*([^{}]+?)\s*\}\}/
+
+interface RuleHits {
+  affected: string[]
+  seen: Set<string>
+  evidence: FindingEvidence[]
+  evidenceKeys: Set<string>
+  description?: string
+}
+
+class FindingCollector {
+  private hits = new Map<RuleId, RuleHits>()
+
+  private entry(ruleId: RuleId): RuleHits {
+    let hits = this.hits.get(ruleId)
+    if (!hits) {
+      hits = { affected: [], seen: new Set(), evidence: [], evidenceKeys: new Set() }
+      this.hits.set(ruleId, hits)
     }
+    return hits
+  }
 
-    if (req.bodyRaw) {
-      try {
-        const parsedBody = JSON.parse(req.bodyRaw) as Record<string, unknown>
-        const check = (obj: Record<string, unknown>) => {
-          for (const [k, v] of Object.entries(obj)) {
-            if (BODY_SECRET_REGEX.test(k) && typeof v === 'string' && !isVariable(v) && v) {
-              const key = 'HARDCODED_SECRET'
-              if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-              affectedByRule.get(key)!.push(req.id)
-              return
-            }
-            if (v && typeof v === 'object' && !Array.isArray(v)) check(v as Record<string, unknown>)
-          }
-        }
-        check(parsedBody)
-      } catch {
-        if (BODY_SECRET_REGEX.test(req.bodyRaw) && !VARIABLE_PATTERN.test(req.bodyRaw)) {
-          const key = 'HARDCODED_SECRET'
-          if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-          affectedByRule.get(key)!.push(req.id)
-        }
+  /** Records a hit. `requestId` adds an affected request; evidence is de-duplicated by location + preview. */
+  add(ruleId: RuleId, requestId?: string, evidence?: Omit<FindingEvidence, 'requestId'>): void {
+    const hits = this.entry(ruleId)
+    if (requestId && !hits.seen.has(requestId)) {
+      hits.seen.add(requestId)
+      hits.affected.push(requestId)
+    }
+    if (evidence && hits.evidence.length < MAX_EVIDENCE_PER_FINDING) {
+      const key = `${requestId ?? ''}|${evidence.location}|${evidence.preview ?? ''}`
+      if (!hits.evidenceKeys.has(key)) {
+        hits.evidenceKeys.add(key)
+        hits.evidence.push(requestId ? { requestId, ...evidence } : { ...evidence })
       }
     }
   }
 
-  const ruleMeta: Record<string, { title: string; description: string; recommendation: string }> = {
-    HARDCODED_PASSWORD: {
-      title: 'Hardcoded password in headers or body',
-      description: 'A password or credential field contains a literal value instead of a variable.',
-      recommendation: 'Replace with {{variable}} reference and define in collection or environment variables.',
-    },
-    HARDCODED_TOKEN: {
-      title: 'Hardcoded Authorization token',
-      description: 'Authorization header contains a literal Bearer or Basic token.',
-      recommendation: 'Store token in a variable and use {{token}} or {{apiKey}} in the header.',
-    },
-    HARDCODED_API_KEY: {
-      title: 'Hardcoded API key',
-      description: 'API key header contains a literal value instead of a variable.',
-      recommendation: 'Use {{apiKey}} or similar variable reference.',
-    },
-    HARDCODED_SECRET: {
-      title: 'Hardcoded secret in request body',
-      description: 'Request body contains secret, client_secret, or access_token with literal value.',
-      recommendation: 'Use variables for all sensitive fields in request bodies.',
-    },
+  /** Ensures a finding exists even without affected requests (collection-level findings). */
+  touch(ruleId: RuleId, description?: string): void {
+    const hits = this.entry(ruleId)
+    if (description) hits.description = description
   }
 
-  for (const [ruleId, affected] of affectedByRule) {
-    const meta = ruleMeta[ruleId]
-    if (meta) {
+  has(ruleId: RuleId): boolean {
+    return this.hits.has(ruleId)
+  }
+
+  affectedBy(ruleIds: RuleId[]): Set<string> {
+    const ids = new Set<string>()
+    for (const ruleId of ruleIds) this.hits.get(ruleId)?.affected.forEach((id) => ids.add(id))
+    return ids
+  }
+
+  build(options: AuditOptions = {}): Finding[] {
+    const disabled = new Set(options.disabledRules ?? [])
+    const overrides = options.severityOverrides ?? {}
+    const findings: Finding[] = []
+
+    for (const rule of RULE_LIST) {
+      const hits = this.hits.get(rule.id)
+      if (!hits || disabled.has(rule.id)) continue
+      const override = overrides[rule.id]
       findings.push({
-        id: `${ruleId}-${Date.now()}`,
-        severity: 'critical',
-        category: 'secrets',
-        title: meta.title,
-        description: meta.description,
-        affected: [...new Set(affected)],
-        recommendation: meta.recommendation,
+        id: rule.id,
+        ruleId: rule.id,
+        severity: isSeverity(override) ? override : rule.severity,
+        category: rule.category,
+        title: rule.title,
+        description: hits.description ?? rule.description,
+        affected: hits.affected,
+        recommendation: rule.recommendation,
+        evidence: hits.evidence.length ? hits.evidence : undefined,
+        cwe: rule.cwe,
+        owasp: rule.owasp,
+      })
+    }
+
+    // Stable ordering: severity first, then registry order (Array.prototype.sort is stable).
+    return findings.sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
+  }
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? '' : 's'}`
+}
+
+// ---------------------------------------------------------------------------
+// Secrets in headers and bodies
+// ---------------------------------------------------------------------------
+
+function checkHeaders(req: ParsedRequest, out: FindingCollector): void {
+  for (const h of req.headers) {
+    const key = h.key.trim()
+    const lower = key.toLowerCase()
+    const literal = !isVariableOrEmpty(h.value)
+    if (!literal) continue
+
+    if (HEADER_PASSWORD_KEY.test(key)) {
+      out.add('HARDCODED_PASSWORD', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+    }
+
+    const isAuthorization = lower === 'authorization' || lower === 'proxy-authorization'
+    if (isAuthorization) {
+      const value = h.value.trim()
+      if (AUTH_HEADER_SCHEME.test(value) || (!/\s/.test(value) && value.length >= 16)) {
+        out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}`, preview: evidencePreview(value) })
+      }
+    } else if (TOKEN_HEADER.test(lower) && isLikelySecretValue(h.value)) {
+      out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+    } else if (lower === 'cookie') {
+      const cookie = h.value.match(SESSION_COOKIE)
+      if (cookie && isLikelySecretValue(cookie[2]) && cookie[2].trim().length >= 8) {
+        out.add('HARDCODED_TOKEN', req.id, { location: `cookie ${cookie[1]}`, preview: evidencePreview(cookie[2]) })
+      }
+    }
+
+    if (API_KEY_HEADER.test(key)) {
+      out.add('HARDCODED_API_KEY', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+    }
+  }
+}
+
+/** Classifies a body field: HARDCODED_PASSWORD, HARDCODED_SECRET, or null when it is not a literal credential. */
+export function classifyBodySecret(key: string, value: string): 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET' | null {
+  if (!isLikelySecretValue(value) || !isSensitiveKey(key)) return null
+  if (PASSWORD_FIELD.test(key)) return 'HARDCODED_PASSWORD'
+  if (BODY_SECRET_FIELD.test(key)) return 'HARDCODED_SECRET'
+  return null
+}
+
+/** True when a query parameter carries a literal credential. */
+export function isQuerySecret(key: string, value: string): boolean {
+  const name = key.trim()
+  if (!isLikelySecretValue(value)) return false
+  if (QUERY_SECRET_KEY.test(name) || isSensitiveKey(name)) return true
+  return /^key$/i.test(name) && value.trim().length >= 16 && !/\s/.test(value)
+}
+
+function checkSecretField(req: ParsedRequest, key: string, value: string, location: string, out: FindingCollector): void {
+  const ruleId = classifyBodySecret(key, value)
+  if (ruleId) out.add(ruleId, req.id, { location, preview: evidencePreview(value) })
+}
+
+function walkJson(value: unknown, visit: (key: string, value: string, path: string) => void, path = '', depth = 0): void {
+  if (depth > 50 || value === null || typeof value !== 'object') return
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => walkJson(child, visit, `${path}[${index}]`, depth + 1))
+    return
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const childPath = path ? `${path}.${key}` : key
+    if (typeof child === 'string') visit(key, child, childPath)
+    else walkJson(child, visit, childPath, depth + 1)
+  }
+}
+
+function tryParseJson(text: string | undefined): unknown {
+  if (!text) return undefined
+  const trimmed = text.trim()
+  if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) return undefined
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    return undefined
+  }
+}
+
+function checkBody(req: ParsedRequest, out: FindingCollector): void {
+  if (req.bodyFields?.length) {
+    for (const field of req.bodyFields) checkSecretField(req, field.key, field.value, `body field ${field.key}`, out)
+    return
+  }
+  if (!req.bodyRaw) return
+
+  if (req.bodyMode === 'graphql') {
+    // GraphQL query text is not data; only the variables JSON can hold literals.
+    const variables = req.bodyRaw.split('\n').slice(1).join('\n')
+    const json = tryParseJson(variables)
+    if (json !== undefined) walkJson(json, (key, value, path) => checkSecretField(req, key, value, `GraphQL variable ${path}`, out))
+    return
+  }
+
+  const json = tryParseJson(req.bodyRaw)
+  if (json !== undefined) {
+    walkJson(json, (key, value, path) => checkSecretField(req, key, value, `body ${path}`, out))
+    return
+  }
+
+  // Non-JSON raw bodies (XML, text): keep the historical keyword heuristic.
+  if (LEGACY_BODY_SECRET.test(req.bodyRaw) && !/\{\{[^{}]+\}\}/.test(req.bodyRaw)) {
+    out.add('HARDCODED_SECRET', req.id, { location: 'raw body', preview: 'Contains secret-like keyword with literal value' })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auth helpers, query strings and URLs
+// ---------------------------------------------------------------------------
+
+function authOwnerLabel(req: ParsedRequest, parsed: ParsedCollection): string {
+  if (req.authSource === 'collection') return 'collection level'
+  if (req.authSource === 'folder' && req.authOwnerPath) {
+    const owner = parsed.authOwners?.find((candidate) => candidate.ownerPath.join('.') === req.authOwnerPath?.join('.'))
+    return owner ? `folder "${owner.owner}"` : 'folder level'
+  }
+  return 'request level'
+}
+
+function checkAuthHelpers(parsed: ParsedCollection, out: FindingCollector): void {
+  for (const req of parsed.requests) {
+    if (!req.authFields?.length) continue
+    for (const field of secretFieldsFor(req.auth)) {
+      const value = req.authFields.find((entry) => entry.key === field)?.value
+      if (value && isLikelySecretValue(value)) {
+        out.add('HARDCODED_AUTH_CREDENTIAL', req.id, {
+          location: `${req.auth} auth ${field} (${authOwnerLabel(req, parsed)})`,
+          preview: evidencePreview(value),
+        })
+      }
+    }
+  }
+
+  // Collection/folder auth leaks in the export even when every request overrides it.
+  for (const owner of parsed.authOwners ?? []) {
+    if (owner.type === 'basic') {
+      const password = owner.fields.find((entry) => entry.key === 'password')?.value
+      if (password && isLikelySecretValue(password)) {
+        out.add('HARDCODED_AUTH_CREDENTIAL', undefined, {
+          location: `basic auth password (${owner.owner === 'collection' ? 'collection level' : `folder "${owner.owner}"`})`,
+          preview: evidencePreview(password),
+        })
+      }
+      continue
+    }
+    for (const field of secretFieldsFor(owner.type)) {
+      const value = owner.fields.find((entry) => entry.key === field)?.value
+      if (value && isLikelySecretValue(value)) {
+        out.add('HARDCODED_AUTH_CREDENTIAL', undefined, {
+          location: `${owner.type} auth ${field} (${owner.owner === 'collection' ? 'collection level' : `folder "${owner.owner}"`})`,
+          preview: evidencePreview(value),
+        })
+      }
+    }
+  }
+}
+
+function checkQueryAndUrl(req: ParsedRequest, out: FindingCollector): void {
+  for (const param of req.queryParams ?? []) {
+    if (isQuerySecret(param.key, param.value)) {
+      out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}`, preview: evidencePreview(param.value) })
+    }
+  }
+
+  const credentials = req.url.match(URL_CREDENTIALS)
+  if (credentials && !isVariableOrEmpty(credentials[2])) {
+    const [, user, password] = credentials
+    out.add('CREDENTIALS_IN_URL', req.id, {
+      location: 'URL userinfo',
+      preview: req.url.replace(`${user}:${password}@`, `${user}:••••••@`).slice(0, 80),
+    })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Scripts, collection variables, saved responses
+// ---------------------------------------------------------------------------
+
+function scanScript(source: string, location: string, requestId: string | undefined, out: FindingCollector): void {
+  if (!source) return
+
+  for (const match of source.matchAll(SCRIPT_SET_CALL)) {
+    const key = match[2]
+    const value = match[4]
+    if (isSensitiveKey(key) && isLikelySecretValue(value)) {
+      out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: sets ${key}`, preview: evidencePreview(value) })
+    }
+  }
+  for (const pattern of [SCRIPT_LITERAL_ASSIGNMENT, SCRIPT_LITERAL_PROPERTY]) {
+    for (const match of source.matchAll(pattern)) {
+      const name = match[1]
+      const value = match[3]
+      if (isSensitiveKey(name) && isLikelySecretValue(value) && !/^https?:\/\//i.test(value)) {
+        out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${name}`, preview: evidencePreview(value) })
+      }
+    }
+  }
+  for (const secret of findSecretPatterns(source, 5)) {
+    out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${secret.label}`, preview: evidencePreview(secret.match) })
+  }
+
+  for (const match of source.matchAll(SCRIPT_CONSOLE_CALL)) {
+    if (SENSITIVE_IDENTIFIER.test(match[1])) {
+      out.add('SECRET_LOGGED_IN_SCRIPT', requestId, {
+        location,
+        preview: redactSecretsInText(match[0]).slice(0, 80),
       })
     }
   }
-
-  return findings
 }
 
-function runWarningChecks(parsed: ParsedCollection): Finding[] {
-  const findings: Finding[] = []
-  const affectedByRule = new Map<string, string[]>()
+function checkScripts(parsed: ParsedCollection, out: FindingCollector): void {
+  for (const req of parsed.requests) {
+    if (req.scripts?.prerequest) scanScript(req.scripts.prerequest, 'pre-request script', req.id, out)
+    if (req.scripts?.test) scanScript(req.scripts.test, 'test script', req.id, out)
+  }
+  for (const script of parsed.scripts ?? []) {
+    const owner = script.owner === 'collection' ? 'collection' : `folder "${script.owner}"`
+    const kind = script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
+    scanScript(script.source, `${owner} ${kind}`, undefined, out)
+  }
+}
+
+function requestText(req: ParsedRequest): string {
+  return [
+    req.url,
+    ...req.headers.map((h) => h.value),
+    req.bodyRaw ?? '',
+    ...(req.authFields ?? []).map((field) => field.value),
+    req.basicAuth ? `${req.basicAuth.username} ${req.basicAuth.password}` : '',
+  ].join('\n')
+}
+
+export interface LeakedVariable {
+  key: string
+  value: string
+  /** Provider format label when the value matched a known token pattern. */
+  reason?: string
+}
+
+/** Collection variables whose literal values look like credentials. Shared with the repair engine. */
+export function findLeakedCollectionVariables(parsed: ParsedCollection): LeakedVariable[] {
+  const leaked: LeakedVariable[] = []
+  for (const variable of parsed.collectionVariables ?? []) {
+    if (!isLikelySecretValue(variable.value)) continue
+    const pattern = findSecretPatterns(variable.value, 1)[0]
+    if (isSensitiveKey(variable.key) || variable.type === 'secret' || pattern) {
+      leaked.push({ key: variable.key, value: variable.value, reason: pattern?.label })
+    }
+  }
+  return leaked
+}
+
+function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollector): void {
+  const leaked = findLeakedCollectionVariables(parsed)
+  if (!leaked.length) return
+
+  const leakedKeys = new Set(leaked.map((variable) => variable.key))
+  out.touch('SECRET_IN_COLLECTION_VARIABLE', `${plural(leaked.length, 'collection variable')} with credential-like names or values ${leaked.length === 1 ? 'has' : 'have'} a literal value that ships with every export.`)
+  for (const variable of leaked) {
+    out.add('SECRET_IN_COLLECTION_VARIABLE', undefined, {
+      location: `collection variable ${variable.key}${variable.reason ? ` (${variable.reason})` : ''}`,
+      preview: evidencePreview(variable.value),
+    })
+  }
+  for (const req of parsed.requests) {
+    if (extractVariableNames(requestText(req)).some((name) => leakedKeys.has(name))) {
+      out.add('SECRET_IN_COLLECTION_VARIABLE', req.id)
+    }
+  }
+}
+
+function checkHeaderListForSecrets(headers: KeyValue[]): KeyValue | undefined {
+  return headers.find((h) => isSensitiveHeader(h.key) && isLikelySecretValue(h.value) && h.value.trim().length >= 8)
+}
+
+function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
+  for (const response of req.savedResponses ?? []) {
+    const label = `saved response "${response.name}"`
+
+    const requestHeader = checkHeaderListForSecrets(response.requestHeaders)
+    if (requestHeader) {
+      out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+        location: `${label} original request header ${requestHeader.key}`,
+        preview: evidencePreview(requestHeader.value),
+      })
+    }
+
+    if (response.requestAuthType && response.requestAuthFields?.length) {
+      for (const field of secretFieldsFor(response.requestAuthType)) {
+        const value = response.requestAuthFields.find((entry) => entry.key === field)?.value
+        if (value && isLikelySecretValue(value)) {
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request ${response.requestAuthType} ${field}`, preview: evidencePreview(value) })
+        }
+      }
+    }
+
+    for (const header of response.headers) {
+      const lower = header.key.toLowerCase()
+      if (lower === 'set-cookie') {
+        const cookie = header.value.match(/^\s*([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i)
+        if (cookie && isLikelySecretValue(cookie[2]) && cookie[2].trim().length >= 8) {
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} Set-Cookie ${cookie[1]}`, preview: evidencePreview(cookie[2]) })
+        }
+      } else if (isSensitiveHeader(header.key) && isLikelySecretValue(header.value) && header.value.trim().length >= 8) {
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} header ${header.key}`, preview: evidencePreview(header.value) })
+      }
+    }
+
+    if (response.body) {
+      for (const match of response.body.matchAll(RESPONSE_JSON_SECRET)) {
+        if (isLikelySecretValue(match[2])) {
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} body ${match[1]}`, preview: evidencePreview(match[2]) })
+        }
+      }
+      for (const secret of findSecretPatterns(response.body, 3)) {
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} body (${secret.label})`, preview: evidencePreview(secret.match) })
+      }
+    }
+
+    for (const secret of findSecretPatterns(response.requestUrl, 2)) {
+      out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request URL (${secret.label})`, preview: evidencePreview(secret.match) })
+    }
+  }
+}
+
+const SECRET_RULES: RuleId[] = [
+  'HARDCODED_PASSWORD',
+  'HARDCODED_TOKEN',
+  'HARDCODED_API_KEY',
+  'HARDCODED_SECRET',
+  'HARDCODED_AUTH_CREDENTIAL',
+  'SECRET_IN_QUERY',
+  'CREDENTIALS_IN_URL',
+  'SECRET_IN_SCRIPT',
+  'SECRET_IN_SAVED_RESPONSE',
+]
+
+/** Provider-format tokens in places the keyword rules did not already flag for that request. */
+function checkKnownPatterns(parsed: ParsedCollection, out: FindingCollector): void {
+  const alreadyFlagged = out.affectedBy(SECRET_RULES)
+  for (const req of parsed.requests) {
+    if (alreadyFlagged.has(req.id)) continue
+    const locations: Array<[string, string | undefined]> = [
+      ['URL', req.url],
+      ...req.headers.map((h): [string, string] => [`header ${h.key}`, h.value]),
+      ['body', req.bodyRaw],
+      ...(req.authFields ?? []).map((field): [string, string] => [`${req.auth} auth ${field.key}`, field.value]),
+    ]
+    for (const [location, text] of locations) {
+      for (const secret of findSecretPatterns(text, 2)) {
+        out.add('KNOWN_SECRET_PATTERN', req.id, { location: `${location} (${secret.label})`, preview: evidencePreview(secret.match) })
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Warnings: URLs, auth, transport
+// ---------------------------------------------------------------------------
+
+export function isLocalHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  return (
+    host === 'localhost' ||
+    host === '::1' ||
+    host === '0.0.0.0' ||
+    host === 'host.docker.internal' ||
+    /^127(\.\d{1,3}){3}$/.test(host) ||
+    /\.(localhost|test|example|invalid)$/.test(host)
+  )
+}
+
+export function resolveLeadingVariable(url: string, parsed: ParsedCollection): string {
+  const match = url.match(URL_VARIABLE_PREFIX)
+  if (!match) return url
+  const variable = parsed.collectionVariables?.find((candidate) => candidate.key === match[1])
+  if (!variable?.value || isVariableOrEmpty(variable.value)) return url
+  return variable.value.replace(/\/+$/, '') + url.slice(match[0].length)
+}
+
+export function plaintextOrigin(url: string): string | null {
+  const match = url.match(/^(http|ws):\/\/([^/?#\s]+)/i)
+  if (!match) return null
+  const authority = match[2].replace(/^[^@]*@/, '')
+  const hostname = authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0]
+  if (!hostname || hostname.includes('{{') || isLocalHost(hostname)) return null
+  return `${match[1].toLowerCase()}://${authority}`
+}
+
+function runWarningChecks(parsed: ParsedCollection, out: FindingCollector): void {
   const urlVarPattern = /\{\{(baseUrl|base_url|host|url|BASE_URL)\}\}/i
   const envHostPattern = /(prod|staging|dev|localhost)(\.|\/|$)/i
+  const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
 
   for (const req of parsed.requests) {
     const url = req.url || ''
     if (url && !urlVarPattern.test(url) && (url.startsWith('http://') || url.startsWith('https://'))) {
-      const key = 'HARDCODED_BASEURL'
-      if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-      affectedByRule.get(key)!.push(req.id)
+      out.add('HARDCODED_BASEURL', req.id)
     }
-    if (url && envHostPattern.test(url) && !VARIABLE_PATTERN.test(url)) {
-      const key = 'HARDCODED_ENV_URL'
-      if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-      affectedByRule.get(key)!.push(req.id)
+    if (url && envHostPattern.test(url) && !/\{\{[^{}]+\}\}/.test(url)) {
+      out.add('HARDCODED_ENV_URL', req.id)
     }
 
-    const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
     const hasAuthHeader = req.headers.some((h) => h.key.toLowerCase() === 'authorization')
     if (mutationMethods.includes(req.method) && req.auth === 'noauth' && !hasAuthHeader) {
-      const key = 'MISSING_AUTH'
-      if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-      affectedByRule.get(key)!.push(req.id)
+      out.add('MISSING_AUTH', req.id)
     }
 
     if (req.auth === 'basic' && req.basicAuth) {
       const { username, password } = req.basicAuth
-      const literalUser = username && !isVariable(username)
-      const literalPass = password && !isVariable(password)
+      const literalUser = username && !isVariableOrEmpty(username)
+      const literalPass = password && !isVariableOrEmpty(password)
       if (literalUser || literalPass) {
-        const key = 'BASIC_AUTH_PLAINTEXT'
-        if (!affectedByRule.has(key)) affectedByRule.set(key, [])
-        affectedByRule.get(key)!.push(req.id)
+        out.add('BASIC_AUTH_PLAINTEXT', req.id, {
+          location: `basic auth (${authOwnerLabel(req, parsed)})`,
+          preview: literalPass ? `password ${evidencePreview(password)}` : 'literal username',
+        })
       }
     }
-  }
 
-  const ruleMeta: Record<string, { title: string; description: string; recommendation: string }> = {
-    HARDCODED_BASEURL: {
-      title: 'Hardcoded base URL',
-      description: 'Request URL uses literal scheme and host instead of {{baseUrl}} or similar variable.',
-      recommendation: 'Use {{baseUrl}} or {{host}} for environment portability.',
-    },
-    HARDCODED_ENV_URL: {
-      title: 'Environment-specific URL',
-      description: 'URL contains literal environment identifiers (prod, staging, dev, localhost).',
-      recommendation: 'Parameterize host with variables to support multiple environments.',
-    },
-    MISSING_AUTH: {
-      title: 'Potentially unprotected mutation request',
-      description: 'POST/PUT/PATCH/DELETE request has no auth and no Authorization header.',
-      recommendation: 'Add collection or request-level auth if the endpoint requires authentication.',
-    },
-    BASIC_AUTH_PLAINTEXT: {
-      title: 'Basic auth with literal credentials',
-      description: 'Basic auth uses literal username/password instead of variables.',
-      recommendation: 'Use {{username}} and {{password}} variables.',
-    },
-  }
+    const origin = plaintextOrigin(resolveLeadingVariable(url, parsed))
+    if (origin) {
+      out.add('INSECURE_HTTP', req.id)
+      out.add('INSECURE_HTTP', undefined, { location: 'endpoint', preview: origin })
+    }
 
-  for (const [ruleId, affected] of affectedByRule) {
-    const meta = ruleMeta[ruleId]
-    if (meta) {
-      findings.push({
-        id: `${ruleId}-${Date.now()}`,
-        severity: 'warning',
-        category: ruleId.includes('URL') ? 'variables' : ruleId.includes('AUTH') ? 'auth' : 'variables',
-        title: meta.title,
-        description: meta.description,
-        affected: [...new Set(affected)],
-        recommendation: meta.recommendation,
-      })
+    if (req.tlsVerificationDisabled) {
+      out.add('TLS_VERIFICATION_DISABLED', req.id)
+      out.add('TLS_VERIFICATION_DISABLED', undefined, { location: 'protocolProfileBehavior', preview: 'strictSSL: false' })
     }
   }
-
-  return findings
 }
 
-function runInfoChecks(parsed: ParsedCollection): Finding[] {
-  const findings: Finding[] = []
+// ---------------------------------------------------------------------------
+// Info: hygiene and structure
+// ---------------------------------------------------------------------------
 
+function runInfoChecks(parsed: ParsedCollection, out: FindingCollector): void {
   const noDesc = parsed.requests.filter((r) => !r.hasDescription)
   if (noDesc.length > 0) {
-    findings.push({
-      id: 'MISSING_DESCRIPTION-1',
-      severity: 'info',
-      category: 'hygiene',
-      title: 'Requests without description',
-      description: `${noDesc.length} request(s) have no description.`,
-      affected: noDesc.map((r) => r.id),
-      recommendation: 'Add descriptions to document purpose and usage of each request.',
-    })
+    out.touch('MISSING_DESCRIPTION', `${noDesc.length} request(s) have no description.`)
+    noDesc.forEach((r) => out.add('MISSING_DESCRIPTION', r.id))
   }
 
   if (parsed.definedVariables.length < 3 && parsed.totalRequests > 0) {
-    findings.push({
-      id: 'NO_COLLECTION_VARIABLES-1',
-      severity: 'info',
-      category: 'variables',
-      title: 'Few collection variables defined',
-      description: `Collection defines ${parsed.definedVariables.length} variable(s). Consider at least baseUrl, apiKey, and environment-specific values.`,
-      affected: [],
-      recommendation: 'Define baseUrl, apiKey, and other shared values as collection variables.',
-    })
+    out.touch(
+      'NO_COLLECTION_VARIABLES',
+      `Collection defines ${parsed.definedVariables.length} variable(s). Consider at least baseUrl, apiKey, and environment-specific values.`
+    )
   }
 
   const authTypeCount = Object.keys(parsed.authTypes).filter((k) => k !== 'noauth').length
   if (authTypeCount > 2) {
-    findings.push({
-      id: 'INCONSISTENT_AUTH-1',
-      severity: 'info',
-      category: 'auth',
-      title: 'Multiple auth types in use',
-      description: `Collection uses ${authTypeCount} different auth types. This may complicate maintenance.`,
-      affected: [],
-      recommendation: 'Standardize on one or two auth strategies where possible.',
-    })
+    out.touch('INCONSISTENT_AUTH', `Collection uses ${authTypeCount} different auth types. This may complicate maintenance.`)
   }
 
-  const emptyHeaders = parsed.requests.filter(
-    (r) => r.headers.length > 0 && r.headers.every((h) => !h.value?.trim())
-  )
+  const emptyHeaders = parsed.requests.filter((r) => r.headers.length > 0 && r.headers.every((h) => !h.value?.trim()))
   if (emptyHeaders.length > 0) {
-    findings.push({
-      id: 'EMPTY_HEADERS-1',
-      severity: 'info',
-      category: 'hygiene',
-      title: 'Requests with empty header values',
-      description: `${emptyHeaders.length} request(s) have headers with empty values.`,
-      affected: emptyHeaders.map((r) => r.id),
-      recommendation: 'Remove empty headers or populate with values.',
-    })
+    out.touch('EMPTY_HEADERS', `${emptyHeaders.length} request(s) have headers with empty values.`)
+    emptyHeaders.forEach((r) => out.add('EMPTY_HEADERS', r.id))
   }
 
   const requestsByFolderAndName = new Map<string, string[]>()
@@ -255,63 +625,74 @@ function runInfoChecks(parsed: ParsedCollection): Finding[] {
   }
   const duplicateNameIds = [...requestsByFolderAndName.values()].filter((ids) => ids.length > 1).flat()
   if (duplicateNameIds.length > 0) {
-    findings.push({
-      id: 'DUPLICATE_REQUEST_NAMES-1',
-      severity: 'info',
-      category: 'hygiene',
-      title: 'Duplicate request names',
-      description: `${duplicateNameIds.length} request(s) share a name with another request in the same folder.`,
-      affected: duplicateNameIds,
-      recommendation: 'Rename duplicate requests so search results, repair previews, and team reviews are easier to scan.',
-    })
+    out.touch('DUPLICATE_REQUEST_NAMES', `${duplicateNameIds.length} request(s) share a name with another request in the same folder.`)
+    duplicateNameIds.forEach((id) => out.add('DUPLICATE_REQUEST_NAMES', id))
   }
 
   const placeholderNamePattern = /^(new request|untitled|request|copy of\b|copy\b)/i
   const placeholderNames = parsed.requests.filter((request) => placeholderNamePattern.test(request.name.trim()))
   if (placeholderNames.length > 0) {
-    findings.push({
-      id: 'PLACEHOLDER_REQUEST_NAMES-1',
-      severity: 'info',
-      category: 'hygiene',
-      title: 'Placeholder request names',
-      description: `${placeholderNames.length} request(s) appear to use placeholder or copied names.`,
-      affected: placeholderNames.map((request) => request.id),
-      recommendation: 'Use action-oriented names that describe the endpoint purpose, such as “Create user” or “List invoices”.',
-    })
+    out.touch('PLACEHOLDER_REQUEST_NAMES', `${placeholderNames.length} request(s) appear to use placeholder or copied names.`)
+    placeholderNames.forEach((r) => out.add('PLACEHOLDER_REQUEST_NAMES', r.id))
   }
 
   const looseRootRequests = parsed.requests.filter((request) => request.folderPath.length === 0)
   if (looseRootRequests.length > 0 && parsed.totalFolders > 1) {
-    findings.push({
-      id: 'ROOT_LEVEL_REQUESTS-1',
-      severity: 'info',
-      category: 'hygiene',
-      title: 'Loose root-level requests',
-      description: `${looseRootRequests.length} request(s) sit at the collection root while the rest of the collection uses folders.`,
-      affected: looseRootRequests.map((request) => request.id),
-      recommendation: 'Move root-level requests into the closest functional folder so the collection tree stays predictable.',
-    })
+    out.touch(
+      'ROOT_LEVEL_REQUESTS',
+      `${looseRootRequests.length} request(s) sit at the collection root while the rest of the collection uses folders.`
+    )
+    looseRootRequests.forEach((r) => out.add('ROOT_LEVEL_REQUESTS', r.id))
   }
 
   const deepNestedRequests = parsed.requests.filter((request) => request.folderPath.length >= 5)
   if (deepNestedRequests.length > 0) {
-    findings.push({
-      id: 'DEEP_FOLDER_NESTING-1',
-      severity: 'info',
-      category: 'hygiene',
-      title: 'Deep folder nesting',
-      description: `${deepNestedRequests.length} request(s) are nested five or more folders deep.`,
-      affected: deepNestedRequests.map((request) => request.id),
-      recommendation: 'Flatten very deep branches where possible, or split large areas into clearer top-level product domains.',
-    })
+    out.touch('DEEP_FOLDER_NESTING', `${deepNestedRequests.length} request(s) are nested five or more folders deep.`)
+    deepNestedRequests.forEach((r) => out.add('DEEP_FOLDER_NESTING', r.id))
   }
 
-  return findings
+  const getWithBody = parsed.requests.filter(
+    (request) =>
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      request.bodyMode !== 'graphql' &&
+      (!!request.bodyRaw?.trim() || !!request.bodyFields?.length)
+  )
+  if (getWithBody.length > 0) {
+    out.touch('GET_WITH_BODY', `${getWithBody.length} GET/HEAD request(s) send a request body.`)
+    getWithBody.forEach((r) => out.add('GET_WITH_BODY', r.id))
+  }
 }
 
-export function runAudit(parsed: ParsedCollection): Finding[] {
-  const critical = runCriticalChecks(parsed)
-  const warning = runWarningChecks(parsed)
-  const info = runInfoChecks(parsed)
-  return [...critical, ...warning, ...info]
+/** Normalizes untrusted option input (localStorage, server config) into a safe AuditOptions object. */
+export function sanitizeAuditOptions(input: unknown): AuditOptions {
+  if (!input || typeof input !== 'object') return {}
+  const raw = input as { disabledRules?: unknown; severityOverrides?: unknown }
+  const disabledRules = Array.isArray(raw.disabledRules) ? raw.disabledRules.filter(isRuleId) : []
+  const severityOverrides: Partial<Record<RuleId, Severity>> = {}
+  if (raw.severityOverrides && typeof raw.severityOverrides === 'object') {
+    for (const [ruleId, severity] of Object.entries(raw.severityOverrides as Record<string, unknown>)) {
+      if (isRuleId(ruleId) && isSeverity(severity) && severity !== RULES[ruleId].severity) severityOverrides[ruleId] = severity
+    }
+  }
+  return { disabledRules, severityOverrides }
+}
+
+export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): Finding[] {
+  const out = new FindingCollector()
+
+  for (const req of parsed.requests) {
+    checkHeaders(req, out)
+    checkBody(req, out)
+    checkQueryAndUrl(req, out)
+    checkSavedResponses(req, out)
+  }
+  checkAuthHelpers(parsed, out)
+  checkScripts(parsed, out)
+  checkCollectionVariables(parsed, out)
+  checkKnownPatterns(parsed, out)
+
+  runWarningChecks(parsed, out)
+  runInfoChecks(parsed, out)
+
+  return out.build(options)
 }

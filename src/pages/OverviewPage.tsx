@@ -26,6 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { extractVariableNames } from '@/lib/variables'
 
 /** Auth / accent slice colors (blue → green → orange). */
 const AUTH_COLORS: Record<string, string> = {
@@ -111,9 +112,7 @@ function variableNamesUsedInRequests(requests: ParsedCollection['requests']): Se
   const names = new Set<string>()
   for (const request of requests) {
     const blob = [request.url, ...request.headers.map((header) => header.key + header.value), request.bodyRaw ?? ''].join(' ')
-    for (const match of blob.matchAll(/\{\{(\w+)\}\}/g)) {
-      names.add(match[1])
-    }
+    extractVariableNames(blob).forEach((name) => names.add(name))
   }
   return names
 }

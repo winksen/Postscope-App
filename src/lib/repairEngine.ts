@@ -1,6 +1,17 @@
-import type { Finding } from './auditor'
+import {
+  AUTH_HEADER_SCHEME,
+  SESSION_COOKIE,
+  TOKEN_HEADER,
+  classifyBodySecret,
+  findLeakedCollectionVariables,
+  isQuerySecret,
+  type Finding,
+} from './auditor'
 import type { ParsedCollection, ParsedRequest } from './parser'
-import type { PostmanCollection, PostmanHeader, PostmanItem, PostmanUrl } from '../types/postman'
+import type { PostmanAuth, PostmanCollection, PostmanHeader, PostmanItem, PostmanUrl } from '../types/postman'
+import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsFor } from './authSchemes'
+import { isLikelySecretValue } from './secretPatterns'
+import { toVariableName } from './variables'
 
 export type RepairFixKind =
   | 'hardcodedBaseUrl'
@@ -11,6 +22,12 @@ export type RepairFixKind =
   | 'emptyHeaders'
   | 'collectionVariables'
   | 'missingDescription'
+  | 'authHelperSecrets'
+  | 'bodySecrets'
+  | 'querySecrets'
+  | 'secretVariables'
+  | 'insecureHttp'
+  | 'tlsVerification'
   | 'manualReview'
 
 export type RepairRiskLevel = 'low' | 'medium' | 'high' | 'manual'
@@ -45,6 +62,10 @@ export interface RepairFix {
   variablesToEnsure?: RepairVariable[]
   generatedDescriptions?: Record<string, string>
   manualReason?: string
+  /** For `secretVariables`: collection variable keys whose values are cleared. */
+  variableKeys?: string[]
+  /** For `bodySecrets`: which body classifier the fix targets. */
+  bodyRule?: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET'
 }
 
 export interface RepairPlan {
@@ -75,6 +96,7 @@ interface UrlParts {
 
 const VARIABLE_PATTERN = /\{\{[^}]+\}\}/
 const API_KEY_REGEX = /api.?key|x-api-key|apikey/i
+const HEADER_PASSWORD_KEY = /passw|password|passwd/i
 
 export function cloneJson<T>(value: T): T {
   if (typeof structuredClone === 'function') return structuredClone(value)
@@ -87,7 +109,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function variableExists(collection: unknown, key: string): boolean {
   const variables = (collection as PostmanCollection).variable
-  return Array.isArray(variables) && variables.some((v) => v.key === key)
+  return Array.isArray(variables) && variables.some((v) => v?.key === key)
 }
 
 export function ensureCollectionVariable(collection: unknown, key: string, value = ''): boolean {
@@ -107,24 +129,33 @@ function hostToString(host: PostmanUrl['host']): string {
   return host || ''
 }
 
+function pathToString(path: PostmanUrl['path']): string {
+  if (typeof path === 'string') return path ? `/${path.replace(/^\/+/, '')}` : ''
+  if (!Array.isArray(path) || path.length === 0) return ''
+  return `/${path.map((segment) => (typeof segment === 'string' ? segment : segment?.value ?? '')).join('/')}`
+}
+
 function queryToString(query: PostmanUrl['query']): string {
   if (!Array.isArray(query) || query.length === 0) return ''
   const params = query
-    .filter((q) => q.key)
+    .filter((q) => q?.key && !q.disabled)
     .map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value ?? '')}`)
   return params.length ? `?${params.join('&')}` : ''
 }
 
 function postmanUrlToString(url: PostmanUrl): string {
   const protocol = url.protocol ? `${url.protocol}://` : ''
-  const host = hostToString(url.host)
-  const path = Array.isArray(url.path) && url.path.length > 0 ? `/${url.path.join('/')}` : ''
-  return `${protocol}${host}${path}${queryToString(url.query)}`
+  return `${protocol}${hostToString(url.host)}${pathToString(url.path)}${queryToString(url.query)}`
+}
+
+function currentUrlString(url: string | PostmanUrl | undefined): string {
+  if (!url) return ''
+  return typeof url === 'string' ? url : url.raw || postmanUrlToString(url)
 }
 
 export function parseUrlParts(value: string | PostmanUrl | undefined): UrlParts | null {
   if (!value) return null
-  const source = typeof value === 'string' ? value : value.raw || postmanUrlToString(value)
+  const source = currentUrlString(value)
   if (!/^https?:\/\//i.test(source)) return null
 
   try {
@@ -147,23 +178,45 @@ export function replaceUrlHostWithBaseUrl(url: string | PostmanUrl | undefined):
   if (!url) return null
   const parts = parseUrlParts(url)
   if (!parts) return null
-  const before = typeof url === 'string' ? url : url.raw || postmanUrlToString(url)
   return {
-    before,
+    before: currentUrlString(url),
     after: `{{baseUrl}}${parts.pathQuery}`,
     origin: parts.origin,
   }
 }
 
 export function getItemAtPath(rawJson: unknown, itemPath: number[]): PostmanItem | undefined {
-  let items: PostmanItem[] | undefined = (rawJson as PostmanCollection).item
+  let items: PostmanItem[] | undefined = (rawJson as PostmanCollection)?.item
   let current: PostmanItem | undefined
   for (const index of itemPath) {
     if (!Array.isArray(items) || index < 0 || index >= items.length) return undefined
     current = items[index]
+    if (!isRecord(current)) return undefined
     items = current.item
   }
   return current
+}
+
+/** Items from the collection root down to the item at `itemPath` (inclusive), skipping missing ones. */
+function itemChain(rawJson: unknown, itemPath: number[]): PostmanItem[] {
+  const chain: PostmanItem[] = []
+  for (let depth = 1; depth <= itemPath.length; depth += 1) {
+    const item = getItemAtPath(rawJson, itemPath.slice(0, depth))
+    if (item) chain.push(item)
+  }
+  return chain
+}
+
+/** Auth object that Postman would actually use for the request at `itemPath` (request → folders → collection). */
+function findEffectiveAuth(rawJson: unknown, itemPath: number[]): PostmanAuth | undefined {
+  const target = getItemAtPath(rawJson, itemPath)
+  if (target?.request?.auth && !isInheritedAuth(target.request.auth)) return target.request.auth
+  const folders = itemChain(rawJson, itemPath.slice(0, -1)).reverse()
+  for (const folder of folders) {
+    if (folder.auth && !isInheritedAuth(folder.auth)) return folder.auth
+  }
+  const collectionAuth = (rawJson as PostmanCollection)?.auth
+  return collectionAuth && !isInheritedAuth(collectionAuth) ? collectionAuth : undefined
 }
 
 function sanitizeIdPart(value: string): string {
@@ -195,7 +248,27 @@ function requestTargets(finding: Finding, parsed: ParsedCollection): RepairTarge
     }))
 }
 
+const KIND_BY_RULE: Partial<Record<string, RepairFixKind>> = {
+  HARDCODED_BASEURL: 'hardcodedBaseUrl',
+  HARDCODED_ENV_URL: 'environmentUrl',
+  HARDCODED_TOKEN: 'hardcodedAuthToken',
+  HARDCODED_API_KEY: 'hardcodedApiKey',
+  BASIC_AUTH_PLAINTEXT: 'basicAuthCredentials',
+  EMPTY_HEADERS: 'emptyHeaders',
+  NO_COLLECTION_VARIABLES: 'collectionVariables',
+  MISSING_DESCRIPTION: 'missingDescription',
+  HARDCODED_AUTH_CREDENTIAL: 'authHelperSecrets',
+  HARDCODED_PASSWORD: 'bodySecrets',
+  HARDCODED_SECRET: 'bodySecrets',
+  SECRET_IN_QUERY: 'querySecrets',
+  SECRET_IN_COLLECTION_VARIABLE: 'secretVariables',
+  INSECURE_HTTP: 'insecureHttp',
+  TLS_VERIFICATION_DISABLED: 'tlsVerification',
+}
+
 function findingKind(finding: Finding): RepairFixKind | null {
+  if (finding.ruleId && KIND_BY_RULE[finding.ruleId]) return KIND_BY_RULE[finding.ruleId] ?? null
+  // Fallback for findings created without a rule id (older data).
   const title = finding.title.toLowerCase()
   if (title === 'hardcoded base url') return 'hardcodedBaseUrl'
   if (title === 'environment-specific url') return 'environmentUrl'
@@ -228,9 +301,13 @@ function authVariablesForTargets(targets: RepairTarget[], parsed: ParsedCollecti
   for (const request of parsed.requests) {
     if (!targetIds.has(request.id)) continue
     for (const header of request.headers) {
-      if (header.key.toLowerCase() !== 'authorization' || isVariableValue(header.value)) continue
-      if (/^Basic\s+/i.test(header.value)) keys.add('basicAuthToken')
-      if (/^Bearer\s+/i.test(header.value)) keys.add('token')
+      if (isVariableValue(header.value)) continue
+      const lower = header.key.toLowerCase()
+      if (lower === 'cookie') keys.add('sessionCookie')
+      else if (lower !== 'authorization' && lower !== 'proxy-authorization') {
+        if (TOKEN_HEADER.test(lower)) keys.add('token')
+      } else if (/^Basic\s+/i.test(header.value)) keys.add('basicAuthToken')
+      else keys.add('token')
     }
   }
   if (keys.size === 0) keys.add('token')
@@ -281,13 +358,16 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
   }
 
   if (kind === 'hardcodedAuthToken') {
-    const beforeSnippet = headerSnippet(affectedRequest, (header) => header.key.toLowerCase() === 'authorization')
+    const beforeSnippet = headerSnippet(affectedRequest, (header) => {
+      const lower = header.key.toLowerCase()
+      return lower === 'authorization' || lower === 'proxy-authorization' || lower === 'cookie' || TOKEN_HEADER.test(lower)
+    })
     const afterSnippet = beforeSnippet?.toLowerCase().includes('basic') ? 'Authorization: Basic {{basicAuthToken}}' : 'Authorization: Bearer {{token}}'
     return {
       ...base,
       status: 'auto',
       title: 'Move Authorization token to variable',
-      description: 'Replaces literal Bearer or Basic Authorization header values with collection variables.',
+      description: 'Replaces literal Authorization, token, and session cookie header values with collection variables.',
       risk: 'medium',
       selectedByDefault: true,
       beforeSnippet,
@@ -315,7 +395,7 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       ...base,
       status: 'auto',
       title: 'Move Basic auth credentials to variables',
-      description: 'Replaces literal username and password fields in Postman Basic auth with {{username}} and {{password}}.',
+      description: 'Replaces literal username and password fields in Postman Basic auth with {{username}} and {{password}}, including auth inherited from folders or the collection.',
       risk: 'low',
       selectedByDefault: true,
       beforeSnippet: 'Basic auth username/password: ***',
@@ -379,6 +459,98 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
     }
   }
 
+  if (kind === 'authHelperSecrets') {
+    const location = finding.evidence?.[0]?.location
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Move auth settings credentials to variables',
+      description:
+        'Replaces literal tokens and secrets in Postman auth helpers (request, folder, and collection level) with variables such as {{token}}, {{apiKey}}, and {{clientSecret}}.',
+      risk: 'medium',
+      selectedByDefault: true,
+      beforeSnippet: location ? `${location}: ***` : 'Auth helper secret: ***',
+      afterSnippet: 'Auth helper secret: {{token}}',
+    }
+  }
+
+  if (kind === 'bodySecrets') {
+    const bodyRule = finding.ruleId === 'HARDCODED_PASSWORD' ? 'HARDCODED_PASSWORD' : 'HARDCODED_SECRET'
+    const field = finding.evidence?.find((evidence) => evidence.location.startsWith('body'))?.location.split(/[ .]/).pop()
+    return {
+      ...base,
+      status: 'auto',
+      title: bodyRule === 'HARDCODED_PASSWORD' ? 'Move passwords to variables' : 'Move body secrets to variables',
+      description:
+        bodyRule === 'HARDCODED_PASSWORD'
+          ? 'Replaces literal password values in password headers, JSON bodies, and form fields with variables named after each field.'
+          : 'Replaces literal secrets and tokens in JSON bodies and form fields with variables named after each field. Non-JSON raw bodies are left for manual review.',
+      risk: 'medium',
+      selectedByDefault: true,
+      bodyRule,
+      beforeSnippet: field ? `"${field}": "***"` : undefined,
+      afterSnippet: field ? `"${field}": "{{${toVariableName(field)}}}"` : undefined,
+    }
+  }
+
+  if (kind === 'querySecrets') {
+    const param = affectedRequest?.queryParams?.find((entry) => isQuerySecret(entry.key, entry.value))
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Move query string secrets to variables',
+      description: 'Replaces literal credential query parameter values with variables named after each parameter.',
+      risk: 'medium',
+      selectedByDefault: true,
+      beforeSnippet: param ? `?${param.key}=***` : undefined,
+      afterSnippet: param ? `?${param.key}={{${toVariableName(param.key)}}}` : undefined,
+    }
+  }
+
+  if (kind === 'secretVariables') {
+    const leaked = findLeakedCollectionVariables(parsed)
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Clear secret collection variable values',
+      description:
+        'Empties the values of credential-like collection variables so the export no longer carries them. Set the real values in a private environment or vault afterwards.',
+      risk: 'medium',
+      selectedByDefault: true,
+      variableKeys: leaked.map((variable) => variable.key),
+      beforeSnippet: leaked[0] ? `${leaked[0].key} = ***` : undefined,
+      afterSnippet: leaked[0] ? `${leaked[0].key} = ""` : undefined,
+    }
+  }
+
+  if (kind === 'insecureHttp') {
+    const example = affectedRequest?.url
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Upgrade plaintext endpoints to HTTPS',
+      description:
+        'Rewrites http:// and ws:// URLs (and a leading {{variable}} that resolves to one) to https:// and wss://. Only apply when the servers support TLS.',
+      risk: 'high',
+      selectedByDefault: false,
+      beforeSnippet: example,
+      afterSnippet: example?.replace(/^http:\/\//i, 'https://').replace(/^ws:\/\//i, 'wss://'),
+    }
+  }
+
+  if (kind === 'tlsVerification') {
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Re-enable TLS certificate verification',
+      description: 'Removes strictSSL: false from affected requests, their folders, and the collection. Requests to servers with self-signed certificates will fail until their CA is trusted.',
+      risk: 'medium',
+      selectedByDefault: false,
+      beforeSnippet: 'protocolProfileBehavior.strictSSL: false',
+      afterSnippet: 'Certificate verification on (default)',
+    }
+  }
+
   return {
     ...base,
     status: 'manual',
@@ -400,6 +572,12 @@ export function createRepairPlan(rawJson: unknown, parsed: ParsedCollection, fin
   }
 }
 
+interface PatchResult {
+  changed: number
+  skipped: SkippedRepair[]
+  variables: RepairVariable[]
+}
+
 function applyUrlPatch(collection: unknown, fix: RepairFix): {
   changed: number
   skipped: SkippedRepair[]
@@ -417,8 +595,7 @@ function applyUrlPatch(collection: unknown, fix: RepairFix): {
     const url = item.request.url
     const replacement = replaceUrlHostWithBaseUrl(url)
     if (!replacement) {
-      const currentUrl = typeof url === 'string' ? url : url ? url.raw || postmanUrlToString(url) : ''
-      if (VARIABLE_PATTERN.test(currentUrl)) continue
+      if (VARIABLE_PATTERN.test(currentUrlString(url))) continue
       skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'URL was not an absolute HTTP URL.' })
       continue
     }
@@ -442,11 +619,7 @@ function applyHeaderPatch(
   collection: unknown,
   fix: RepairFix,
   patcher: (header: PostmanHeader) => { changed: boolean; variables: RepairVariable[] }
-): {
-  changed: number
-  skipped: SkippedRepair[]
-  variables: RepairVariable[]
-} {
+): PatchResult {
   let changed = 0
   const variables = new Map<string, RepairVariable>()
   const skipped: SkippedRepair[] = []
@@ -461,6 +634,7 @@ function applyHeaderPatch(
 
     let changedForRequest = false
     for (const header of headers) {
+      if (!isRecord(header) || typeof header.value !== 'string' || typeof header.key !== 'string') continue
       const result = patcher(header)
       if (result.changed) {
         changed += 1
@@ -476,23 +650,44 @@ function applyHeaderPatch(
   return { changed, skipped, variables: [...variables.values()] }
 }
 
-export function patchHeaders(collection: unknown, fix: RepairFix): {
-  changed: number
-  skipped: SkippedRepair[]
-  variables: RepairVariable[]
-} {
+function patchAuthorizationHeader(header: PostmanHeader): { changed: boolean; variables: RepairVariable[] } {
+  const value = header.value.trim()
+  if (/^Bearer\s+/i.test(value)) {
+    header.value = 'Bearer {{token}}'
+    return { changed: true, variables: [{ key: 'token', value: '' }] }
+  }
+  if (/^Basic\s+/i.test(value)) {
+    header.value = 'Basic {{basicAuthToken}}'
+    return { changed: true, variables: [{ key: 'basicAuthToken', value: '' }] }
+  }
+  const scheme = value.match(AUTH_HEADER_SCHEME)
+  if (scheme) {
+    header.value = `${scheme[1]} {{token}}`
+    return { changed: true, variables: [{ key: 'token', value: '' }] }
+  }
+  if (!/\s/.test(value) && value.length >= 16) {
+    header.value = '{{token}}'
+    return { changed: true, variables: [{ key: 'token', value: '' }] }
+  }
+  return { changed: false, variables: [] }
+}
+
+export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
   if (fix.kind === 'hardcodedAuthToken') {
     return applyHeaderPatch(collection, fix, (header) => {
-      if (header.disabled || header.key.toLowerCase() !== 'authorization' || isVariableValue(header.value)) {
-        return { changed: false, variables: [] }
-      }
-      if (/^Bearer\s+/i.test(header.value)) {
-        header.value = 'Bearer {{token}}'
+      if (header.disabled || isVariableValue(header.value)) return { changed: false, variables: [] }
+      const lower = header.key.toLowerCase()
+      if (lower === 'authorization' || lower === 'proxy-authorization') return patchAuthorizationHeader(header)
+      if (TOKEN_HEADER.test(lower) && isLikelySecretValue(header.value)) {
+        header.value = '{{token}}'
         return { changed: true, variables: [{ key: 'token', value: '' }] }
       }
-      if (/^Basic\s+/i.test(header.value)) {
-        header.value = 'Basic {{basicAuthToken}}'
-        return { changed: true, variables: [{ key: 'basicAuthToken', value: '' }] }
+      if (lower === 'cookie') {
+        const cookie = header.value.match(SESSION_COOKIE)
+        if (cookie && isLikelySecretValue(cookie[2])) {
+          header.value = header.value.replace(`${cookie[1]}=${cookie[2]}`, `${cookie[1]}={{sessionCookie}}`)
+          return { changed: true, variables: [{ key: 'sessionCookie', value: '' }] }
+        }
       }
       return { changed: false, variables: [] }
     })
@@ -525,34 +720,339 @@ export function patchBasicAuth(collection: unknown, fix: RepairFix): {
 } {
   let changed = 0
   const skipped: SkippedRepair[] = []
+  const patchedOwners = new Set<PostmanAuth>()
 
   for (const target of fix.affectedRequests) {
-    const item = getItemAtPath(collection, target.itemPath)
-    const basic = item?.request?.auth?.basic
-    if (!Array.isArray(basic)) {
+    const auth = findEffectiveAuth(collection, target.itemPath)
+    const basic = auth && normalizeAuthType(auth.type) === 'basic' ? auth.basic : undefined
+    if (!auth || !Array.isArray(basic)) {
       skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'Basic auth fields were not found.' })
       continue
     }
+    // Inherited auth is shared: patch the owner once and count every request it covers.
+    if (patchedOwners.has(auth)) continue
+    patchedOwners.add(auth)
 
-    let changedForRequest = false
+    let changedForOwner = false
     for (const entry of basic) {
+      if (!isRecord(entry)) continue
       if (entry.key === 'username' && !isVariableValue(entry.value)) {
         entry.value = '{{username}}'
         changed += 1
-        changedForRequest = true
+        changedForOwner = true
       }
       if (entry.key === 'password' && !isVariableValue(entry.value)) {
         entry.value = '{{password}}'
         changed += 1
-        changedForRequest = true
+        changedForOwner = true
       }
     }
-    if (!changedForRequest) {
+    if (!changedForOwner) {
       skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal Basic auth credentials were found.' })
     }
   }
 
   return { changed, skipped }
+}
+
+/** Replaces literal secret fields of one auth object; returns the variables it introduced. */
+function patchAuthObject(auth: PostmanAuth, variables: Map<string, RepairVariable>): number {
+  const type = normalizeAuthType(auth.type)
+  const fields = type === 'basic' ? ['username', 'password'] : secretFieldsFor(type)
+  if (!fields.length) return 0
+  const rawType = typeof auth.type === 'string' ? auth.type : type
+  const block = (auth as Record<string, unknown>)[rawType] ?? (auth as Record<string, unknown>)[type]
+  let changed = 0
+
+  const replacement = (field: string) => {
+    const name = AUTH_FIELD_VARIABLES[field] ?? field
+    variables.set(name, { key: name, value: '' })
+    return `{{${name}}}`
+  }
+  const shouldPatch = (field: string, value: unknown) =>
+    typeof value === 'string' && (field === 'username' ? !isVariableValue(value) : isLikelySecretValue(value))
+
+  if (Array.isArray(block)) {
+    for (const entry of block) {
+      if (!isRecord(entry) || typeof entry.key !== 'string' || !fields.includes(entry.key)) continue
+      if (shouldPatch(entry.key, entry.value)) {
+        entry.value = replacement(entry.key)
+        changed += 1
+      }
+    }
+  } else if (isRecord(block)) {
+    for (const field of fields) {
+      if (shouldPatch(field, block[field])) {
+        block[field] = replacement(field)
+        changed += 1
+      }
+    }
+  }
+  return changed
+}
+
+function patchAuthHelperSecrets(collection: unknown): PatchResult {
+  const variables = new Map<string, RepairVariable>()
+  let changed = 0
+  const col = collection as PostmanCollection
+
+  const visitAuth = (auth: unknown) => {
+    if (isRecord(auth) && !isInheritedAuth(auth)) changed += patchAuthObject(auth as PostmanAuth, variables)
+  }
+  const walk = (items: unknown, depth: number) => {
+    if (!Array.isArray(items) || depth > 100) return
+    for (const item of items) {
+      if (!isRecord(item)) continue
+      visitAuth(item.auth)
+      if (isRecord(item.request)) visitAuth(item.request.auth)
+      walk(item.item, depth + 1)
+    }
+  }
+
+  visitAuth(col.auth)
+  walk(col.item, 0)
+  return { changed, skipped: [], variables: [...variables.values()] }
+}
+
+function detectIndent(raw: string): number | string {
+  const match = raw.match(/\n([ \t]+)\S/)
+  if (!match) return raw.includes('\n') ? 2 : 0
+  return match[1].includes('\t') ? '\t' : match[1].length
+}
+
+function replaceJsonSecrets(value: unknown, rule: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET', variables: Map<string, RepairVariable>, depth = 0): number {
+  if (depth > 50 || value === null || typeof value !== 'object') return 0
+  let changed = 0
+  if (Array.isArray(value)) {
+    value.forEach((child) => {
+      changed += replaceJsonSecrets(child, rule, variables, depth + 1)
+    })
+    return changed
+  }
+  const record = value as Record<string, unknown>
+  for (const [key, child] of Object.entries(record)) {
+    if (typeof child === 'string') {
+      if (classifyBodySecret(key, child) === rule) {
+        const name = toVariableName(key)
+        record[key] = `{{${name}}}`
+        variables.set(name, { key: name, value: '' })
+        changed += 1
+      }
+    } else {
+      changed += replaceJsonSecrets(child, rule, variables, depth + 1)
+    }
+  }
+  return changed
+}
+
+function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
+  const rule = fix.bodyRule ?? 'HARDCODED_SECRET'
+  const variables = new Map<string, RepairVariable>()
+  const skipped: SkippedRepair[] = []
+  let changed = 0
+
+  for (const target of fix.affectedRequests) {
+    const item = getItemAtPath(collection, target.itemPath)
+    const request = item?.request
+    if (!request) {
+      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'Request item was not found.' })
+      continue
+    }
+    let changedForRequest = 0
+
+    if (rule === 'HARDCODED_PASSWORD' && Array.isArray(request.header)) {
+      for (const header of request.header) {
+        if (!isRecord(header) || header.disabled || typeof header.key !== 'string' || typeof header.value !== 'string') continue
+        if (HEADER_PASSWORD_KEY.test(header.key) && !isVariableValue(header.value)) {
+          const name = toVariableName(header.key, 'password')
+          header.value = `{{${name}}}`
+          variables.set(name, { key: name, value: '' })
+          changedForRequest += 1
+        }
+      }
+    }
+
+    const body = request.body
+    if (isRecord(body)) {
+      for (const mode of ['urlencoded', 'formdata'] as const) {
+        const fields = body[mode]
+        if (!Array.isArray(fields)) continue
+        for (const field of fields) {
+          if (!isRecord(field) || field.disabled || field.type === 'file' || typeof field.key !== 'string' || typeof field.value !== 'string') continue
+          if (classifyBodySecret(field.key, field.value) === rule) {
+            const name = toVariableName(field.key)
+            field.value = `{{${name}}}`
+            variables.set(name, { key: name, value: '' })
+            changedForRequest += 1
+          }
+        }
+      }
+      if (typeof body.raw === 'string' && (!body.mode || body.mode === 'raw')) {
+        try {
+          const json = JSON.parse(body.raw) as unknown
+          const replaced = replaceJsonSecrets(json, rule, variables)
+          if (replaced > 0) {
+            body.raw = JSON.stringify(json, null, detectIndent(body.raw))
+            changedForRequest += replaced
+          }
+        } catch {
+          // Raw bodies that are not strict JSON (or contain unquoted {{vars}}) are left untouched.
+        }
+      }
+    }
+
+    if (changedForRequest === 0) {
+      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal value could be replaced automatically (body is not JSON or form data).' })
+    }
+    changed += changedForRequest
+  }
+
+  return { changed, skipped, variables: [...variables.values()] }
+}
+
+function patchQuerySecrets(collection: unknown, fix: RepairFix): PatchResult {
+  const variables = new Map<string, RepairVariable>()
+  const skipped: SkippedRepair[] = []
+  let changed = 0
+
+  const replaceInRaw = (raw: string, key: string, value: string, replacement: string) =>
+    raw.replace(new RegExp(`([?&]${escapeRegExp(key)}=)${escapeRegExp(value)}(?=&|#|$)`), `$1${replacement}`)
+
+  for (const target of fix.affectedRequests) {
+    const item = getItemAtPath(collection, target.itemPath)
+    const request = item?.request
+    if (!request?.url) {
+      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'Request URL was not found.' })
+      continue
+    }
+    let changedForRequest = 0
+
+    if (typeof request.url === 'string') {
+      const queryStart = request.url.indexOf('?')
+      if (queryStart !== -1) {
+        const [query, hash = ''] = request.url.slice(queryStart + 1).split('#')
+        const pairs = query.split('&').map((pair) => {
+          const eq = pair.indexOf('=')
+          if (eq === -1) return pair
+          const key = pair.slice(0, eq)
+          const value = pair.slice(eq + 1)
+          let decoded = value
+          try {
+            decoded = decodeURIComponent(value)
+          } catch {
+            /* keep raw */
+          }
+          if (!isQuerySecret(key, decoded)) return pair
+          const name = toVariableName(key)
+          variables.set(name, { key: name, value: '' })
+          changedForRequest += 1
+          return `${key}={{${name}}}`
+        })
+        request.url = `${request.url.slice(0, queryStart)}?${pairs.join('&')}${hash ? `#${hash}` : ''}`
+      }
+    } else if (isRecord(request.url)) {
+      const url = request.url as PostmanUrl
+      for (const param of Array.isArray(url.query) ? url.query : []) {
+        if (!isRecord(param) || param.disabled || typeof param.key !== 'string' || typeof param.value !== 'string') continue
+        if (!isQuerySecret(param.key, param.value)) continue
+        const name = toVariableName(param.key)
+        const replacement = `{{${name}}}`
+        if (typeof url.raw === 'string') {
+          url.raw = replaceInRaw(replaceInRaw(url.raw, param.key, param.value, replacement), param.key, encodeURIComponent(param.value), replacement)
+        }
+        param.value = replacement
+        variables.set(name, { key: name, value: '' })
+        changedForRequest += 1
+      }
+    }
+
+    if (changedForRequest === 0) {
+      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal query parameter secret was found.' })
+    }
+    changed += changedForRequest
+  }
+
+  return { changed, skipped, variables: [...variables.values()] }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function patchSecretVariables(collection: unknown, fix: RepairFix): PatchResult {
+  const keys = new Set(fix.variableKeys ?? [])
+  const col = collection as PostmanCollection
+  let changed = 0
+  for (const variable of Array.isArray(col.variable) ? col.variable : []) {
+    if (isRecord(variable) && keys.has(variable.key) && typeof variable.value === 'string' && variable.value) {
+      variable.value = ''
+      changed += 1
+    }
+  }
+  return { changed, skipped: [], variables: [] }
+}
+
+function upgradeScheme(url: string): string {
+  return url.replace(/^http:\/\//i, 'https://').replace(/^ws:\/\//i, 'wss://')
+}
+
+function patchInsecureHttp(collection: unknown, fix: RepairFix): PatchResult {
+  const col = collection as PostmanCollection
+  const skipped: SkippedRepair[] = []
+  const upgradedVariables = new Set<string>()
+  let changed = 0
+
+  for (const target of fix.affectedRequests) {
+    const request = getItemAtPath(collection, target.itemPath)?.request
+    if (!request?.url) {
+      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'Request URL was not found.' })
+      continue
+    }
+    const current = currentUrlString(request.url)
+    const leadingVariable = current.match(/^\{\{\s*([^{}]+?)\s*\}\}/)?.[1]
+
+    if (leadingVariable) {
+      const variable = Array.isArray(col.variable) ? col.variable.find((entry) => entry?.key === leadingVariable) : undefined
+      if (variable && typeof variable.value === 'string' && /^(http|ws):\/\//i.test(variable.value)) {
+        if (!upgradedVariables.has(leadingVariable)) {
+          variable.value = upgradeScheme(variable.value)
+          upgradedVariables.add(leadingVariable)
+          changed += 1
+        }
+        continue
+      }
+      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: `{{${leadingVariable}}} is not defined as a collection variable.` })
+      continue
+    }
+
+    if (typeof request.url === 'string') {
+      request.url = upgradeScheme(request.url)
+    } else if (isRecord(request.url)) {
+      const url = request.url as PostmanUrl
+      if (typeof url.raw === 'string') url.raw = upgradeScheme(url.raw)
+      if (url.protocol === 'http') url.protocol = 'https'
+      if (url.protocol === 'ws') url.protocol = 'wss'
+    }
+    changed += 1
+  }
+
+  return { changed, skipped, variables: [] }
+}
+
+function patchTlsVerification(collection: unknown, fix: RepairFix): PatchResult {
+  let changed = 0
+  const clear = (owner: unknown) => {
+    if (!isRecord(owner) || !isRecord(owner.protocolProfileBehavior)) return
+    if (owner.protocolProfileBehavior.strictSSL === false) {
+      delete owner.protocolProfileBehavior.strictSSL
+      changed += 1
+    }
+  }
+  clear(collection)
+  for (const target of fix.affectedRequests) {
+    itemChain(collection, target.itemPath).forEach(clear)
+  }
+  return { changed, skipped: [], variables: [] }
 }
 
 function patchDescriptions(collection: unknown, fix: RepairFix): {
@@ -568,7 +1068,9 @@ function patchDescriptions(collection: unknown, fix: RepairFix): {
       skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'Request item was not found.' })
       continue
     }
-    if (item.request.description && String(item.request.description).trim()) {
+    const existing = item.request.description as unknown
+    const existingText = typeof existing === 'string' ? existing : isRecord(existing) ? String(existing.content ?? '') : ''
+    if (existingText.trim()) {
       skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'Request already has a description.' })
       continue
     }
@@ -626,6 +1128,30 @@ export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan
       changed = result.changed
       localSkipped = result.skipped
       action = `Added generated descriptions to ${changed} request(s).`
+    } else {
+      const patchers: Partial<Record<RepairFixKind, (collection: unknown, fix: RepairFix) => PatchResult>> = {
+        authHelperSecrets: (collection) => patchAuthHelperSecrets(collection),
+        bodySecrets: patchBodySecrets,
+        querySecrets: patchQuerySecrets,
+        secretVariables: patchSecretVariables,
+        insecureHttp: patchInsecureHttp,
+        tlsVerification: patchTlsVerification,
+      }
+      const result = patchers[fix.kind]?.(fixedJson, fix)
+      if (result) {
+        changed = result.changed
+        localSkipped = result.skipped
+        variables = result.variables.length ? result.variables : variables
+        const actions: Partial<Record<RepairFixKind, string>> = {
+          authHelperSecrets: `Replaced ${changed} auth setting credential(s) with variables.`,
+          bodySecrets: `Replaced ${changed} literal secret value(s) with variables.`,
+          querySecrets: `Replaced ${changed} query parameter secret(s) with variables.`,
+          secretVariables: `Cleared ${changed} secret collection variable value(s).`,
+          insecureHttp: `Upgraded ${changed} endpoint(s) to HTTPS.`,
+          tlsVerification: `Re-enabled certificate verification in ${changed} place(s).`,
+        }
+        action = actions[fix.kind] ?? action
+      }
     }
 
     const variablesAdded = variables.reduce((count, variable) => {

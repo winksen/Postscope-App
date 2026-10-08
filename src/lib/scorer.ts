@@ -1,5 +1,6 @@
 import type { Finding } from './auditor'
 import type { ParsedCollection } from './parser'
+import { penaltyScore } from './severity'
 
 export interface ScoreBreakdown {
   total: number;
@@ -13,26 +14,11 @@ export interface ScoreBreakdown {
   summary: string;
 }
 
-const SEVERITY_PENALTY = { critical: 20, warning: 8, info: 2 } as const
-
 function categoryScore(findings: Finding[], category: Finding['category']): number {
-  const catFindings = findings.filter((f) => f.category === category)
-  let score = 100
-  for (const f of catFindings) {
-    score -= SEVERITY_PENALTY[f.severity]
-  }
-  return Math.max(0, Math.min(100, score))
+  return penaltyScore(findings.filter((f) => f.category === category))
 }
 
-function totalScore(findings: Finding[]): number {
-  let score = 100
-  for (const f of findings) {
-    score -= SEVERITY_PENALTY[f.severity]
-  }
-  return Math.max(0, Math.min(100, score))
-}
-
-function grade(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
+export function grade(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
   if (score >= 90) return 'A'
   if (score >= 75) return 'B'
   if (score >= 55) return 'C'
@@ -60,7 +46,7 @@ function summary(score: number, findings: Finding[]): string {
 }
 
 export function calculateScore(_parsed: ParsedCollection, findings: Finding[]): ScoreBreakdown {
-  const total = totalScore(findings)
+  const total = penaltyScore(findings)
   return {
     total,
     categories: {
