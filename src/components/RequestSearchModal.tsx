@@ -88,29 +88,41 @@ export function RequestSearchModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
+              role="combobox"
+              aria-label="Search requests"
+              aria-expanded={results.length > 0}
+              aria-controls="request-search-results"
+              aria-autocomplete="list"
+              aria-activedescendant={results.length > 0 ? `request-search-option-${activeIndex}` : undefined}
             />
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[min(24rem,calc(85vh-8rem))]">
+        <ScrollArea className="max-h-[min(24rem,calc(85vh-8rem))]" focusable label="Search results">
           <div ref={listRef} className="box-border w-full max-w-full px-6 py-2.5">
             {results.length === 0 ? (
               <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                 {query.trim() ? 'No requests match your search.' : 'Start typing to search requests.'}
               </p>
             ) : (
-              <ul className="w-full max-w-full space-y-0.5 overflow-hidden" role="listbox">
+              <ul id="request-search-results" aria-label="Matching requests" className="w-full max-w-full space-y-0.5 overflow-hidden" role="listbox">
                 {results.map((request, index) => (
-                  <li key={request.id} className="max-w-full overflow-hidden" role="option" aria-selected={index === activeIndex}>
-                    <button
-                      type="button"
+                  <li
+                    key={request.id}
+                    id={`request-search-option-${index}`}
+                    className="max-w-full cursor-pointer overflow-hidden"
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectAt(index)}
+                  >
+                    {/* Focus stays in the search field (combobox pattern), so the row itself is not a button. */}
+                    <div
                       data-active={index === activeIndex}
                       className={cn(
                         'flex w-full max-w-full items-start gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-left transition-colors duration-150',
                         index === activeIndex ? 'bg-muted' : 'hover:bg-muted/60'
                       )}
-                      onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => selectAt(index)}
                     >
                       <RequestBadges request={request} />
                       <div className="w-0 min-w-0 flex-1 overflow-hidden">
@@ -123,7 +135,7 @@ export function RequestSearchModal({
                           </p>
                         )}
                       </div>
-                    </button>
+                    </div>
                   </li>
                 ))}
               </ul>

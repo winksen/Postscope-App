@@ -257,7 +257,11 @@ CLI: `postscope diff <old> <new>` (`runDiff` in `cli/postscope.ts`) reuses `anal
 
 ### 3.1 Bootstrap and routing
 
-`main.tsx` → `ThemeProvider` → `TooltipProvider` → `ToastProvider` → `App`. `App` fetches `/api/config` (8 s timeout; on failure it falls back to privacy-first defaults) and routes `/`, `/analyze`, `/samples` according to `publicLandingPage`.
+`main.tsx` → `ThemeProvider` → `TooltipProvider` → `ToastProvider` → `App`. `App` fetches `/api/config` (8 s timeout; on failure it falls back to privacy-first defaults) and routes according to `publicLandingPage`: with the landing page, `/` is the landing page, `/analyze/*` the analyzer and `/samples` the samples; without it, `/samples` and everything else (`/*`) is the analyzer and `/analyze/*` redirects to `/`. `AnalyzeApp` gets `basePath` (`/analyze` or empty).
+
+**Addresses (`appRoutes.ts`).** `parseAppLocation(pathname, search, basePath)` returns `{ page, requestId?, severity?, category?, rule?, finding?, view? }` or null; `buildAppPath(basePath, location)` is its inverse. Pages: overview (the base path), `requests`, `security`, `hygiene`, `repair`, `score`, `compare`. `/requests/<encodeURIComponent(id)>` selects a request (ids contain `/`, spaces and dots). Filters are only read on `security` (severity, category, rule, finding, `view=suppressed`) and `hygiene` (severity, rule, finding); unknown or malformed values are ignored, rule ids must match `^[A-Z][A-Z0-9_]{1,63}$`. The active page is derived from `useLocation()` (the former `active` state is gone); `goTo(location, replace?)` navigates through a ref to `navigate` so its identity is stable. Page changes, request selection and opening a finding push history entries; filter changes and closing a finding replace. A session restore keeps the page in the address, a new import goes to the dashboard, an invalid address redirects to the dashboard. `SamplesApp` keeps the same page props with local state.
+
+**Server fallback.** `serveStatic` serves `index.html` for browser navigations (`Accept: text/html`) to any path that is not a file, including paths whose last segment looks like a file name (`/analyze/requests/v1.2%2FGet%20item`); other requests for unknown files (scripts, data, API) still return 404.
 
 ### 3.2 `AnalyzeApp` state
 
@@ -286,6 +290,17 @@ Imports: size guard (50 MB), `File.text()`, `analyzeCollectionText` (worker with
 | `FindingEvidence` | Evidence list + rule/CWE/OWASP badges in Security and Hygiene dialogs |
 | `RuleSettingsDialog` | Enable/disable rules, severity overrides, reset to team defaults |
 | `app-header` | Export menu (Markdown, JSON, SARIF, sanitized copy) and Rules button |
+
+### 3.3.1 Keyboard and accessibility
+
+| Piece | Behavior |
+|---|---|
+| `keyboard.ts` | `isSearchShortcut(event, dialogOpen)`: Ctrl/Cmd+K anywhere, `/` outside inputs, textareas, selects, contenteditable and when a dialog is open |
+| Request tree | `handleTreeKeyDown` (`RequestsPage.tsx`) on the `role="group"` container; items carry `data-tree-item="folder|request"`, folders `aria-expanded` and `data-tree-folder`; closed folder content is `inert` |
+| Search dialog | Combobox pattern: the input has `role="combobox"` with `aria-activedescendant`, rows are `role="option"` (no nested buttons), the list scrolls in a focusable region |
+| Shell | Skip link to `#main-content`, `nav` labeled "Pages" with `aria-current="page"`, import page wrapped in `main` with a polite live region for progress |
+| Tokens | `--success-text`, `--warning-text`, `--destructive-text` (text on tints) and a base `:focus-visible` outline in `index.css`; method and protocol badges use the 700 shades; `CardTitle` is an `h2` (`as` prop); `ScrollArea` takes `focusable`; charts are `aria-hidden` with a `sr-only` summary |
+| Verification | Manual axe-core 4.10 pass (light and dark) on the import page, Dashboard, Requests (with a selection), Security, Hygiene, Repair, Score and Compare, and on the search, finding and rules dialogs: zero serious or critical violations. V0.1.44 automates it |
 
 ### 3.4 Browser storage
 
@@ -410,9 +425,10 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `redactionAndReports.test.ts` | Sanitized copies, idempotence, SARIF/JSON/Markdown validity, no secret leakage |
 | `security.test.ts` | Client IP resolution (hops, spoofed headers, IPv4-mapped, ports), failure tracker eviction and global back-off |
 | `compare.test.ts` | Identical collections, new and resolved findings, rename matched by URL, request/host/auth changes, URL normalization, deterministic and secret-free output, CLI `diff` exit codes, formats and usage errors |
+| `appRoutes.test.ts` | Page and filter parsing with and without a base path, rejection of foreign addresses, request id round trips (slashes, spaces, dots, percent signs), build/parse inverse, search shortcut rules |
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `libraryEncryption.test.ts` | Key parsing and resolution, envelope round trip and tamper rejection, encrypted store behavior, keyed dedupe hash, migration and rotation, proxy user, audit entries |
-| `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
+| `server.test.ts` | Traversal, deep-link navigations get the app shell, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
 | `inputs.test.ts` | Glob compilation, folder search (skips node_modules and .git), duplicates, sibling environments |
 | `compiled.test.ts` | Builds `dist-node` into a temp folder and runs the compiled CLI (folders, globs, junit, html, sarif, `--auto-env`) and the compiled server (starts with no node_modules, health, config, `.env`) |
@@ -477,3 +493,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.39 | Compiled server and CLI (`npm run build:node`, `bin.postscope`), folder/glob input, `--auto-env`, `--format junit`, GitHub composite action, `docs/CI.md`, Docker runtime image without node_modules; server no longer depends on Vite at run time |
 | V0.1.40 | Library encryption at rest (AES-256-GCM, keyed dedupe hash, migration and rotation tool `library.js`), append-only audit log, proxy user identity (`TRUSTED_USER_HEADER`, `savedBy`), `libraryEncrypted` in config |
 | V0.1.41 | `compare.ts` and `compareReport.ts` (request matching by id then method and URL, finding matching by occurrence fingerprint, score delta, hosts and auth types), Compare page (file or library, also two dropped files), `postscope diff` with `--fail-on-new` |
+| V0.1.42 | `appRoutes.ts` (pages, request ids and filters in the address, back and forward), `keyboard.ts` and request tree arrow keys, `/` search shortcut, server SPA fallback for navigations, accessibility pass (text color tokens, labels, landmarks, inert collapsed folders, live regions, axe zero serious violations) |

@@ -45,6 +45,8 @@ export default {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
+          /** Text on light tints of the color (badges, error messages); `DEFAULT` is for fills. */
+          text: 'hsl(var(--destructive-text))',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

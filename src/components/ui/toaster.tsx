@@ -81,7 +81,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <Icon
                 className={cn(
                   'mt-0.5 h-5 w-5 shrink-0',
-                  toast.variant === 'error' ? 'text-destructive' : toast.variant === 'success' ? 'text-[hsl(var(--success))]' : 'text-muted-foreground'
+                  toast.variant === 'error' ? 'text-destructive-text' : toast.variant === 'success' ? 'text-[hsl(var(--success-text))]' : 'text-muted-foreground'
                 )}
                 weight="fill"
               />

@@ -71,7 +71,7 @@ export function StatCard({
             <p
               className={cn(
                 'text-xs font-medium',
-                trendPositive ? 'text-[hsl(var(--success))]' : 'text-[hsl(var(--warning))]'
+                trendPositive ? 'text-[hsl(var(--success-text))]' : 'text-[hsl(var(--warning-text))]'
               )}
             >
               {trendLabel}

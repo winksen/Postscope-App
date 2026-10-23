@@ -84,7 +84,7 @@ export function AppSidebar({
       </div>
 
       <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-1" aria-label="Pages">
           {nav.map((item) => {
             const isActive = active === item.id;
             const Icon = isActive ? item.activeIcon : item.icon;
@@ -102,7 +102,7 @@ export function AppSidebar({
               </Badge>
             ) : null;
             const btn = (
-              <Button key={item.id} variant={isActive ? "secondary" : "ghost"} size="sm" className={cn("h-9 w-full justify-start gap-3 rounded-full text-sm font-medium transition-all duration-200 [&_svg]:size-5", isActive && "bg-foreground text-background hover:bg-foreground/90 hover:text-background", collapsed && "justify-center px-0")} onClick={() => onNav(item.id)}>
+              <Button key={item.id} variant={isActive ? "secondary" : "ghost"} size="sm" className={cn("h-9 w-full justify-start gap-3 rounded-full text-sm font-medium transition-all duration-200 [&_svg]:size-5", isActive && "bg-foreground text-background hover:bg-foreground/90 hover:text-background", collapsed && "justify-center px-0")} onClick={() => onNav(item.id)} aria-label={collapsed ? item.label : undefined} aria-current={isActive ? "page" : undefined}>
                 <Icon className={cn("shrink-0 transition-colors duration-200", isActive && "text-background")} weight="fill" />
                 {!collapsed && (
                   <>

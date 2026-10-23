@@ -70,6 +70,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 - **Score**: headline score (85% security, 15% hygiene), letter grade, per-category subscores and a per-finding penalty breakdown; a finding costs more when it affects more requests, and teams can set `SCORE_WEIGHTS`
 - **Rule settings**: disable rules or override severities per browser, or set team defaults on the server
 - **Exports**: JSON (versioned, with a published schema), SARIF 2.1.0 with line and column locations, Markdown, and a self-contained HTML report
+- **Deep links and keyboard use**: every page, filter, open finding and selected request has its own address (`/analyze/security?severity=critical&rule=HARDCODED_TOKEN`, `/analyze/requests/<id>`), so links and the back button work within a session; arrow-key navigation in the request tree, `/` or `Ctrl+K` to search, and a checked accessibility baseline (axe: no serious violations)
 - **Compare versions**: new, resolved and unchanged findings, the score change and added, removed or edited requests between two versions of a collection (two files, or the open collection and a library entry), also as `postscope diff old.json new.json` for pull request checks
 - **Team library** (server): shared history with quotas, retention and optional server-side redaction
 - **CLI**: `npm run scan` with `--fail-on`, `--min-score` and `--sanitize` for CI, a project config file (`.postscope.json`), baselines so CI fails only on new findings, and reviewed suppressions with a mandatory reason

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import {
   CaretRight,
   Check,
@@ -27,8 +27,9 @@ interface RequestsPageProps {
   parsed: ParsedCollection
   findings: Finding[]
   search: string
-  focusRequestId?: string | null
-  onFocusRequestHandled?: () => void
+  /** Request selected in the address (`/requests/<id>`). */
+  selectedId?: string | null
+  onSelectId?: (id: string | null) => void
 }
 
 interface TreeNode {
@@ -133,6 +134,54 @@ function DisabledBadge() {
   )
 }
 
+/**
+ * Arrow-key navigation for the request tree. Down and Up move between the visible folders and requests, Home and End
+ * jump to the ends, Right opens a folder (or steps into it), Left closes it (or moves to the parent folder). Enter and
+ * Space keep their button behavior. Items inside a closed folder are `inert`, so they are skipped here and by Tab.
+ */
+function handleTreeKeyDown(event: KeyboardEvent<HTMLElement>) {
+  const target = event.target as HTMLElement
+  if (!target.matches('[data-tree-item]') || event.altKey || event.ctrlKey || event.metaKey) return
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[data-tree-item]')).filter((element) => !element.closest('[inert]'))
+  const index = items.indexOf(target)
+  const focusAt = (position: number) => items[Math.max(0, Math.min(items.length - 1, position))]?.focus()
+  const isFolder = target.dataset.treeItem === 'folder'
+  const expanded = target.getAttribute('aria-expanded') === 'true'
+
+  switch (event.key) {
+    case 'ArrowDown':
+      focusAt(index + 1)
+      break
+    case 'ArrowUp':
+      focusAt(index - 1)
+      break
+    case 'Home':
+      focusAt(0)
+      break
+    case 'End':
+      focusAt(items.length - 1)
+      break
+    case 'ArrowRight':
+      if (!isFolder) return
+      if (!expanded) target.click()
+      else focusAt(index + 1)
+      break
+    case 'ArrowLeft': {
+      if (isFolder && expanded) {
+        target.click()
+        break
+      }
+      const own = target.closest('[data-tree-folder]')
+      const parent = isFolder ? own?.parentElement?.closest('[data-tree-folder]') : own
+      parent?.querySelector<HTMLElement>(':scope > [data-tree-item]')?.focus()
+      break
+    }
+    default:
+      return
+  }
+  event.preventDefault()
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -141,14 +190,15 @@ function CopyButton({ text }: { text: string }) {
       type="button"
       variant="ghost"
       size="icon"
-      className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+      className="h-6 w-6 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+      aria-label={copied ? 'Copied' : 'Copy value'}
       onClick={() => {
         void navigator.clipboard.writeText(text)
         setCopied(true)
         window.setTimeout(() => setCopied(false), 1500)
       }}
     >
-      {copied ? <Check className="h-3 w-3 text-[hsl(var(--success))]" /> : <Copy className="h-3 w-3" />}
+      {copied ? <Check className="h-3 w-3 text-[hsl(var(--success-text))]" /> : <Copy className="h-3 w-3" />}
     </Button>
   )
 }
@@ -169,10 +219,12 @@ function RequestRow({
       type="button"
       className={cn(
         'group flex min-h-9 w-full max-w-full items-center justify-start gap-2 overflow-hidden rounded-2xl px-2.5 py-1.5 text-left font-normal transition-colors duration-200',
-        'focus-visible:outline-none focus-visible:ring-0',
+        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         'hover:bg-muted/55',
         active && 'bg-muted/65 text-foreground hover:bg-muted/65'
       )}
+      data-tree-item="request"
+      aria-current={active ? 'true' : undefined}
       onClick={() => onSelect(request)}
     >
       <MethodBadge method={request.method} />
@@ -215,12 +267,14 @@ function FolderNode({
   const total = requestCountForNode(node)
 
   return (
-    <div className={cn('max-w-full overflow-hidden', depth > 0 && 'ml-1 pl-2')}>
+    <div className={cn('max-w-full overflow-hidden', depth > 0 && 'ml-1 pl-2')} data-tree-folder>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        data-tree-item="folder"
+        aria-expanded={open}
         className={cn(
-          'group flex w-full max-w-full items-center gap-2 overflow-hidden rounded-xl py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-0',
+          'group flex w-full max-w-full items-center gap-2 overflow-hidden rounded-xl py-1.5 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           depth === 0 ? 'px-0' : 'px-2.5'
         )}
       >
@@ -238,6 +292,8 @@ function FolderNode({
           'overflow-hidden transition-all duration-300',
           open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
         )}
+        // A closed folder keeps its content in the page for the animation; inert keeps it out of Tab and screen readers.
+        {...(open ? {} : { inert: '' })}
       >
         <div className="ml-1 mt-1 max-w-full space-y-1 overflow-hidden pl-1.5 pr-1.5">
           {node.requests.map((request) => (
@@ -265,13 +321,14 @@ export function RequestsPage({
   parsed,
   findings,
   search,
-  focusRequestId,
-  onFocusRequestHandled,
+  selectedId: selectedRequestId = null,
+  onSelectId,
 }: RequestsPageProps) {
   const { root, nodes } = useMemo(() => buildTree(parsed.requests), [parsed.requests])
   const filteredRoot = useMemo(() => filterRequests(root, search), [root, search])
   const filteredNodes = useMemo(() => filterNodes(nodes, search), [nodes, search])
-  const [selected, setSelected] = useState<ParsedRequest | null>(null)
+  const selected = useMemo(() => parsed.requests.find((request) => request.id === selectedRequestId) ?? null, [parsed.requests, selectedRequestId])
+  const setSelected = (request: ParsedRequest | null) => onSelectId?.(request?.id ?? null)
   const [expandSignal, setExpandSignal] = useState(0)
   const [collapseSignal, setCollapseSignal] = useState(0)
   const [expandedByControl, setExpandedByControl] = useState(false)
@@ -291,21 +348,10 @@ export function RequestsPage({
   const selectedQueryParams = useMemo(() => (selected ? parseQueryParams(selected.url) : []), [selected])
 
   useEffect(() => {
-    if (selected && !requestMatches(selected, search)) {
-      setSelected(null)
-    }
-  }, [selected, search])
-
-  useEffect(() => {
-    setSelected(null)
-  }, [parsed])
-
-  useEffect(() => {
-    if (!focusRequestId) return
-    const request = parsed.requests.find((r) => r.id === focusRequestId)
-    if (request) setSelected(request)
-    onFocusRequestHandled?.()
-  }, [focusRequestId, parsed.requests, onFocusRequestHandled])
+    if (selected && !requestMatches(selected, search)) onSelectId?.(null)
+    // Only a changed search clears the selection; selecting does not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
@@ -347,7 +393,12 @@ export function RequestsPage({
           </CardHeader>
           <CardContent className="min-h-0 flex-1 p-0">
             <ScrollArea className="h-full">
-              <div className="box-border max-w-full space-y-2 overflow-hidden px-5 pb-10">
+              <div
+                className="box-border max-w-full space-y-2 overflow-hidden px-5 pb-10"
+                role="group"
+                aria-label="Collection requests. Use the arrow keys to move between folders and requests."
+                onKeyDown={handleTreeKeyDown}
+              >
                 {filteredRoot.length > 0 && (
                   <div className="pl-2 pr-1.5">
                     <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">

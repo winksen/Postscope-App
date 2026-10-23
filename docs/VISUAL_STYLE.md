@@ -158,7 +158,10 @@ Use `-` or short words (`None`, `N/A`) for missing field values, never an em das
 
 - Preserve visible focus rings (`ring` token); do not remove focus styles without a replacement.
 - Maintain contrast for `muted-foreground` on `background` and `card` in both themes.
-- Prefer semantic HTML and Radix primitives for dialogs, tabs, and menus.
+- Prefer semantic HTML and Radix primitives for dialogs, tabs, and menus. Escape closes every dialog.
+- Text must reach 4.5:1 on its background in both themes. Use the `*-text` tokens for colored text and keep method and protocol badges on the `700` shades with white text.
+- Keyboard: `/` or `Ctrl+K` opens request search, arrow keys move through the request tree, a skip link jumps to the main content, and analysis progress is announced through a polite live region.
+- Before a release that changes the UI, run an axe pass (light and dark) on every page and dialog; the bar is zero serious or critical violations.
 
 ---
 

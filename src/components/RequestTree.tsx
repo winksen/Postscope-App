@@ -40,9 +40,9 @@ function RequestRow({
       <MethodBadge method={request.method} />
       <span className="min-w-0 flex-1 truncate text-left text-sm">{request.name}</span>
       {hasAuth ? (
-        <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success))] opacity-60 group-hover:opacity-100 transition-opacity" />
+        <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success-text))] opacity-60 group-hover:opacity-100 transition-opacity" />
       ) : (
-        <LockOpen className="h-3.5 w-3.5 shrink-0 text-destructive opacity-60 group-hover:opacity-100 transition-opacity" />
+        <LockOpen className="h-3.5 w-3.5 shrink-0 text-destructive-text opacity-60 group-hover:opacity-100 transition-opacity" />
       )}
     </Button>
   )
