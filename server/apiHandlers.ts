@@ -14,7 +14,7 @@ import { isPublicLandingEnabled } from './landingConfig'
 import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConfig'
 import { HttpError, readJsonBody, sendJson } from './http'
 import { checkRateLimit, isSameOriginRequest } from './security'
-import { getAuditPolicy, getMaxCollectionBytes, isHealthVersionExposed, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
+import { getAuditPolicy, getMaxCollectionBytes, getScoreWeights, isHealthVersionExposed, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
 import { errorFields, log } from './logger'
 import { redactCollection } from '../src/lib/redaction'
 
@@ -55,6 +55,7 @@ export async function handleConfigApi(req: IncomingMessage, res: ServerResponse,
     libraryAllowDelete: isLibraryDeleteAllowed(),
     libraryRedactSecrets: isLibraryRedactionEnabled(),
     auditPolicy: getAuditPolicy(),
+    scoreWeights: getScoreWeights(),
   })
   return true
 }

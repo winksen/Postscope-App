@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DEFAULT_APP_CONFIG, fetchAppConfig, type AppConfig } from '@/lib/deploymentConfig'
+import { setActiveScoreWeights } from '@/lib/scorer'
 import { LandingPage } from '@/pages/LandingPage'
 import { AnalyzeApp } from '@/pages/AnalyzeApp'
 import { SamplesApp } from '@/pages/SamplesApp'
@@ -13,7 +14,9 @@ export default function App() {
     let cancelled = false
     void fetchAppConfig()
       .then((loaded) => {
-        if (!cancelled) setConfig(loaded)
+        if (cancelled) return
+        setActiveScoreWeights(loaded.scoreWeights)
+        setConfig(loaded)
       })
       // Falls back to privacy-first defaults (incognito, no landing page) when the server is unreachable.
       .catch((e) => console.error(e))

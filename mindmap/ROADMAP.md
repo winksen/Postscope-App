@@ -106,7 +106,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes | `61b576f` |
 | V0.1.33 | `v0.1.33` | A2 | Enhancement | Secret pattern expansion and Basic token decoding | `bff360d` |
 | V0.1.34 | `v0.1.34` | A2 | Feature | Postman environments and globals | `f5c3110` |
-| V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules | |
+| V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules | `00911f8` |
 | V0.1.36 | `v0.1.36` | A2 | Enhancement | Scoring model v2 | |
 | V0.1.37 | `v0.1.37` | A3 | Feature | Config file, baselines and suppressions | |
 | V0.1.38 | `v0.1.38` | A3 | Enhancement | Precise SARIF locations, report schema, HTML report | |

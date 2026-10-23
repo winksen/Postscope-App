@@ -122,3 +122,18 @@ test('--sanitize also writes sanitized environment copies next to the output', (
   assert.equal(JSON.parse(sanitizedEnvironment).values.find((item: { key: string }) => item.key === 'clientSecret').value, '')
   assert.equal(JSON.parse(sanitizedGlobals).values.find((item: { key: string }) => item.key === 'gatewayHost').value, 'https://gateway.example.com')
 })
+
+test('--weights changes the score and invalid weights are usage errors', () => {
+  const score = (...args: string[]) => JSON.parse(cli(risky, '--format', 'json', '--fail-on', 'none', ...args).stdout).score as { total: number; security: number; hygiene: number; scoreModel: number }
+  const defaults = score()
+  const light = score('--weights', 'critical=2,warning=1,info=0')
+  const none = score('--weights', 'critical=0,warning=0,info=0')
+  assert.equal(defaults.scoreModel, 2)
+  assert.ok(light.security > defaults.security)
+  assert.equal(none.total, 100)
+  assert.equal(cli(risky, '--weights', 'critical=abc').code, 2)
+  assert.equal(cli(risky, '--weights', 'fatal=5').code, 2)
+  assert.match(cli(risky, '--fail-on', 'none').stdout, /security \d+, hygiene \d+/)
+  assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '80', '--weights', 'critical=1,warning=1,info=0').code, 0)
+  assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '80').code, 1)
+})

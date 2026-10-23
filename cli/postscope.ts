@@ -17,7 +17,7 @@ import { redactCollection, redactEnvironment } from '../src/lib/redaction'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
 import { readPackageVersion } from '../server/appVersion'
-import { isSeverity, severityRank, type Severity } from '../src/lib/severity'
+import { isSeverity, parseScoreWeights, severityRank, type ScoreWeights, type Severity } from '../src/lib/severity'
 
 type Format = 'text' | 'json' | 'sarif' | 'markdown'
 type FailOn = Severity | 'none'
@@ -29,6 +29,7 @@ interface CliOptions {
   failOn: FailOn
   minScore?: number
   audit: AuditOptions
+  weights?: ScoreWeights
   sanitize?: string
   /** Postman environment and globals export files (applied to every collection). */
   environments: Array<{ file: string; globals: boolean }>
@@ -47,6 +48,8 @@ Options:
       --min-score <0-100>                  Exit 1 when any collection scores below this value
       --disable <RULE,RULE>                Disable rules (see --list-rules)
       --severity <RULE=level,...>          Override rule severities (critical, warning, info)
+      --weights <critical=N,warning=N,info=N>
+                                           Points deducted per finding severity (default critical=20,warning=8,info=2)
       --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input).
                                            Environment files are written next to it as <name>.sanitized.postman_environment.json
   -e, --environment <file>                 Postman environment export to analyze with the collections (repeatable)
@@ -117,6 +120,12 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
           overrides[rule.toUpperCase()] = level
         }
         break
+      case '--weights': {
+        const parsed = parseScoreWeights(value())
+        if (parsed.errors.length) throw new UsageError(`Invalid --weights: ${parsed.errors.join('; ')}`)
+        options.weights = parsed.weights
+        break
+      }
       case '--sanitize':
         options.sanitize = value()
         break
@@ -187,7 +196,7 @@ function environmentStem(file: string): string {
   return path.basename(file).replace(/\.postman_(?:environment|globals)\.json$/i, '').replace(/\.json$/i, '')
 }
 
-function analyzeFile(input: string, audit: AuditOptions, appVersion: string, environments: LoadedEnvironment[]): { result: AnalyzedFile; json: unknown } {
+function analyzeFile(input: string, audit: AuditOptions, appVersion: string, environments: LoadedEnvironment[], weights?: ScoreWeights): { result: AnalyzedFile; json: unknown } {
   let json: unknown
   try {
     json = JSON.parse(readInput(input))
@@ -205,7 +214,7 @@ function analyzeFile(input: string, audit: AuditOptions, appVersion: string, env
     throw new UsageError(`${input}: not a Postman collection (missing item array)`)
   }
   const findings = runAudit(parsed, audit)
-  const score = calculateScore(parsed, findings)
+  const score = calculateScore(parsed, findings, weights)
   return {
     result: { input, ctx: { parsed, findings, score, appVersion, sourceName: input === '-' ? undefined : path.basename(input) } },
     json,
@@ -219,7 +228,7 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
     ctx.findings.forEach((finding) => (counts[finding.severity] += 1))
     lines.push(`PostScope ${appVersion}  ${ctx.parsed.name}  (${input === '-' ? 'stdin' : input}, ${ctx.parsed.totalRequests} requests)`)
     if (ctx.parsed.environments?.length) lines.push(`Environments: ${ctx.parsed.environments.map((environment) => `${environment.name} (${environment.kind})`).join(', ')}`)
-    lines.push(`Score ${ctx.score.total}/100 (grade ${ctx.score.grade})  ·  ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info`)
+    lines.push(`Score ${ctx.score.total}/100 (grade ${ctx.score.grade}, security ${ctx.score.security}, hygiene ${ctx.score.hygiene})  ·  ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info`)
     const labels = new Map(ctx.parsed.requests.map((r) => [r.id, r.folderPath.length ? `${r.folderPath.join(' / ')} / ${r.name}` : r.name]))
     for (const finding of ctx.findings) {
       lines.push(`  ${finding.severity.toUpperCase().padEnd(8)} ${finding.ruleId.padEnd(30)} ${finding.title}${finding.affected.length ? ` (${finding.affected.length})` : ''}`)
@@ -276,7 +285,7 @@ export function main(argv: string[]): number {
   try {
     const environments = loadEnvironments(options.environments)
     for (const input of options.inputs) {
-      const { result, json } = analyzeFile(input, options.audit, appVersion, environments)
+      const { result, json } = analyzeFile(input, options.audit, appVersion, environments, options.weights)
       files.push(result)
       if (options.sanitize) {
         const { json: sanitized, redactedCount } = redactCollection(json)

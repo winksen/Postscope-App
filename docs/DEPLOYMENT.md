@@ -39,6 +39,7 @@ Set these variables on the container or host process:
 | `SHOW_GITHUB_LINK` | `true` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows or hides the analyzer sidebar GitHub link. Set to `false` for closed internal networks. |
 | `SHOW_FEEDBACK_LINK` | `true` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows or hides the analyzer sidebar feedback link. Set to `false` for closed internal networks. |
 | `FEEDBACK_URL` | GitHub issue form | Absolute URL | External form opened by the analyzer sidebar feedback link. |
+| `SCORE_WEIGHTS` | `critical=20,warning=8,info=2` | Any subset of `critical=N,warning=N,info=N`, each 0 to 100 | Points deducted per finding severity in the score (scoring model v2). Sent to every browser through `/api/config`; the CLI uses `--weights`. Invalid entries are ignored with a warning. |
 | `TRUST_PROXY` | `false` | `true`, `false` | Trust `X-Forwarded-For` / `X-Forwarded-Host` from a reverse proxy. Leave `false` when clients connect directly. |
 | `TRUST_PROXY_HOPS` | `1` | Integer 1 to 10 | Number of trusted proxies in front of PostScope (only with `TRUST_PROXY=true`). The client IP is the entry that many positions from the right of `X-Forwarded-For`; entries further left are client-controlled and ignored. Use `2` for a CDN plus a load balancer. |
 | `HEALTH_EXPOSE_VERSION` | `true` | `true`, `false` | When `false`, the unauthenticated `/api/health` endpoint omits `version`. `/api/config` is behind Basic auth when it is enabled. |

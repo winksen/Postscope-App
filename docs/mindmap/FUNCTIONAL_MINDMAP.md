@@ -99,7 +99,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | **Requests** | Postman-like explorer: folder tree, request details (URL, query params, headers, body), and per-request findings with a health score. Credential values are **masked** until the user clicks the eye icon. |
 | **Security** | All security-impact findings with severity/category filters and search. The detail dialog shows the recommendation, affected requests, **masked evidence** (where each issue was found), and **CWE / OWASP API Top 10** references. |
 | **Hygiene** | Maintainability notes: missing descriptions, unused collection variables, duplicate or placeholder names, loose root requests, deep nesting, empty headers, GET requests with bodies. |
-| **Score** | 0–100 score, letter grade (A–F), per-category scores (Secrets, Variables, Auth, Hygiene), and improvement advice. |
+| **Score** | A headline 0–100 score and letter grade (A–F) made of a **security score** (secrets, variables, auth; 85%) and a **hygiene score** (15%), per-category scores, a per-finding penalty breakdown, and improvement advice. A finding that affects more requests costs more points, up to a cap per rule, so one noisy rule cannot zero the score alone. Teams can change the point values with `SCORE_WEIGHTS`. |
 
 ### What gets detected
 
@@ -186,7 +186,8 @@ Available in `hybrid` and `on` modes.
 |---|---|
 | `--format text|json|sarif|markdown` | Report format (multiple files merge into one JSON array or one SARIF log) |
 | `--fail-on critical|warning|info|none` | Exit code 1 when findings at or above this severity exist (default: critical) |
-| `--min-score N` | Exit code 1 when a collection scores below N |
+| `--min-score N` | Exit code 1 when a collection scores below N (headline score; thresholds chosen before V0.1.36 may need adjusting) |
+| `--weights critical=N,warning=N,info=N` | Override the points deducted per finding severity |
 | `--disable`, `--severity` | Same rule policy controls as the UI |
 | `--sanitize out.json` | Write a sanitized copy; sanitized environment copies are written next to it as `<name>.sanitized.postman_environment.json` |
 | `-e, --environment file.json` | Analyze a Postman environment export with the collections (repeatable) |

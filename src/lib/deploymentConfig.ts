@@ -1,6 +1,7 @@
 import type { StorageMode } from './storagePreferences'
 import { parseLoggingMode, type LoggingMode } from './parseLoggingMode'
 import { sanitizeAuditOptions, type AuditOptions } from './auditor'
+import { DEFAULT_SCORE_WEIGHTS, sanitizeScoreWeights, type ScoreWeights } from './severity'
 
 export type { LoggingMode }
 export { parseLoggingMode }
@@ -22,6 +23,8 @@ export interface AppConfig {
   libraryRedactSecrets: boolean
   /** Team audit policy defaults (disabled rules, severity overrides). */
   auditPolicy: AuditOptions
+  /** Points per finding severity used by the score (scoring model v2). */
+  scoreWeights: ScoreWeights
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -35,6 +38,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   libraryAllowDelete: true,
   libraryRedactSecrets: false,
   auditPolicy: {},
+  scoreWeights: DEFAULT_SCORE_WEIGHTS,
 }
 
 function parseBooleanFlag(value: unknown): boolean {
@@ -75,6 +79,7 @@ export async function fetchAppConfig(): Promise<AppConfig> {
       libraryAllowDelete: body.libraryAllowDelete !== false,
       libraryRedactSecrets: body.libraryRedactSecrets === true,
       auditPolicy: sanitizeAuditOptions(body.auditPolicy),
+      scoreWeights: sanitizeScoreWeights(body.scoreWeights),
     }
   } finally {
     clearTimeout(timer)

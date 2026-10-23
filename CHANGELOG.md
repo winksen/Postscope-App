@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.36
+
+- Enhanced scoring to account for how many requests each finding affects
+- Separated the security score from the hygiene score
+- Added configurable score weights for teams
+
 ## V0.1.35
 
 - Added detection of variables that are referenced but never defined

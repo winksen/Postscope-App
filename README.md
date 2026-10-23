@@ -66,7 +66,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 - **Overview**: stat cards, method and auth distribution charts, request tree with search
 - **Requests, Security and Hygiene**: filterable findings with masked evidence and per-request context
 - **Repair**: guided fixes (secrets to variables, base URL variables, auth cleanup and more) and a sanitized download
-- **Score**: numeric score, letter grade and per-category subscores
+- **Score**: headline score (85% security, 15% hygiene), letter grade, per-category subscores and a per-finding penalty breakdown; a finding costs more when it affects more requests, and teams can set `SCORE_WEIGHTS`
 - **Rule settings**: disable rules or override severities per browser, or set team defaults on the server
 - **Exports**: JSON, SARIF 2.1.0 and Markdown reports
 - **Team library** (server): shared history with quotas, retention and optional server-side redaction
@@ -129,7 +129,7 @@ None are required for local development or a static production build. The Node s
 | `npm run start` | Run the Node server (serves `dist/` and the `/api` endpoints) |
 | `npm run preview` | Serve the production build locally on **port 3010** |
 | `npm test` | Run every `tests/*.test.ts` suite with the Node test runner |
-| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`) |
+| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`); supports `--environment`, `--globals`, `--weights` and `--min-score` |
 | `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
 | `npm run release:check` | Verify that package, Docker and compose versions match the changelog |
 
