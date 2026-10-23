@@ -2,6 +2,9 @@ import type { PostmanAuth, PostmanCollection } from '../types/postman'
 import { detectRequestProtocol, type RequestProtocol } from './requestProtocol'
 import { getAuthEntries, isInheritedAuth, normalizeAuthType, type AuthEntry } from './authSchemes'
 import { extractVariableNames } from './variables'
+import { MAX_DESCRIPTION_LENGTH } from './descriptions'
+import { itemPointer } from './jsonPositions'
+import type { ParsedEnvironment } from './environment'
 
 export type { RequestProtocol }
 
@@ -19,47 +22,67 @@ export interface ParsedSavedResponse {
   /** Truncated body text, kept only for scanning. */
   body?: string
   requestHeaders: KeyValue[]
+  /** Disabled headers of the saved request. They still ship in the export, so they are audited. */
+  disabledRequestHeaders?: KeyValue[]
   requestUrl?: string
+  /** Query parameters of the saved request (kept for scanning). */
+  requestQuery?: KeyValue[]
+  /** Truncated body text of the saved request (raw text, or form fields as `key=value` pairs). */
+  requestBody?: string
   requestAuthType?: string
   requestAuthFields?: AuthEntry[]
 }
 
 export interface ParsedRequest {
-  id: string;
-  name: string;
-  method: string;
-  protocol: RequestProtocol;
-  url: string;
+  id: string
+  name: string
+  method: string
+  protocol: RequestProtocol
+  url: string
   /** Index path through nested Postman item arrays back to the raw collection item. */
-  itemPath: number[];
-  folderPath: string[];
+  itemPath: number[]
+  /** JSON pointer of the raw item (`/item/0/item/3`), for locating evidence in the exported file. */
+  pointer: string
+  folderPath: string[]
   /** Effective auth type, including auth inherited from folders or the collection. */
-  auth: string;
+  auth: string
   /** Present when the effective Postman auth type is basic (username/password fields). */
-  basicAuth?: { username: string; password: string };
-  headers: Array<{ key: string; value: string }>;
-  bodyRaw?: string;
-  hasDescription: boolean;
-  authSource?: AuthSource;
+  basicAuth?: { username: string; password: string }
+  headers: Array<{ key: string; value: string }>
+  /** Headers switched off in Postman. They are not sent but still ship in the export. */
+  disabledHeaders?: KeyValue[]
+  bodyRaw?: string
+  /** True when `bodyRaw` was cut to the first 64 KB for display (see `compactResult.ts`); findings used the full text. */
+  bodyTruncated?: boolean
+  /** Length of the full body in characters, set together with `bodyTruncated`. */
+  bodySize?: number
+  hasDescription: boolean
+  authSource?: AuthSource
   /** Item path of the request or folder that owns the effective auth; `[]` means collection level. */
-  authOwnerPath?: number[];
+  authOwnerPath?: number[]
   /** Entries of the effective auth helper (all types except basic). */
-  authFields?: AuthEntry[];
-  queryParams?: KeyValue[];
-  bodyMode?: string;
+  authFields?: AuthEntry[]
+  queryParams?: KeyValue[]
+  /** Path variables (`:id` segments) from `url.variable`. */
+  pathVariables?: KeyValue[]
+  /** Query params switched off in Postman (kept in `url.query`, absent from `url.raw`). */
+  disabledQueryParams?: KeyValue[]
+  bodyMode?: string
   /** Text fields of urlencoded / form-data bodies. */
-  bodyFields?: KeyValue[];
-  scripts?: { prerequest?: string; test?: string };
-  savedResponses?: ParsedSavedResponse[];
+  bodyFields?: KeyValue[]
+  /** Disabled text fields of urlencoded / form-data bodies. */
+  disabledBodyFields?: KeyValue[]
+  scripts?: { prerequest?: string; test?: string; disabledPrerequest?: string; disabledTest?: string }
+  savedResponses?: ParsedSavedResponse[]
   /** True when Postman SSL certificate verification is disabled for this request (directly or inherited). */
-  tlsVerificationDisabled?: boolean;
+  tlsVerificationDisabled?: boolean
 }
 
 export interface ParsedFolder {
-  name: string;
-  path: string[];
-  requestCount: number;
-  requests: ParsedRequest[];
+  name: string
+  path: string[]
+  requestCount: number
+  requests: ParsedRequest[]
 }
 
 export interface ParsedScript {
@@ -68,6 +91,30 @@ export interface ParsedScript {
   ownerPath: number[]
   listen: string
   source: string
+  /** True when the event is switched off in Postman. It still ships in the export. */
+  disabled?: boolean
+}
+
+/** Free-text documentation of the collection, a folder or a request. */
+export interface ParsedDescription {
+  kind: 'collection' | 'folder' | 'request'
+  /** `collection`, the folder path joined with ` / `, or the request id. */
+  owner: string
+  /** Item path of the owner; `[]` for the collection. */
+  ownerPath: number[]
+  /** Set for request descriptions. */
+  requestId?: string
+  /** Truncated to 64 KB. */
+  text: string
+}
+
+/** A variable defined on a folder or a request (not on the collection). */
+export interface ParsedScopedVariable extends ParsedVariable {
+  scope: 'folder' | 'request'
+  /** The folder path joined with ` / ` or the request id. */
+  owner: string
+  ownerPath: number[]
+  requestId?: string
 }
 
 /** A collection or folder that defines its own auth (requests may inherit it). */
@@ -87,24 +134,32 @@ export interface ParsedVariable {
 }
 
 export interface ParsedCollection {
-  name: string;
-  version: string;
-  totalRequests: number;
-  totalFolders: number;
-  methods: Record<string, number>;
-  authTypes: Record<string, number>;
-  variables: string[];
-  definedVariables: string[];
-  requests: ParsedRequest[];
-  folders: ParsedFolder[];
-  collectionVariables?: ParsedVariable[];
-  collectionAuthType?: string;
+  name: string
+  version: string
+  totalRequests: number
+  totalFolders: number
+  methods: Record<string, number>
+  authTypes: Record<string, number>
+  variables: string[]
+  definedVariables: string[]
+  requests: ParsedRequest[]
+  folders: ParsedFolder[]
+  collectionVariables?: ParsedVariable[]
+  /** Postman environment and globals exports loaded with the collection (see `environment.ts`). */
+  environments?: ParsedEnvironment[]
+  /** Index into `environments` of the selected environment; globals are always applied. */
+  activeEnvironment?: number
+  /** Folder and request level variables. */
+  scopedVariables?: ParsedScopedVariable[]
+  /** Collection, folder and request descriptions. */
+  descriptions?: ParsedDescription[]
+  collectionAuthType?: string
   /** Collection- and folder-level auth definitions. */
-  authOwners?: ParsedAuthOwner[];
+  authOwners?: ParsedAuthOwner[]
   /** Collection- and folder-level scripts (request scripts live on each request). */
-  scripts?: ParsedScript[];
+  scripts?: ParsedScript[]
   /** Non-fatal problems found while reading a malformed export. */
-  parseWarnings?: string[];
+  parseWarnings?: string[]
 }
 
 /** Nesting deeper than this is almost certainly malformed and is skipped to protect the call stack. */
@@ -165,6 +220,14 @@ function parseQueryFromRaw(rawUrl: string): KeyValue[] {
     })
 }
 
+function getPathVariables(url: unknown): KeyValue[] {
+  if (!isRecord(url) || !Array.isArray(url.variable)) return []
+  return url.variable
+    .filter(isRecord)
+    .map((entry) => ({ key: asText(entry.key), value: asText(entry.value) }))
+    .filter((entry) => entry.key)
+}
+
 function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value.replace(/\+/g, ' '))
@@ -173,14 +236,18 @@ function safeDecode(value: string): string {
   }
 }
 
-function getQueryParams(url: unknown, urlString: string): KeyValue[] {
+function getQueryParams(url: unknown, urlString: string): { active: KeyValue[]; disabled: KeyValue[] } {
   if (isRecord(url) && Array.isArray(url.query)) {
-    return url.query
-      .filter((entry): entry is UnknownRecord => isRecord(entry) && entry.disabled !== true)
-      .map((entry) => ({ key: asText(entry.key), value: asText(entry.value) }))
+    const entries = url.query
+      .filter((entry): entry is UnknownRecord => isRecord(entry))
+      .map((entry) => ({ key: asText(entry.key), value: asText(entry.value), disabled: entry.disabled === true }))
       .filter((entry) => entry.key)
+    return {
+      active: entries.filter((entry) => !entry.disabled).map(({ key, value }) => ({ key, value })),
+      disabled: entries.filter((entry) => entry.disabled).map(({ key, value }) => ({ key, value })),
+    }
   }
-  return parseQueryFromRaw(urlString)
+  return { active: parseQueryFromRaw(urlString), disabled: [] }
 }
 
 interface NormalizedHeader {
@@ -208,10 +275,10 @@ function normalizeHeaders(headers: unknown): NormalizedHeader[] {
     .filter((header) => header.key)
 }
 
-function formFields(entries: unknown): KeyValue[] {
+function formFields(entries: unknown, disabled = false): KeyValue[] {
   if (!Array.isArray(entries)) return []
   return entries
-    .filter((entry): entry is UnknownRecord => isRecord(entry) && entry.disabled !== true && entry.type !== 'file')
+    .filter((entry): entry is UnknownRecord => isRecord(entry) && (entry.disabled === true) === disabled && entry.type !== 'file')
     .map((entry) => ({ key: asText(entry.key), value: asText(entry.value) }))
     .filter((entry) => entry.key)
 }
@@ -220,6 +287,7 @@ interface BodyInfo {
   mode?: string
   raw?: string
   fields?: KeyValue[]
+  disabledFields?: KeyValue[]
   graphqlQuery?: string
 }
 
@@ -230,10 +298,12 @@ function readBody(body: unknown): BodyInfo {
   const graphqlQuery = graphql ? asText(graphql.query) || undefined : undefined
   const urlencoded = formFields(body.urlencoded)
   const formdata = formFields(body.formdata)
+  const disabledUrlencoded = formFields(body.urlencoded, true)
+  const disabledFormdata = formFields(body.formdata, true)
   const pairs = (fields: KeyValue[]) => fields.map((entry) => `${entry.key}=${entry.value}`).join('&')
 
-  if (mode === 'urlencoded') return { mode, fields: urlencoded, raw: pairs(urlencoded) || undefined }
-  if (mode === 'formdata') return { mode, fields: formdata, raw: pairs(formdata) || undefined }
+  if (mode === 'urlencoded') return { mode, fields: urlencoded, disabledFields: disabledUrlencoded, raw: pairs(urlencoded) || undefined }
+  if (mode === 'formdata') return { mode, fields: formdata, disabledFields: disabledFormdata, raw: pairs(formdata) || undefined }
   if (mode === 'graphql') {
     const variables = graphql ? asText(graphql.variables) : ''
     return { mode, graphqlQuery, raw: graphqlQuery ? [graphqlQuery, variables].filter(Boolean).join('\n') : undefined }
@@ -243,7 +313,13 @@ function readBody(body: unknown): BodyInfo {
 
   // Unknown or missing mode: keep the historical behavior (raw first, then urlencoded).
   const raw = typeof body.raw === 'string' ? body.raw : urlencoded.length ? pairs(urlencoded) : undefined
-  return { mode, raw: raw || undefined, fields: urlencoded.length ? urlencoded : undefined, graphqlQuery }
+  return {
+    mode,
+    raw: raw || undefined,
+    fields: urlencoded.length ? urlencoded : undefined,
+    disabledFields: disabledUrlencoded.length ? disabledUrlencoded : undefined,
+    graphqlQuery,
+  }
 }
 
 function scriptSource(script: unknown): string {
@@ -253,12 +329,19 @@ function scriptSource(script: unknown): string {
   return asText(exec)
 }
 
-function readEvents(events: unknown): Array<{ listen: string; source: string }> {
+function readEvents(events: unknown): Array<{ listen: string; source: string; disabled: boolean }> {
   if (!Array.isArray(events)) return []
   return events
-    .filter((event): event is UnknownRecord => isRecord(event) && event.disabled !== true)
-    .map((event) => ({ listen: asText(event.listen) || 'script', source: scriptSource(event.script) }))
+    .filter((event): event is UnknownRecord => isRecord(event))
+    .map((event) => ({ listen: asText(event.listen) || 'script', source: scriptSource(event.script), disabled: event.disabled === true }))
     .filter((event) => event.source.trim())
+}
+
+/** Saved request body as scannable text: raw text, or form fields as `key=value` pairs. */
+function savedRequestBody(body: unknown): string | undefined {
+  const info = readBody(body)
+  const text = info.raw ?? (info.fields ?? []).map((entry) => `${entry.key}=${entry.value}`).join('&')
+  return text ? text.slice(0, MAX_RESPONSE_BODY_SCAN) : undefined
 }
 
 function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
@@ -270,16 +353,17 @@ function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
       const original = isRecord(response.originalRequest) ? response.originalRequest : undefined
       const originalAuth = original && isRecord(original.auth) ? (original.auth as PostmanAuth) : undefined
       const body = asText(response.body)
+      const originalHeaders = original ? normalizeHeaders(original.header) : []
+      const disabledRequestHeaders = originalHeaders.filter((header) => header.disabled).map(({ key, value }) => ({ key, value }))
       return {
         name: asText(response.name) || 'Example',
         headers: normalizeHeaders(response.header).map(({ key, value }) => ({ key, value })),
         body: body ? body.slice(0, MAX_RESPONSE_BODY_SCAN) : undefined,
-        requestHeaders: original
-          ? normalizeHeaders(original.header)
-              .filter((header) => !header.disabled)
-              .map(({ key, value }) => ({ key, value }))
-          : [],
+        requestHeaders: originalHeaders.filter((header) => !header.disabled).map(({ key, value }) => ({ key, value })),
+        disabledRequestHeaders: disabledRequestHeaders.length ? disabledRequestHeaders : undefined,
         requestUrl: original ? getUrlString(original.url) || undefined : undefined,
+        requestQuery: original ? getQueryParams(original.url, getUrlString(original.url)).active : undefined,
+        requestBody: original ? savedRequestBody(original.body) : undefined,
         requestAuthType: originalAuth && !isInheritedAuth(originalAuth) ? normalizeAuthType(originalAuth.type) : undefined,
         requestAuthFields: originalAuth && !isInheritedAuth(originalAuth) ? getAuthEntries(originalAuth) : undefined,
       }
@@ -315,20 +399,43 @@ interface ParseAccumulator {
   idCounts: Map<string, number>
   scripts: ParsedScript[]
   authOwners: ParsedAuthOwner[]
+  scopedVariables: ParsedScopedVariable[]
+  descriptions: ParsedDescription[]
   warnings: string[]
+}
+
+function readScopedVariables(
+  variables: unknown,
+  scope: ParsedScopedVariable['scope'],
+  owner: string,
+  ownerPath: number[],
+  requestId?: string
+): ParsedScopedVariable[] {
+  return readCollectionVariables(variables).map((variable) => ({ ...variable, scope, owner, ownerPath, requestId }))
+}
+
+function addDescription(
+  acc: ParseAccumulator,
+  kind: ParsedDescription['kind'],
+  owner: string,
+  ownerPath: number[],
+  value: unknown,
+  requestId?: string
+): void {
+  const text = descriptionText(value)
+  if (!text.trim()) return
+  const duplicate = acc.descriptions.some(
+    (entry) => entry.owner === owner && entry.kind === kind && entry.text === text.slice(0, MAX_DESCRIPTION_LENGTH)
+  )
+  if (duplicate) return
+  acc.descriptions.push({ kind, owner, ownerPath, requestId, text: text.slice(0, MAX_DESCRIPTION_LENGTH) })
 }
 
 function warn(acc: ParseAccumulator, message: string): void {
   if (acc.warnings.length < MAX_WARNINGS) acc.warnings.push(message)
 }
 
-function parseItem(
-  rawItem: unknown,
-  folderPath: string[],
-  itemPath: number[],
-  inherited: InheritedContext,
-  acc: ParseAccumulator
-): void {
+function parseItem(rawItem: unknown, folderPath: string[], itemPath: number[], inherited: InheritedContext, acc: ParseAccumulator): void {
   if (!isRecord(rawItem)) {
     warn(acc, `Skipped a malformed item at position ${itemPath.join('.')}.`)
     return
@@ -348,6 +455,7 @@ function parseItem(
     const url = getUrlString(req.url)
     const allHeaders = normalizeHeaders(req.header)
     const headers = allHeaders.filter((h) => !h.disabled).map((h) => ({ key: h.key, value: h.value }))
+    const disabledHeaders = allHeaders.filter((h) => h.disabled).map((h) => ({ key: h.key, value: h.value }))
     const body = readBody(req.body)
     const bodyRaw = body.raw
 
@@ -369,11 +477,19 @@ function parseItem(
     })
 
     const queryParams = getQueryParams(req.url, url)
+    const pathVariables = getPathVariables(req.url)
     const events = readEvents(rawItem.event)
+    const joinSources = (listen: string, disabled: boolean) =>
+      events
+        .filter((e) => e.listen === listen && e.disabled === disabled)
+        .map((e) => e.source)
+        .join('\n') || undefined
     const scripts = events.length
       ? {
-          prerequest: events.filter((e) => e.listen === 'prerequest').map((e) => e.source).join('\n') || undefined,
-          test: events.filter((e) => e.listen === 'test').map((e) => e.source).join('\n') || undefined,
+          prerequest: joinSources('prerequest', false),
+          test: joinSources('test', false),
+          disabledPrerequest: joinSources('prerequest', true),
+          disabledTest: joinSources('test', true),
         }
       : undefined
 
@@ -403,22 +519,31 @@ function parseItem(
       protocol,
       url,
       itemPath,
+      pointer: itemPointer(itemPath),
       folderPath,
       auth,
       basicAuth,
       headers,
+      disabledHeaders: disabledHeaders.length ? disabledHeaders : undefined,
       bodyRaw: bodyRaw || undefined,
       hasDescription: !!(descriptionText(req.description).trim() || descriptionText(rawItem.description).trim()),
       authSource,
       authOwnerPath: usesOwnAuth ? itemPath : effectiveAuth ? inherited.authOwnerPath : undefined,
       authFields: authFields?.length ? authFields : undefined,
-      queryParams: queryParams.length ? queryParams : undefined,
+      queryParams: queryParams.active.length ? queryParams.active : undefined,
+      disabledQueryParams: queryParams.disabled.length ? queryParams.disabled : undefined,
       bodyMode: body.mode,
       bodyFields: body.fields?.length ? body.fields : undefined,
+      disabledBodyFields: body.disabledFields?.length ? body.disabledFields : undefined,
       scripts,
       savedResponses: savedResponses.length ? savedResponses : undefined,
       tlsVerificationDisabled: strictSSL === false ? true : undefined,
+      pathVariables: pathVariables.length ? pathVariables : undefined,
     })
+
+    addDescription(acc, 'request', id, itemPath, req.description, id)
+    addDescription(acc, 'request', id, itemPath, rawItem.description, id)
+    acc.scopedVariables.push(...readScopedVariables(rawItem.variable, 'request', id, itemPath, id))
   }
 
   if (rawItem.item !== undefined && rawItem.item !== null) {
@@ -441,8 +566,17 @@ function parseItem(
       })
     }
 
+    addDescription(acc, 'folder', newPath.join(' / '), itemPath, rawItem.description)
+    acc.scopedVariables.push(...readScopedVariables(rawItem.variable, 'folder', newPath.join(' / '), itemPath))
+
     for (const event of readEvents(rawItem.event)) {
-      acc.scripts.push({ owner: newPath.join(' / '), ownerPath: itemPath, listen: event.listen, source: event.source })
+      acc.scripts.push({
+        owner: newPath.join(' / '),
+        ownerPath: itemPath,
+        listen: event.listen,
+        source: event.source,
+        disabled: event.disabled || undefined,
+      })
     }
 
     rawItem.item.forEach((child, index) => parseItem(child, newPath, [...itemPath, index], childContext, acc))
@@ -474,6 +608,8 @@ export function parseCollection(json: unknown): ParsedCollection {
     idCounts: new Map<string, number>(),
     scripts: [],
     authOwners: [],
+    scopedVariables: [],
+    descriptions: [],
     warnings: [],
   }
 
@@ -494,8 +630,16 @@ export function parseCollection(json: unknown): ParsedCollection {
     })
   }
 
+  addDescription(acc, 'collection', 'collection', [], isRecord(col.info) ? col.info.description : undefined)
+
   for (const event of readEvents(col.event)) {
-    acc.scripts.push({ owner: 'collection', ownerPath: [], listen: event.listen, source: event.source })
+    acc.scripts.push({
+      owner: 'collection',
+      ownerPath: [],
+      listen: event.listen,
+      source: event.source,
+      disabled: event.disabled || undefined,
+    })
   }
 
   col.item.forEach((item, index) => parseItem(item, [], [index], rootContext, acc))
@@ -547,6 +691,8 @@ export function parseCollection(json: unknown): ParsedCollection {
     requests: acc.requests,
     folders,
     collectionVariables,
+    scopedVariables: acc.scopedVariables,
+    descriptions: acc.descriptions,
     collectionAuthType: collectionAuth ? normalizeAuthType(collectionAuth.type) : undefined,
     authOwners: acc.authOwners,
     scripts: acc.scripts,

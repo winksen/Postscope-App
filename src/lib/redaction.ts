@@ -1,8 +1,12 @@
 import { AUTH_HEADER_SCHEME, classifyBodySecret, isQuerySecret } from './auditor'
 import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsFor } from './authSchemes'
-import { isLikelySecretValue, isSensitiveHeader, isSensitiveKey, redactSecretsInText } from './secretPatterns'
+import { decodeBasicCredentials, isLikelySecretValue, isSensitiveHeader, isSensitiveKey, redactSecretsInText } from './secretPatterns'
 import { toVariableName } from './variables'
 import { cloneJson } from './repairEngine'
+import { detectIndent, parseTemplatedJson } from './jsonBody'
+import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
+import { scrubDescription } from './descriptions'
+import { scrubScript } from './scriptSecrets'
 
 /** Marker for places that cannot hold a usable variable (saved responses, scripts, free text). */
 export const REDACTED = '{{REDACTED}}'
@@ -20,7 +24,6 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 const RESPONSE_JSON_SECRET =
   /("(?:access_token|accessToken|refresh_token|refreshToken|id_token|idToken|token|password|client_secret|clientSecret|api_key|apiKey|secret|session_id|sessionId)"\s*:\s*")([^"\\]{4,})(")/g
-const SCRIPT_SET_CALL = /(pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`]+)\2\s*,\s*(['"`]))([^'"`]*)(\4)/g
 const URL_CREDENTIALS = /^([a-z][a-z0-9+.-]*:\/\/)([^\s/@:{}]+):([^\s/@{}]+)@/i
 const COOKIE_PAIR = /([^=;\s]+)=([^;]*)/g
 
@@ -93,6 +96,9 @@ class Redactor {
         header.value = this.text(header.value)
         continue
       }
+      const basic = /^Basic\s+\S+$/i.test(header.value.trim()) ? decodeBasicCredentials(header.value) : null
+      // A Basic token that only encodes a variable or placeholder password carries no secret.
+      if (basic && !isLikelySecretValue(basic.password)) continue
       const scheme = header.value.trim().match(AUTH_HEADER_SCHEME)
       const variable = lower === 'authorization' || lower === 'proxy-authorization' ? 'token' : toVariableName(header.key, 'token')
       header.value = runnable ? `${scheme ? `${scheme[1]} ` : ''}{{${variable}}}` : REDACTED
@@ -102,10 +108,17 @@ class Redactor {
 
   url(request: UnknownRecord): void {
     const url = request.url
-    const scrub = (raw: string) => {
-      let next = raw.replace(URL_CREDENTIALS, (match, scheme: string, user: string, password: string) =>
-        password.includes('{{') ? match : `${scheme}${user}:{{password}}@`
-      )
+    /**
+     * Scrubs a raw URL and returns how many secrets were removed. When the query is also kept as a `query[]`
+     * array, those entries are counted on their own, so the raw copy of the same pairs is not counted twice.
+     */
+    const scrub = (raw: string, countQueryPairs: boolean) => {
+      let changes = 0
+      let next = raw.replace(URL_CREDENTIALS, (match, scheme: string, user: string, password: string) => {
+        if (password.includes('{{')) return match
+        changes += 1
+        return `${scheme}${user}:{{password}}@`
+      })
       next = next.replace(/([?&])([^=&#]+)=([^&#]*)/g, (pair, sep: string, key: string, value: string) => {
         let decoded = value
         try {
@@ -113,22 +126,48 @@ class Redactor {
         } catch {
           /* keep raw */
         }
-        return isQuerySecret(key, decoded) ? `${sep}${key}={{${toVariableName(key)}}}` : pair
+        if (!isQuerySecret(key, decoded)) return pair
+        if (countQueryPairs) changes += 1
+        return `${sep}${key}={{${toVariableName(key)}}}`
       })
-      next = redactSecretsInText(next, () => REDACTED)
-      if (next !== raw) this.count += 1
-      return next
+      const patterned = redactSecretsInText(next, () => REDACTED)
+      if (patterned !== next) changes += 1
+      return { text: patterned, changes }
     }
     if (typeof url === 'string') {
-      request.url = scrub(url)
+      const result = scrub(url, true)
+      request.url = result.text
+      this.count += result.changes
       return
     }
     if (!isRecord(url)) return
-    if (typeof url.raw === 'string') url.raw = scrub(url.raw)
+    const hasQueryArray = Array.isArray(url.query)
+    if (typeof url.raw === 'string') {
+      const result = scrub(url.raw, !hasQueryArray)
+      url.raw = result.text
+      this.count += result.changes
+    }
+    if (Array.isArray(url.variable)) {
+      for (const variable of url.variable) {
+        if (
+          isRecord(variable) &&
+          typeof variable.key === 'string' &&
+          typeof variable.value === 'string' &&
+          isQuerySecret(variable.key, variable.value)
+        ) {
+          variable.value = `{{${toVariableName(variable.key)}}}`
+          this.count += 1
+        }
+      }
+      for (const variable of url.variable) {
+        if (isRecord(variable) && typeof variable.description !== 'undefined') this.description(variable, 'description')
+      }
+    }
     if (Array.isArray(url.query)) {
       for (const param of url.query) {
         if (isRecord(param) && typeof param.key === 'string' && typeof param.value === 'string' && isQuerySecret(param.key, param.value)) {
           param.value = `{{${toVariableName(param.key)}}}`
+          this.count += 1
         }
       }
     }
@@ -153,6 +192,21 @@ class Redactor {
     }
   }
 
+  /** Raw body text: JSON (with or without unquoted variables) is edited structurally, anything else field by field. */
+  rawText(raw: string): string {
+    const templated = parseTemplatedJson(raw)
+    if (templated) {
+      const before = this.count
+      this.jsonValue(templated.value)
+      return this.count === before ? raw : templated.restore(JSON.stringify(templated.value, null, detectIndent(raw)))
+    }
+    const replacements = scanRawBodyFields(raw)
+      .filter((field) => classifyBodySecret(field.key, field.value))
+      .map((field) => ({ field, value: `{{${toVariableName(field.key)}}}` }))
+    this.count += replacements.length
+    return this.text(replacements.length ? replaceRawBodyFields(raw, replacements) : raw)
+  }
+
   body(body: unknown): void {
     if (!isRecord(body)) return
     for (const mode of ['urlencoded', 'formdata'] as const) {
@@ -167,24 +221,15 @@ class Redactor {
       }
     }
     const raw = body.raw
-    if (typeof raw === 'string' && raw.trim()) {
-      try {
-        const json = JSON.parse(raw) as unknown
-        const before = this.count
-        this.jsonValue(json)
-        if (this.count !== before) body.raw = JSON.stringify(json, null, raw.includes('\n') ? 2 : 0)
-      } catch {
-        body.raw = this.text(raw)
-      }
-    }
+    if (typeof raw === 'string' && raw.trim()) body.raw = this.rawText(raw)
     if (isRecord(body.graphql) && typeof body.graphql.variables === 'string') {
-      try {
-        const json = JSON.parse(body.graphql.variables) as unknown
+      const variables = body.graphql.variables
+      const templated = parseTemplatedJson(variables)
+      if (templated) {
         const before = this.count
-        this.jsonValue(json)
-        if (this.count !== before) body.graphql.variables = JSON.stringify(json, null, 2)
-      } catch {
-        /* not JSON */
+        this.jsonValue(templated.value)
+        if (this.count !== before)
+          body.graphql.variables = templated.restore(JSON.stringify(templated.value, null, detectIndent(variables)))
       }
     }
   }
@@ -193,17 +238,22 @@ class Redactor {
     if (!Array.isArray(events)) return
     for (const event of events) {
       if (!isRecord(event) || !isRecord(event.script)) continue
-      const scrub = (line: string) => {
-        let next = line.replace(SCRIPT_SET_CALL, (match, prefix: string, _q: string, key: string, _q2: string, value: string, suffix: string) =>
-          isSensitiveKey(key) && isLikelySecretValue(value) ? `${prefix}${REDACTED}${suffix}` : match
-        )
-        next = redactSecretsInText(next, () => REDACTED)
-        if (next !== line) this.count += 1
-        return next
-      }
       const exec = event.script.exec
-      if (Array.isArray(exec)) event.script.exec = exec.map((line) => (typeof line === 'string' ? scrub(line) : line))
-      else if (typeof exec === 'string') event.script.exec = scrub(exec)
+      if (Array.isArray(exec)) {
+        // Scan the joined source so multi-line objects (`{ key: ..., value: ... }`) are seen; lines never gain newlines.
+        const source = exec.map((line) => (typeof line === 'string' ? line : '')).join('\n')
+        const result = scrubScript(source, REDACTED)
+        if (result.count) {
+          event.script.exec = result.text.split('\n')
+          this.count += result.count
+        }
+      } else if (typeof exec === 'string') {
+        const result = scrubScript(exec, REDACTED)
+        if (result.count) {
+          event.script.exec = result.text
+          this.count += result.count
+        }
+      }
     }
   }
 
@@ -226,7 +276,22 @@ class Redactor {
     }
   }
 
+  /** Descriptions are strings or `{ content, type }`; credentials in them become `{{REDACTED}}`. */
+  description(owner: UnknownRecord, key: string): void {
+    const value = owner[key]
+    if (typeof value === 'string') {
+      const result = scrubDescription(value, REDACTED)
+      if (result.count) {
+        owner[key] = result.text
+        this.count += result.count
+      }
+    } else if (isRecord(value) && typeof value.content === 'string') {
+      this.description(value, 'content')
+    }
+  }
+
   request(request: UnknownRecord): void {
+    this.description(request, 'description')
     this.auth(request.auth)
     this.headersOn(request, true)
     this.url(request)
@@ -237,6 +302,8 @@ class Redactor {
     if (!Array.isArray(items) || depth > 100) return
     for (const item of items) {
       if (!isRecord(item)) continue
+      this.description(item, 'description')
+      this.variables(item.variable)
       this.auth(item.auth)
       this.script(item.event)
       if (isRecord(item.request)) this.request(item.request)
@@ -268,9 +335,23 @@ export function redactCollection(input: unknown): RedactionResult {
   const json = cloneJson(input)
   if (!isRecord(json)) return { json, redactedCount: 0 }
   const redactor = new Redactor()
+  if (isRecord(json.info)) redactor.description(json.info, 'description')
   redactor.auth(json.auth)
   redactor.script(json.event)
   redactor.variables(json.variable)
   redactor.items(json.item)
+  return { json, redactedCount: redactor.count }
+}
+
+/**
+ * Returns a copy of a Postman environment or globals export with credential values emptied: variables with
+ * credential-like names, the `secret` type, or provider-format tokens. Names, keys and structure are kept so the
+ * file can still be imported and filled in privately.
+ */
+export function redactEnvironment(input: unknown): RedactionResult {
+  const json = cloneJson(input)
+  if (!isRecord(json)) return { json, redactedCount: 0 }
+  const redactor = new Redactor()
+  redactor.variables(json.values)
   return { json, redactedCount: redactor.count }
 }

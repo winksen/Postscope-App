@@ -37,7 +37,10 @@ export function FindingEvidence({ finding, requests }: { finding: Finding; reque
           </p>
           <ul className="mt-2 space-y-1.5">
             {evidence.slice(0, MAX_ROWS).map((entry, index) => (
-              <li key={`${entry.requestId ?? 'collection'}-${entry.location}-${index}`} className="rounded-lg bg-muted/40 px-3 py-2 text-xs">
+              <li
+                key={`${entry.requestId ?? 'collection'}-${entry.location}-${index}`}
+                className="rounded-lg bg-muted/40 px-3 py-2 text-xs"
+              >
                 <p className="font-medium text-foreground">
                   {entry.requestId ? requestLabelById(entry.requestId, requests) : 'Collection'}
                   <span className="font-normal text-muted-foreground"> · {entry.location}</span>
@@ -46,7 +49,9 @@ export function FindingEvidence({ finding, requests }: { finding: Finding; reque
               </li>
             ))}
           </ul>
-          {evidence.length > MAX_ROWS && <p className="mt-1.5 text-xs text-muted-foreground">+{evidence.length - MAX_ROWS} more locations</p>}
+          {evidence.length > MAX_ROWS && (
+            <p className="mt-1.5 text-xs text-muted-foreground">+{evidence.length - MAX_ROWS} more locations</p>
+          )}
         </div>
       )}
     </div>

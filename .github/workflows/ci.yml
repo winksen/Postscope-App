@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -21,12 +25,76 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - name: Release version check
+        run: npm run release:check
+      - name: Lint
+        run: npm run lint
+      - name: Formatting
+        run: npm run format:check
+      - name: Style rules (no em dash)
+        run: npm run check:style
       - name: Tests
         run: npm test
       - name: Typecheck and build
         run: npm run build
+      - name: Performance budgets
+        if: matrix.node == 20
+        run: npm run bench -- --check --report bench-report.json
+      - name: Upload performance report
+        if: matrix.node == 20 && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report
+          path: bench-report.json
+          if-no-files-found: ignore
+      - name: Compile the CLI and server
+        run: npm run build:node
       - name: Scan sample collections with the CLI
         run: npm run scan -- public/samples/default.postman_collection.json --fail-on none --format markdown
-      - name: Dependency audit (runtime)
+      - name: Scan with the compiled CLI (folder, junit)
+        run: node dist-node/cli.js scan public/samples --fail-on none --format junit --output postscope-junit.xml
+      - name: Install the browser for the smoke tests
+        if: matrix.node == 20
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke tests
+        if: matrix.node == 20
+        run: npm run test:e2e
+      - name: Upload the browser test report
+        if: matrix.node == 20 && failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+      - name: Dependency audit (runtime dependencies, high severity)
         run: npm run audit:deps
-        continue-on-error: true
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build --tag postscope:ci .
+      - name: Runs as an unprivileged user
+        run: test "$(docker run --rm --entrypoint id postscope:ci -u)" != "0"
+      - name: CLI inside the image reports the package version
+        run: |
+          expected="$(node -p "require('./package.json').version")"
+          actual="$(docker run --rm postscope:ci node dist-node/cli.js --version)"
+          echo "package.json: $expected, image: $actual"
+          test "$expected" = "$actual"
+      - name: Start the container and check /api/health
+        run: |
+          docker run --detach --name postscope --publish 127.0.0.1:3010:3010 --env LOGGING_MODE=off postscope:ci
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:3010/api/health > health.json; then break; fi
+            sleep 1
+          done
+          cat health.json
+          node -e "const h=require('./health.json'); if (h.status !== 'ok') process.exit(1)"
+          curl --silent --fail --header 'Accept: text/html' http://127.0.0.1:3010/analyze/security | grep -q '<div id="root">'
+      - name: Container logs
+        if: always()
+        run: docker logs postscope || true

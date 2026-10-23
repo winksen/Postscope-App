@@ -5,7 +5,7 @@ Guidelines for how PostScope should look and read in the UI, marketing pages, an
 **Source of truth**
 
 - Color and radius tokens: `src/index.css`
-- Tailwind theme: `tailwind.config.ts`
+- Tailwind theme: the `@theme` block in `src/index.css`
 - Marketing shell: `src/components/marketing/marketing-shell.tsx`
 - App shell: `src/components/layout/*`
 
@@ -42,7 +42,7 @@ PostScope is a **SaaS-style dashboard** with a **light-first** palette and optio
 - **Data-forward:** Metrics, charts, and findings should dominate; decoration stays subtle.
 - **Separated review lanes:** Security pages show security-impact categories (`secrets`, `auth`, `variables`). Hygiene pages show maintainability notes (`hygiene`) such as missing descriptions.
 - **Two surfaces:**
-  - **Marketing** (`LandingPage`, samples entry): centered hero, soft blobs, frosted cards (`bg-card/60`, `backdrop-blur-sm`).
+  - **Marketing** (`LandingPage`, samples entry): centered hero, soft blobs, frosted cards (`bg-card/60`, `backdrop-blur-xs`).
   - **Dashboard** (`DashboardShell`): fixed sidebar + header, darker light-mode `background` page wash, `p-6 lg:p-8` content padding.
 
 ### Postman relationship
@@ -158,7 +158,10 @@ Use `-` or short words (`None`, `N/A`) for missing field values, never an em das
 
 - Preserve visible focus rings (`ring` token); do not remove focus styles without a replacement.
 - Maintain contrast for `muted-foreground` on `background` and `card` in both themes.
-- Prefer semantic HTML and Radix primitives for dialogs, tabs, and menus.
+- Prefer semantic HTML and Radix primitives for dialogs, tabs, and menus. Escape closes every dialog.
+- Text must reach 4.5:1 on its background in both themes. Use the `*-text` tokens for colored text and keep method and protocol badges on the `700` shades with white text.
+- Keyboard: `/` or `Ctrl+K` opens request search, arrow keys move through the request tree, a skip link jumps to the main content, and analysis progress is announced through a polite live region.
+- Before a release that changes the UI, run an axe pass (light and dark) on every page and dialog; the bar is zero serious or critical violations.
 
 ---
 

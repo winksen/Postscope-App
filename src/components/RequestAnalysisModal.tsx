@@ -32,7 +32,7 @@ function CopyButton({ text }: { text: string }) {
         setTimeout(() => setCopied(false), 1500)
       }}
     >
-      {copied ? <Check className="h-3 w-3 text-[hsl(var(--success))]" /> : <Copy className="h-3 w-3" />}
+      {copied ? <Check className="h-3 w-3 text-[hsl(var(--success-text))]" /> : <Copy className="h-3 w-3" />}
     </Button>
   )
 }
@@ -45,7 +45,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
     <Dialog open={!!request} onOpenChange={(open) => !open && onClose()}>
       {request ? (
         <DialogContent className="max-h-[85vh] max-w-lg gap-0 overflow-hidden p-0 sm:max-w-lg border-l-4 border-l-primary">
-          <DialogHeader className="space-y-3 border-b border-border bg-gradient-to-r from-muted/50 to-transparent p-6 text-left">
+          <DialogHeader className="space-y-3 border-b border-border bg-linear-to-r from-muted/50 to-transparent p-6 text-left">
             <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Request analysis
             </DialogDescription>
@@ -91,11 +91,11 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {request.hasDescription ? (
-                    <span className="inline-flex items-center gap-1 text-[hsl(var(--success))]">
+                    <span className="inline-flex items-center gap-1 text-[hsl(var(--success-text))]">
                       <Check className="h-3.5 w-3.5" /> Present
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[hsl(var(--warning))]">
+                    <span className="inline-flex items-center gap-1 text-[hsl(var(--warning-text))]">
                       <LockOpen className="h-3.5 w-3.5" /> Missing
                     </span>
                   )}
@@ -138,13 +138,11 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
               <Separator />
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Security findings ({findings.length})
-                </p>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Security findings ({findings.length})</p>
                 {findings.length === 0 ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4">
-                    <Check className="h-5 w-5 text-[hsl(var(--success))]" />
-                    <p className="text-sm text-[hsl(var(--success))]">No issues flagged for this request.</p>
+                    <Check className="h-5 w-5 text-[hsl(var(--success-text))]" />
+                    <p className="text-sm text-[hsl(var(--success-text))]">No issues flagged for this request.</p>
                   </div>
                 ) : (
                   <ul className="mt-3 space-y-3">
@@ -156,8 +154,8 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                           f.severity === 'critical'
                             ? 'border-destructive/20 bg-destructive/5'
                             : f.severity === 'warning'
-                            ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
-                            : 'border-border bg-card'
+                              ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
+                              : 'border-border bg-card'
                         )}
                       >
                         <div className="flex flex-wrap items-center gap-2">

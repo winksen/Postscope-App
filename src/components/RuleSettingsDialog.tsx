@@ -86,8 +86,8 @@ export function RuleSettingsDialog({ open, onOpenChange, value, defaults, usingD
             Rules
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Turn rules off or change their severity to match your team&apos;s risk model. Settings are saved in this browser and
-            re-run instantly on the open collection. {usingDefaults ? 'You are using the deployment defaults.' : 'Custom settings are active.'}
+            Turn rules off or change their severity to match your team&apos;s risk model. Settings are saved in this browser and re-run
+            instantly on the open collection. {usingDefaults ? 'You are using the deployment defaults.' : 'Custom settings are active.'}
           </p>
         </DialogHeader>
 
@@ -103,7 +103,10 @@ export function RuleSettingsDialog({ open, onOpenChange, value, defaults, usingD
                     return (
                       <li
                         key={rule.id}
-                        className={cn('flex flex-wrap items-center gap-3 rounded-xl bg-muted/35 px-3 py-2.5 sm:flex-nowrap', !enabled && 'opacity-60')}
+                        className={cn(
+                          'flex flex-wrap items-center gap-3 rounded-xl bg-muted/35 px-3 py-2.5 sm:flex-nowrap',
+                          !enabled && 'opacity-60'
+                        )}
                       >
                         <Checkbox
                           id={`rule-${rule.id}`}

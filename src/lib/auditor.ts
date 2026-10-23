@@ -1,14 +1,27 @@
-import type { ParsedCollection, ParsedRequest, KeyValue } from './parser'
+import type { ParsedCollection, ParsedRequest, ParsedScopedVariable, KeyValue } from './parser'
 import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
 import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
 import { secretFieldsFor } from './authSchemes'
+import { parseTemplatedJson } from './jsonBody'
+import { scanRawBodyFields } from './rawBody'
+import { findDescriptionSecrets } from './descriptions'
+import { findScriptSecrets } from './scriptSecrets'
+import { lookupVariableValue } from './environment'
+import { analyzeVariableUsage } from './variableUsage'
+import { applySuppressions, type ConfigSuppression, type SuppressedFinding } from './suppressions'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
+  AUTH_HEADER_SCHEME,
+  SESSION_COOKIE,
+  TOKEN_HEADER,
+  decodeBasicCredentials,
   evidencePreview,
   findSecretPatterns,
+  isHighEntropyLiteral,
   isLikelySecretValue,
   isSensitiveHeader,
   isSensitiveKey,
+  maskUsername,
   redactSecretsInText,
 } from './secretPatterns'
 
@@ -19,22 +32,24 @@ export interface FindingEvidence {
   location: string
   /** Masked preview. Never contains the full secret value. */
   preview?: string
+  /** JSON pointer of the value inside the exported collection (set when a report is built from the raw file). */
+  pointer?: string
 }
 
 export interface Finding {
   /** Unique within one audit run; equals the rule id. */
-  id: string;
-  ruleId: RuleId;
-  severity: Severity;
-  category: FindingCategory;
-  title: string;
-  description: string;
+  id: string
+  ruleId: RuleId
+  severity: Severity
+  category: FindingCategory
+  title: string
+  description: string
   /** Stable request ids from the parser (not display names). */
-  affected: string[];
-  recommendation: string;
-  evidence?: FindingEvidence[];
-  cwe?: string;
-  owasp?: string;
+  affected: string[]
+  recommendation: string
+  evidence?: FindingEvidence[]
+  cwe?: string
+  owasp?: string
 }
 
 export interface AuditOptions {
@@ -42,6 +57,10 @@ export interface AuditOptions {
   disabledRules?: readonly string[]
   /** Per-rule severity overrides (team policy or personal preference). */
   severityOverrides?: Partial<Record<string, Severity>>
+  /** Reviewed suppressions (from `.postscope.json`); inline `postscope-ignore` lines are always honored. */
+  suppressions?: readonly ConfigSuppression[]
+  /** Clock used to decide whether a suppression has expired. Defaults to now. */
+  now?: Date
 }
 
 const MAX_EVIDENCE_PER_FINDING = 100
@@ -50,16 +69,10 @@ const HEADER_PASSWORD_KEY = /passw|password|passwd/i
 const API_KEY_HEADER = /api.?key|x-api-key|apikey/i
 const PASSWORD_FIELD = /passw/i
 const BODY_SECRET_FIELD = /secret|access_?token|refresh_?token|id_?token|api_?key|apikey|private_?key|client_?assertion/i
-const LEGACY_BODY_SECRET = /secret|client_secret|access_token/i
-export const AUTH_HEADER_SCHEME = /^(Bearer|Basic|Token|Digest|Hawk|ApiKey|Api-Key|JWT|AWS4-HMAC-SHA256|SharedKey|OAuth)\s+\S+/i
-export const TOKEN_HEADER = /^(x-(auth|access|session|refresh)-token|x-amz-security-token|private-token)$/i
-export const SESSION_COOKIE = /(?:^|;\s*)([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i
+export { AUTH_HEADER_SCHEME, SESSION_COOKIE, TOKEN_HEADER }
 const QUERY_SECRET_KEY =
   /^(access_?token|auth_?token|id_?token|refresh_?token|token|api_?key|apikey|x-api-key|secret|client_?secret|password|passwd|pwd|session_?id|sessionid|sid|sig|signature|private_?key|x-amz-(signature|security-token|credential))$/i
 const URL_CREDENTIALS = /^[a-z][a-z0-9+.-]*:\/\/([^\s/@:{}]+):([^\s/@]+)@/i
-const SCRIPT_SET_CALL = /pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`]+)\1\s*,\s*(['"`])([^'"`]*)\3/g
-const SCRIPT_LITERAL_ASSIGNMENT = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([^'"`\n]{6,})\2/g
-const SCRIPT_LITERAL_PROPERTY = /['"]?([A-Za-z_$][\w$-]*)['"]?\s*:\s*(['"`])([^'"`\n]{6,})\2/g
 const SCRIPT_CONSOLE_CALL = /console\.(?:log|info|debug|warn|error|trace)\s*\(([^)\n]*)\)/g
 const SENSITIVE_IDENTIFIER = /(token|password|passwd|secret|api_?key|apikey|authorization|credential|cookie|bearer)/i
 const RESPONSE_JSON_SECRET =
@@ -72,6 +85,8 @@ interface RuleHits {
   evidence: FindingEvidence[]
   evidenceKeys: Set<string>
   description?: string
+  /** Severity to use instead of the registry default (a user override still wins). */
+  severity?: Severity
 }
 
 class FindingCollector {
@@ -102,10 +117,24 @@ class FindingCollector {
     }
   }
 
+  /** Lowers or raises a rule's severity for this run because the evidence is less certain. */
+  setSeverity(ruleId: RuleId, severity: Severity): void {
+    this.entry(ruleId).severity = severity
+  }
+
   /** Ensures a finding exists even without affected requests (collection-level findings). */
   touch(ruleId: RuleId, description?: string): void {
     const hits = this.entry(ruleId)
     if (description) hits.description = description
+  }
+
+  /** `requestId|location` keys already reported by any of the given rules. */
+  flaggedLocations(ruleIds: RuleId[]): Set<string> {
+    const keys = new Set<string>()
+    for (const ruleId of ruleIds) {
+      for (const evidence of this.hits.get(ruleId)?.evidence ?? []) keys.add(`${evidence.requestId ?? ''}|${evidence.location}`)
+    }
+    return keys
   }
 
   has(ruleId: RuleId): boolean {
@@ -130,7 +159,7 @@ class FindingCollector {
       findings.push({
         id: rule.id,
         ruleId: rule.id,
-        severity: isSeverity(override) ? override : rule.severity,
+        severity: isSeverity(override) ? override : (hits.severity ?? rule.severity),
         category: rule.category,
         title: rule.title,
         description: hits.description ?? rule.description,
@@ -155,34 +184,54 @@ function plural(count: number, word: string): string {
 // Secrets in headers and bodies
 // ---------------------------------------------------------------------------
 
+/** Appended to evidence locations for entries that are switched off in Postman but still ship in the export. */
+const DISABLED_SUFFIX = ' (disabled)'
+
 function checkHeaders(req: ParsedRequest, out: FindingCollector): void {
-  for (const h of req.headers) {
+  checkHeaderList(req, req.headers, '', out)
+  checkHeaderList(req, req.disabledHeaders ?? [], DISABLED_SUFFIX, out)
+}
+
+function checkHeaderList(req: ParsedRequest, headers: KeyValue[], suffix: string, out: FindingCollector): void {
+  for (const h of headers) {
     const key = h.key.trim()
     const lower = key.toLowerCase()
     const literal = !isVariableOrEmpty(h.value)
     if (!literal) continue
 
     if (HEADER_PASSWORD_KEY.test(key)) {
-      out.add('HARDCODED_PASSWORD', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+      out.add('HARDCODED_PASSWORD', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(h.value) })
     }
 
     const isAuthorization = lower === 'authorization' || lower === 'proxy-authorization'
     if (isAuthorization) {
       const value = h.value.trim()
+      const basic = /^Basic\s+\S+$/i.test(value) ? decodeBasicCredentials(value) : null
+      if (basic) {
+        // The token is readable: only a literal password makes it a leak (a variable or placeholder is fine).
+        if (isLikelySecretValue(basic.password)) {
+          const account = /^api$/i.test(basic.username) && /^key-[0-9a-f]{32}$/.test(basic.password) ? ' (Mailgun API key)' : ''
+          out.add('HARDCODED_TOKEN', req.id, {
+            location: `header ${key}${suffix} (basic credentials for user ${maskUsername(basic.username)})${account}`,
+            preview: evidencePreview(basic.password),
+          })
+        }
+        continue
+      }
       if (AUTH_HEADER_SCHEME.test(value) || (!/\s/.test(value) && value.length >= 16)) {
-        out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}`, preview: evidencePreview(value) })
+        out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(value) })
       }
     } else if (TOKEN_HEADER.test(lower) && isLikelySecretValue(h.value)) {
-      out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+      out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(h.value) })
     } else if (lower === 'cookie') {
       const cookie = h.value.match(SESSION_COOKIE)
       if (cookie && isLikelySecretValue(cookie[2]) && cookie[2].trim().length >= 8) {
-        out.add('HARDCODED_TOKEN', req.id, { location: `cookie ${cookie[1]}`, preview: evidencePreview(cookie[2]) })
+        out.add('HARDCODED_TOKEN', req.id, { location: `cookie ${cookie[1]}${suffix}`, preview: evidencePreview(cookie[2]) })
       }
     }
 
     if (API_KEY_HEADER.test(key)) {
-      out.add('HARDCODED_API_KEY', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+      out.add('HARDCODED_API_KEY', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(h.value) })
     }
   }
 }
@@ -221,18 +270,15 @@ function walkJson(value: unknown, visit: (key: string, value: string, path: stri
   }
 }
 
+/** Parses a JSON body, tolerating unquoted Postman variables such as `{"id": {{userId}}}`. */
 function tryParseJson(text: string | undefined): unknown {
-  if (!text) return undefined
-  const trimmed = text.trim()
-  if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) return undefined
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    return undefined
-  }
+  return text ? parseTemplatedJson(text)?.value : undefined
 }
 
 function checkBody(req: ParsedRequest, out: FindingCollector): void {
+  for (const field of req.disabledBodyFields ?? []) {
+    checkSecretField(req, field.key, field.value, `body field ${field.key}${DISABLED_SUFFIX}`, out)
+  }
   if (req.bodyFields?.length) {
     for (const field of req.bodyFields) checkSecretField(req, field.key, field.value, `body field ${field.key}`, out)
     return
@@ -253,9 +299,50 @@ function checkBody(req: ParsedRequest, out: FindingCollector): void {
     return
   }
 
-  // Non-JSON raw bodies (XML, text): keep the historical keyword heuristic.
-  if (LEGACY_BODY_SECRET.test(req.bodyRaw) && !/\{\{[^{}]+\}\}/.test(req.bodyRaw)) {
-    out.add('HARDCODED_SECRET', req.id, { location: 'raw body', preview: 'Contains secret-like keyword with literal value' })
+  // Non-JSON raw bodies (XML/SOAP, form-like text, JSON that does not parse): look at individual fields.
+  for (const field of scanRawBodyFields(req.bodyRaw)) {
+    checkSecretField(req, field.key, field.value, `raw body ${field.key}`, out)
+  }
+}
+
+/**
+ * Long random-looking literals in credential positions (sensitive header, query, form or JSON field names)
+ * that no other secret rule reported at the same place.
+ */
+function checkHighEntropy(parsed: ParsedCollection, out: FindingCollector): void {
+  const flagged = out.flaggedLocations(SECRET_RULES)
+  const report = (req: ParsedRequest, location: string, value: string) => {
+    if (flagged.has(`${req.id}|${location}`) || !isHighEntropyLiteral(value) || findSecretPatterns(value, 1).length) return
+    out.add('HIGH_ENTROPY_LITERAL', req.id, { location, preview: evidencePreview(value) })
+  }
+  for (const req of parsed.requests) {
+    for (const [headers, suffix] of [
+      [req.headers, ''],
+      [req.disabledHeaders ?? [], DISABLED_SUFFIX],
+    ] as const) {
+      for (const header of headers) {
+        const lower = header.key.trim().toLowerCase()
+        // Cookies and readable Basic tokens are judged by the header rules, not by entropy.
+        if (lower === 'cookie' || (/^Basic\s/i.test(header.value.trim()) && decodeBasicCredentials(header.value))) continue
+        if (isSensitiveHeader(header.key)) report(req, `header ${header.key.trim()}${suffix}`, header.value)
+      }
+    }
+    for (const [params, suffix] of [
+      [req.queryParams ?? [], ''],
+      [req.disabledQueryParams ?? [], DISABLED_SUFFIX],
+    ] as const) {
+      for (const param of params) if (isSensitiveKey(param.key)) report(req, `query ${param.key.trim()}${suffix}`, param.value)
+    }
+    for (const [fields, suffix] of [
+      [req.bodyFields ?? [], ''],
+      [req.disabledBodyFields ?? [], DISABLED_SUFFIX],
+    ] as const) {
+      for (const field of fields) if (isSensitiveKey(field.key)) report(req, `body field ${field.key}${suffix}`, field.value)
+    }
+    if (!req.bodyFields?.length && req.bodyRaw && req.bodyMode !== 'graphql') {
+      const json = tryParseJson(req.bodyRaw)
+      if (json !== undefined) walkJson(json, (key, value, path) => isSensitiveKey(key) && report(req, `body ${path}`, value))
+    }
   }
 }
 
@@ -316,6 +403,16 @@ function checkQueryAndUrl(req: ParsedRequest, out: FindingCollector): void {
       out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}`, preview: evidencePreview(param.value) })
     }
   }
+  for (const variable of req.pathVariables ?? []) {
+    if (isQuerySecret(variable.key, variable.value)) {
+      out.add('SECRET_IN_QUERY', req.id, { location: `path variable ${variable.key.trim()}`, preview: evidencePreview(variable.value) })
+    }
+  }
+  for (const param of req.disabledQueryParams ?? []) {
+    if (isQuerySecret(param.key, param.value)) {
+      out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}${DISABLED_SUFFIX}`, preview: evidencePreview(param.value) })
+    }
+  }
 
   const credentials = req.url.match(URL_CREDENTIALS)
   if (credentials && !isVariableOrEmpty(credentials[2])) {
@@ -334,24 +431,8 @@ function checkQueryAndUrl(req: ParsedRequest, out: FindingCollector): void {
 function scanScript(source: string, location: string, requestId: string | undefined, out: FindingCollector): void {
   if (!source) return
 
-  for (const match of source.matchAll(SCRIPT_SET_CALL)) {
-    const key = match[2]
-    const value = match[4]
-    if (isSensitiveKey(key) && isLikelySecretValue(value)) {
-      out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: sets ${key}`, preview: evidencePreview(value) })
-    }
-  }
-  for (const pattern of [SCRIPT_LITERAL_ASSIGNMENT, SCRIPT_LITERAL_PROPERTY]) {
-    for (const match of source.matchAll(pattern)) {
-      const name = match[1]
-      const value = match[3]
-      if (isSensitiveKey(name) && isLikelySecretValue(value) && !/^https?:\/\//i.test(value)) {
-        out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${name}`, preview: evidencePreview(value) })
-      }
-    }
-  }
-  for (const secret of findSecretPatterns(source, 5)) {
-    out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${secret.label}`, preview: evidencePreview(secret.match) })
+  for (const secret of findScriptSecrets(source)) {
+    out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${secret.label}`, preview: evidencePreview(secret.value) })
   }
 
   for (const match of source.matchAll(SCRIPT_CONSOLE_CALL)) {
@@ -368,11 +449,14 @@ function checkScripts(parsed: ParsedCollection, out: FindingCollector): void {
   for (const req of parsed.requests) {
     if (req.scripts?.prerequest) scanScript(req.scripts.prerequest, 'pre-request script', req.id, out)
     if (req.scripts?.test) scanScript(req.scripts.test, 'test script', req.id, out)
+    if (req.scripts?.disabledPrerequest) scanScript(req.scripts.disabledPrerequest, `pre-request script${DISABLED_SUFFIX}`, req.id, out)
+    if (req.scripts?.disabledTest) scanScript(req.scripts.disabledTest, `test script${DISABLED_SUFFIX}`, req.id, out)
   }
   for (const script of parsed.scripts ?? []) {
     const owner = script.owner === 'collection' ? 'collection' : `folder "${script.owner}"`
-    const kind = script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
-    scanScript(script.source, `${owner} ${kind}`, undefined, out)
+    const kind =
+      script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
+    scanScript(script.source, `${owner} ${kind}${script.disabled ? DISABLED_SUFFIX : ''}`, undefined, out)
   }
 }
 
@@ -393,34 +477,137 @@ export interface LeakedVariable {
   reason?: string
 }
 
-/** Collection variables whose literal values look like credentials. Shared with the repair engine. */
-export function findLeakedCollectionVariables(parsed: ParsedCollection): LeakedVariable[] {
-  const leaked: LeakedVariable[] = []
-  for (const variable of parsed.collectionVariables ?? []) {
+function leakedFrom<T extends { key: string; value: string; type?: string }>(variables: T[]): Array<T & { reason?: string }> {
+  const leaked: Array<T & { reason?: string }> = []
+  for (const variable of variables) {
     if (!isLikelySecretValue(variable.value)) continue
     const pattern = findSecretPatterns(variable.value, 1)[0]
     if (isSensitiveKey(variable.key) || variable.type === 'secret' || pattern) {
-      leaked.push({ key: variable.key, value: variable.value, reason: pattern?.label })
+      leaked.push({ ...variable, reason: pattern?.label })
     }
   }
   return leaked
 }
 
+/** Collection variables whose literal values look like credentials. Shared with the repair engine. */
+export function findLeakedCollectionVariables(parsed: ParsedCollection): LeakedVariable[] {
+  return leakedFrom(parsed.collectionVariables ?? []).map(({ key, value, reason }) => ({ key, value, reason }))
+}
+
+export interface LeakedScopedVariable extends LeakedVariable {
+  scope: ParsedScopedVariable['scope']
+  owner: string
+  ownerPath: number[]
+  requestId?: string
+}
+
+/** Folder and request level variables whose literal values look like credentials. Shared with the repair engine. */
+export function findLeakedScopedVariables(parsed: ParsedCollection): LeakedScopedVariable[] {
+  return leakedFrom(parsed.scopedVariables ?? []).map(({ key, value, reason, scope, owner, ownerPath, requestId }) => ({
+    key,
+    value,
+    reason,
+    scope,
+    owner,
+    ownerPath,
+    requestId,
+  }))
+}
+
+export interface LeakedEnvironmentVariable extends LeakedVariable {
+  /** Name of the environment or globals file. */
+  environment: string
+  kind: 'environment' | 'globals'
+  enabled: boolean
+}
+
+/** Environment and globals variables whose literal values look like credentials. Shared with redaction tests. */
+export function findLeakedEnvironmentVariables(parsed: ParsedCollection): LeakedEnvironmentVariable[] {
+  const leaked: LeakedEnvironmentVariable[] = []
+  for (const environment of parsed.environments ?? []) {
+    for (const variable of leakedFrom(environment.variables)) {
+      leaked.push({
+        key: variable.key,
+        value: variable.value,
+        reason: variable.reason,
+        environment: environment.name,
+        kind: environment.kind,
+        enabled: variable.enabled,
+      })
+    }
+  }
+  return leaked
+}
+
+function checkEnvironments(parsed: ParsedCollection, out: FindingCollector): void {
+  const leaked = findLeakedEnvironmentVariables(parsed)
+  if (!leaked.length) return
+  const names = new Set(leaked.map((variable) => variable.key))
+  out.touch(
+    'SECRET_IN_ENVIRONMENT',
+    `${plural(leaked.length, 'environment variable')} with credential-like names, the secret type or token-shaped values ${leaked.length === 1 ? 'has' : 'have'} a literal value in the loaded environment or globals files.`
+  )
+  for (const variable of leaked) {
+    const place = variable.kind === 'globals' ? `globals "${variable.environment}"` : `environment "${variable.environment}"`
+    out.add('SECRET_IN_ENVIRONMENT', undefined, {
+      location: `${place} variable ${variable.key}${variable.enabled ? '' : DISABLED_SUFFIX}${variable.reason ? ` (${variable.reason})` : ''}`,
+      preview: evidencePreview(variable.value),
+    })
+  }
+  for (const req of parsed.requests) {
+    if (extractVariableNames(requestText(req)).some((name) => names.has(name))) out.add('SECRET_IN_ENVIRONMENT', req.id)
+  }
+}
+
 function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollector): void {
   const leaked = findLeakedCollectionVariables(parsed)
-  if (!leaked.length) return
+  const leakedScoped = findLeakedScopedVariables(parsed)
+  const total = leaked.length + leakedScoped.length
+  if (!total) return
 
-  const leakedKeys = new Set(leaked.map((variable) => variable.key))
-  out.touch('SECRET_IN_COLLECTION_VARIABLE', `${plural(leaked.length, 'collection variable')} with credential-like names or values ${leaked.length === 1 ? 'has' : 'have'} a literal value that ships with every export.`)
+  const leakedKeys = new Set([...leaked, ...leakedScoped].map((variable) => variable.key))
+  const where = leakedScoped.length ? 'collection, folder or request level variable' : 'collection variable'
+  out.touch(
+    'SECRET_IN_COLLECTION_VARIABLE',
+    `${plural(total, where)} with credential-like names or values ${total === 1 ? 'has' : 'have'} a literal value that ships with every export.`
+  )
   for (const variable of leaked) {
     out.add('SECRET_IN_COLLECTION_VARIABLE', undefined, {
       location: `collection variable ${variable.key}${variable.reason ? ` (${variable.reason})` : ''}`,
       preview: evidencePreview(variable.value),
     })
   }
+  for (const variable of leakedScoped) {
+    const place =
+      variable.scope === 'folder' ? `folder variable ${variable.key} (folder "${variable.owner}")` : `request variable ${variable.key}`
+    out.add('SECRET_IN_COLLECTION_VARIABLE', variable.requestId, {
+      location: `${place}${variable.reason ? ` (${variable.reason})` : ''}`,
+      preview: evidencePreview(variable.value),
+    })
+  }
   for (const req of parsed.requests) {
     if (extractVariableNames(requestText(req)).some((name) => leakedKeys.has(name))) {
       out.add('SECRET_IN_COLLECTION_VARIABLE', req.id)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Descriptions
+// ---------------------------------------------------------------------------
+
+function checkDescriptions(parsed: ParsedCollection, out: FindingCollector): void {
+  for (const description of parsed.descriptions ?? []) {
+    const place =
+      description.kind === 'collection'
+        ? 'description (collection)'
+        : description.kind === 'folder'
+          ? `description (folder "${description.owner}")`
+          : 'description'
+    for (const secret of findDescriptionSecrets(description.text)) {
+      const ruleId = secret.kind === 'pattern' ? 'KNOWN_SECRET_PATTERN' : 'HARDCODED_SECRET'
+      const label = secret.kind === 'pattern' ? ` (${secret.label})` : `: ${secret.label}`
+      out.add(ruleId, description.requestId, { location: `${place}${label}`, preview: evidencePreview(secret.value) })
     }
   }
 }
@@ -440,12 +627,22 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
         preview: evidencePreview(requestHeader.value),
       })
     }
+    const disabledRequestHeader = checkHeaderListForSecrets(response.disabledRequestHeaders ?? [])
+    if (disabledRequestHeader) {
+      out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+        location: `${label} original request header ${disabledRequestHeader.key}${DISABLED_SUFFIX}`,
+        preview: evidencePreview(disabledRequestHeader.value),
+      })
+    }
 
     if (response.requestAuthType && response.requestAuthFields?.length) {
       for (const field of secretFieldsFor(response.requestAuthType)) {
         const value = response.requestAuthFields.find((entry) => entry.key === field)?.value
         if (value && isLikelySecretValue(value)) {
-          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request ${response.requestAuthType} ${field}`, preview: evidencePreview(value) })
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+            location: `${label} original request ${response.requestAuthType} ${field}`,
+            preview: evidencePreview(value),
+          })
         }
       }
     }
@@ -473,8 +670,41 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
       }
     }
 
+    for (const param of response.requestQuery ?? []) {
+      if (isQuerySecret(param.key, param.value)) {
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+          location: `${label} original request query ${param.key.trim()}`,
+          preview: evidencePreview(param.value),
+        })
+      }
+    }
+
+    if (response.requestBody) {
+      const json = parseTemplatedJson(response.requestBody)
+      const fields: Array<{ key: string; value: string; path: string }> = []
+      if (json) walkJson(json.value, (key, value, path) => fields.push({ key, value, path }))
+      else for (const field of scanRawBodyFields(response.requestBody)) fields.push({ key: field.key, value: field.value, path: field.key })
+      for (const field of fields) {
+        if (classifyBodySecret(field.key, field.value)) {
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+            location: `${label} original request body ${field.path}`,
+            preview: evidencePreview(field.value),
+          })
+        }
+      }
+      for (const secret of findSecretPatterns(response.requestBody, 3)) {
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+          location: `${label} original request body (${secret.label})`,
+          preview: evidencePreview(secret.match),
+        })
+      }
+    }
+
     for (const secret of findSecretPatterns(response.requestUrl, 2)) {
-      out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request URL (${secret.label})`, preview: evidencePreview(secret.match) })
+      out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+        location: `${label} original request URL (${secret.label})`,
+        preview: evidencePreview(secret.match),
+      })
     }
   }
 }
@@ -499,6 +729,9 @@ function checkKnownPatterns(parsed: ParsedCollection, out: FindingCollector): vo
     const locations: Array<[string, string | undefined]> = [
       ['URL', req.url],
       ...req.headers.map((h): [string, string] => [`header ${h.key}`, h.value]),
+      ...(req.disabledHeaders ?? []).map((h): [string, string] => [`header ${h.key}${DISABLED_SUFFIX}`, h.value]),
+      ...(req.disabledQueryParams ?? []).map((p): [string, string] => [`query ${p.key}${DISABLED_SUFFIX}`, p.value]),
+      ...(req.disabledBodyFields ?? []).map((f): [string, string] => [`body field ${f.key}${DISABLED_SUFFIX}`, f.value]),
       ['body', req.bodyRaw],
       ...(req.authFields ?? []).map((field): [string, string] => [`${req.auth} auth ${field.key}`, field.value]),
     ]
@@ -529,9 +762,9 @@ export function isLocalHost(hostname: string): boolean {
 export function resolveLeadingVariable(url: string, parsed: ParsedCollection): string {
   const match = url.match(URL_VARIABLE_PREFIX)
   if (!match) return url
-  const variable = parsed.collectionVariables?.find((candidate) => candidate.key === match[1])
-  if (!variable?.value || isVariableOrEmpty(variable.value)) return url
-  return variable.value.replace(/\/+$/, '') + url.slice(match[0].length)
+  const value = lookupVariableValue(parsed, match[1].trim())
+  if (!value || isVariableOrEmpty(value)) return url
+  return value.replace(/\/+$/, '') + url.slice(match[0].length)
 }
 
 export function plaintextOrigin(url: string): string | null {
@@ -543,23 +776,114 @@ export function plaintextOrigin(url: string): string | null {
   return `${match[1].toLowerCase()}://${authority}`
 }
 
+/**
+ * Hostname of an absolute or scheme-less URL, or null when the authority is a variable, contains a variable,
+ * or does not look like a host (`{{baseUrl}}/users`, `users/1`).
+ */
+export function urlHostname(url: string): string | null {
+  const match = url.trim().match(/^(?:([a-z][a-z0-9+.-]*):\/\/)?([^/?#\s]+)/i)
+  if (!match) return null
+  const authority = match[2].replace(/^[^@]*@/, '')
+  if (authority.includes('{{')) return null
+  const hostname = (authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0]).toLowerCase()
+  if (!hostname) return null
+  if (!match[1] && !hostname.includes('.') && hostname !== 'localhost') return null
+  return hostname
+}
+
+const ENVIRONMENT_LABEL = /(^|[.-])(prod|production|stg|staging|stage|dev|develop|qa|uat|preprod|sandbox|test|int)([.-]|$)/
+const AUTH_ASSIGNING_SCRIPT = [
+  /pm\.request\.headers\.(?:add|upsert)\s*\(\s*(?:\{[^}]{0,300}?\bkey\s*:\s*)?['"`]\s*(?:proxy-)?authorization\b/i,
+  /pm\.request\.auth\s*=[^=]/,
+  /pm\.request\.auth\.update\s*\(/,
+]
+
+function scriptSetsAuthorization(source: string | undefined): boolean {
+  return !!source && AUTH_ASSIGNING_SCRIPT.some((pattern) => pattern.test(source))
+}
+
+/** Enabled pre-request scripts that run for a request: its own, its folders' and the collection's. */
+function requestSetsAuthorizationInScript(req: ParsedRequest, parsed: ParsedCollection): boolean {
+  if (scriptSetsAuthorization(req.scripts?.prerequest)) return true
+  return (parsed.scripts ?? []).some(
+    (script) =>
+      !script.disabled &&
+      script.listen === 'prerequest' &&
+      script.ownerPath.length <= req.itemPath.length &&
+      script.ownerPath.every((index, position) => req.itemPath[position] === index) &&
+      scriptSetsAuthorization(script.source)
+  )
+}
+
+const NON_AUTH_TOKEN_HEADER = /csrf|xsrf/i
+
+/** True when a request without an auth helper still carries credentials: header, cookie, query or script. */
+function hasCredentialsOutsideAuthHelper(req: ParsedRequest, parsed: ParsedCollection): boolean {
+  if (req.headers.some((h) => !NON_AUTH_TOKEN_HEADER.test(h.key) && isSensitiveHeader(h.key))) return true
+  if ((req.queryParams ?? []).some((param) => QUERY_SECRET_KEY.test(param.key.trim()) || isSensitiveKey(param.key))) return true
+  return requestSetsAuthorizationInScript(req, parsed)
+}
+
+/** `POST /v1/users` style label for triage; the origin and query string are dropped. */
+function requestRoute(req: ParsedRequest): string {
+  const path = req.url.replace(/^\s*(?:[a-z][a-z0-9+.-]*:\/\/[^/?#]*|\{\{[^{}]+\}\})/i, '').split(/[?#]/)[0]
+  return `${req.method} ${path.startsWith('/') ? path : `/${path}`}`
+}
+
+/** Variables that are referenced but never defined, and collection variables nobody references. */
+function checkVariableIntegrity(parsed: ParsedCollection, out: FindingCollector): void {
+  const usage = analyzeVariableUsage(parsed)
+
+  if (usage.undefinedNames.size > 0) {
+    const uncertain = !usage.environmentLoaded || usage.hasDynamicSets
+    const hint = !usage.environmentLoaded
+      ? ' They may be defined in an environment that was not loaded.'
+      : usage.hasDynamicSets
+        ? ' Scripts also set variables with computed names, so some of these may be defined at runtime.'
+        : ''
+    out.touch(
+      'UNDEFINED_VARIABLE',
+      `${plural(usage.undefinedNames.size, 'variable')} ${usage.undefinedNames.size === 1 ? 'is' : 'are'} referenced but not defined anywhere in the export.${hint}`
+    )
+    for (const [name, references] of usage.undefinedNames) {
+      for (const reference of references) {
+        out.add('UNDEFINED_VARIABLE', reference.requestId || undefined, { location: `{{${name}}} in ${reference.place}` })
+      }
+    }
+    if (uncertain) out.setSeverity('UNDEFINED_VARIABLE', 'info')
+  }
+
+  // Empty starter placeholders (added by the repair engine) are intentional and not reported.
+  const unused = usage.unusedCollectionVariables.filter((key) => {
+    const variable = parsed.collectionVariables?.find((candidate) => candidate.key === key)
+    return !(STARTER_VARIABLES.has(key) && !variable?.value)
+  })
+  if (unused.length > 0) {
+    out.touch(
+      'UNUSED_COLLECTION_VARIABLE',
+      `${plural(unused.length, 'collection variable')} ${unused.length === 1 ? 'is' : 'are'} defined but never referenced.`
+    )
+    for (const key of unused) out.add('UNUSED_COLLECTION_VARIABLE', undefined, { location: `collection variable ${key}` })
+  }
+}
+
+const STARTER_VARIABLES = new Set(['baseUrl', 'apiKey', 'token'])
+
 function runWarningChecks(parsed: ParsedCollection, out: FindingCollector): void {
-  const urlVarPattern = /\{\{(baseUrl|base_url|host|url|BASE_URL)\}\}/i
-  const envHostPattern = /(prod|staging|dev|localhost)(\.|\/|$)/i
   const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
 
   for (const req of parsed.requests) {
     const url = req.url || ''
-    if (url && !urlVarPattern.test(url) && (url.startsWith('http://') || url.startsWith('https://'))) {
+    const hostname = urlHostname(url)
+    if (/^https?:\/\//i.test(url) && hostname) {
       out.add('HARDCODED_BASEURL', req.id)
     }
-    if (url && envHostPattern.test(url) && !/\{\{[^{}]+\}\}/.test(url)) {
-      out.add('HARDCODED_ENV_URL', req.id)
+    if (hostname && (hostname === 'localhost' || ENVIRONMENT_LABEL.test(hostname))) {
+      out.add('HARDCODED_ENV_URL', req.id, { location: 'host', preview: hostname })
     }
 
-    const hasAuthHeader = req.headers.some((h) => h.key.toLowerCase() === 'authorization')
-    if (mutationMethods.includes(req.method) && req.auth === 'noauth' && !hasAuthHeader) {
-      out.add('MISSING_AUTH', req.id)
+    if (mutationMethods.includes(req.method) && req.auth === 'noauth' && !hasCredentialsOutsideAuthHelper(req, parsed)) {
+      out.add('MISSING_AUTH', req.id, { location: requestRoute(req) })
     }
 
     if (req.auth === 'basic' && req.basicAuth) {
@@ -677,7 +1001,21 @@ export function sanitizeAuditOptions(input: unknown): AuditOptions {
   return { disabledRules, severityOverrides }
 }
 
-export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): Finding[] {
+export interface AuditResult {
+  /** Active findings: what is reported, scored and checked by `--fail-on`. */
+  findings: Finding[]
+  /** Occurrences hidden by a reviewed suppression, kept for reports. */
+  suppressed: SuppressedFinding[]
+}
+
+function sortFindings(findings: Finding[]): Finding[] {
+  const order = new Map(RULE_LIST.map((rule, index) => [rule.id, index]))
+  return findings.sort(
+    (a, b) => severityRank(a.severity) - severityRank(b.severity) || (order.get(a.ruleId) ?? 0) - (order.get(b.ruleId) ?? 0)
+  )
+}
+
+export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions = {}): AuditResult {
   const out = new FindingCollector()
 
   for (const req of parsed.requests) {
@@ -689,10 +1027,23 @@ export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): 
   checkAuthHelpers(parsed, out)
   checkScripts(parsed, out)
   checkCollectionVariables(parsed, out)
+  checkEnvironments(parsed, out)
   checkKnownPatterns(parsed, out)
+  checkDescriptions(parsed, out)
+  checkHighEntropy(parsed, out)
 
   runWarningChecks(parsed, out)
+  checkVariableIntegrity(parsed, out)
   runInfoChecks(parsed, out)
 
-  return out.build(options)
+  const { active, suppressed, notices } = applySuppressions(parsed, out.build(options), options)
+  if (notices.length === 0) return { findings: active, suppressed }
+
+  const noticeCollector = new FindingCollector()
+  for (const notice of notices) noticeCollector.add(notice.ruleId, undefined, { location: notice.location })
+  return { findings: sortFindings([...active, ...noticeCollector.build(options)]), suppressed }
+}
+
+export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): Finding[] {
+  return runAuditDetailed(parsed, options).findings
 }

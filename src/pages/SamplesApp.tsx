@@ -4,6 +4,8 @@ import { DashboardShell } from '../components/layout/dashboard-shell'
 import { RequestSearchModal } from '../components/RequestSearchModal'
 import { OverviewPage } from './OverviewPage'
 import { RequestsPage } from './RequestsPage'
+import { isSearchShortcut } from '../lib/keyboard'
+import type { AppLocation } from '../lib/appRoutes'
 import { SecurityPage } from './SecurityPage'
 import { HygienePage } from './HygienePage'
 import { ScorePage } from './ScorePage'
@@ -28,12 +30,15 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
   const [active, setActive] = useState<NavId>('overview')
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [focusRequestId, setFocusRequestId] = useState<string | null>(null)
+  /** The samples page keeps its state in the component: it has no addresses of its own. */
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+  const [securityView, setSecurityView] = useState<AppLocation>({ page: 'security' })
+  const [hygieneView, setHygieneView] = useState<AppLocation>({ page: 'hygiene' })
   const [landingLoading, setLandingLoading] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if (isSearchShortcut(e, document.querySelector('[role="dialog"]') !== null)) {
         e.preventDefault()
         setSearchOpen(true)
       }
@@ -74,13 +79,13 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
     setOriginalRawJson(null)
     setSearch('')
     setSearchOpen(false)
-    setFocusRequestId(null)
+    setSelectedRequestId(null)
   }, [])
 
   const handleSearchSelect = useCallback((request: ParsedRequest) => {
     setActive('requests')
     setSearch('')
-    setFocusRequestId(request.id)
+    setSelectedRequestId(request.id)
   }, [])
 
   const handleApplyRepairedCollection = useCallback(async (raw: string) => {
@@ -103,13 +108,7 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
   }, [handleApplyRepairedCollection, originalRawJson])
 
   if (!parsed) {
-    return (
-      <SampleDropZone
-        onSelectSample={handleSelectSample}
-        loading={landingLoading}
-        analyzePath={analyzePath}
-      />
-    )
+    return <SampleDropZone onSelectSample={handleSelectSample} loading={landingLoading} analyzePath={analyzePath} />
   }
 
   const score = calculateScore(parsed, findings)
@@ -145,15 +144,28 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
             parsed={parsed}
             findings={findings}
             search={search}
-            focusRequestId={focusRequestId}
-            onFocusRequestHandled={() => setFocusRequestId(null)}
+            selectedId={selectedRequestId}
+            onSelectId={setSelectedRequestId}
           />
         )}
         {active === 'security' && (
-          <SecurityPage parsed={parsed} findings={securityFindings} score={score} search={search} />
+          <SecurityPage
+            parsed={parsed}
+            findings={securityFindings}
+            score={score}
+            search={search}
+            location={securityView}
+            onLocationChange={setSecurityView}
+          />
         )}
         {active === 'hygiene' && (
-          <HygienePage parsed={parsed} findings={hygieneFindings} search={search} />
+          <HygienePage
+            parsed={parsed}
+            findings={hygieneFindings}
+            search={search}
+            location={hygieneView}
+            onLocationChange={setHygieneView}
+          />
         )}
         {active === 'repair' && rawJson && (
           <RepairPage

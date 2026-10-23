@@ -2,7 +2,7 @@
 
 > **Audience:** the agent or engineer implementing the next releases, plus reviewers who want to know what is coming and why.
 > **Baseline:** `Update V0.1.24` (commit `e97a99c`, 2026-10-08). Every item below was derived from a read of the code and docs at that commit.
-> **Status:** plan only. Nothing in this file is implemented yet.
+> **Status:** in progress. Shipped releases get their commit hash in the `Commit` column of section 2; the plan text below is kept as written for history.
 
 ---
 
@@ -94,45 +94,45 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 
 ## 2. Release overview
 
-| Version | Tag | Track | Type | Title |
-|---|---|---|---|---|
-| V0.1.25 | `v0.1.25` | A1 | Chore, Docs, Bug | Version alignment, changelog, release tags, stale docs |
-| V0.1.26 | `v0.1.26` | A1 | Security, Bug | Audit disabled headers, query params and form fields |
-| V0.1.27 | `v0.1.27` | A1 | Bug | Variable-tolerant body parsing |
-| V0.1.28 | `v0.1.28` | A1 | Security, Bug | Descriptions, item variables, path variables, saved request bodies |
-| V0.1.29 | `v0.1.29` | A1 | Bug | URL and auth rule accuracy |
-| V0.1.30 | `v0.1.30` | A1 | Bug, Enhancement | Script credential detection gaps |
-| V0.1.31 | `v0.1.31` | A1 | Security | Trusted proxy and lockout hardening |
-| V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes |
-| V0.1.33 | `v0.1.33` | A2 | Enhancement | Secret pattern expansion and Basic token decoding |
-| V0.1.34 | `v0.1.34` | A2 | Feature | Postman environments and globals |
-| V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules |
-| V0.1.36 | `v0.1.36` | A2 | Enhancement | Scoring model v2 |
-| V0.1.37 | `v0.1.37` | A3 | Feature | Config file, baselines and suppressions |
-| V0.1.38 | `v0.1.38` | A3 | Enhancement | Precise SARIF locations, report schema, HTML report |
-| V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server |
-| V0.1.40 | `v0.1.40` | A4 | Security, Feature | Library encryption at rest, audit log, proxy identity |
-| V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift |
-| V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility |
-| V0.1.43 | `v0.1.43` | A5 | Enhancement | Performance: code splitting, virtualization, budgets |
-| V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests |
-| V0.1.45 | `v0.1.45` | A6 | Security, Chore | Tailwind CSS 4 migration and dependency refresh |
-| V0.2.0 | `v0.2.0` | B0 | Feature | Rule packs, identity category, compliance metadata |
-| V0.2.1 | `v0.2.1` | B0 | Feature | Identity context extraction and platform fingerprinting |
-| V0.2.2 | `v0.2.2` | B1 AM | Feature | OAuth 2.0 and OIDC flow rules |
-| V0.2.3 | `v0.2.3` | B1 AM | Feature | JWT inspection rules |
-| V0.2.4 | `v0.2.4` | B1 AM | Feature | SAML, sessions and token revocation coverage |
-| V0.2.5 | `v0.2.5` | B2 IGA | Feature | SCIM 2.0 provisioning analysis |
-| V0.2.6 | `v0.2.6` | B2 IGA | Feature | Joiner, mover, leaver coverage map |
-| V0.2.7 | `v0.2.7` | B2 IGA | Feature | Governance APIs and personal data exposure |
-| V0.2.8 | `v0.2.8` | B3 PAM | Feature | PAM and secrets vault API rules |
-| V0.2.9 | `v0.2.9` | B3 PAM | Feature | Privileged and admin-plane operations inventory |
-| V0.2.10 | `v0.2.10` | B4 | Feature | Platform profiles: access management and CIAM |
-| V0.2.11 | `v0.2.11` | B4 | Feature | Platform profiles: IGA, PAM and cloud IAM |
-| V0.2.12 | `v0.2.12` | B5 | Feature | Identity page |
-| V0.2.13 | `v0.2.13` | B5 | Feature | IAM reporting and compliance mapping |
-| V0.2.14 | `v0.2.14` | B5 | Enhancement | IAM repair fixes |
-| V0.2.15 | `v0.2.15` | B5 | Feature, Docs | IAM sample collections and guide |
+| Version | Tag | Track | Type | Title | Commit |
+|---|---|---|---|---|---|
+| V0.1.25 | `v0.1.25` | A1 | Chore, Docs, Bug | Version alignment, changelog, release tags, stale docs | `68d478a` |
+| V0.1.26 | `v0.1.26` | A1 | Security, Bug | Audit disabled headers, query params and form fields | `d693acc` |
+| V0.1.27 | `v0.1.27` | A1 | Bug | Variable-tolerant body parsing | `85e530d` |
+| V0.1.28 | `v0.1.28` | A1 | Security, Bug | Descriptions, item variables, path variables, saved request bodies | `7e41077` |
+| V0.1.29 | `v0.1.29` | A1 | Bug | URL and auth rule accuracy | `b971633` |
+| V0.1.30 | `v0.1.30` | A1 | Bug, Enhancement | Script credential detection gaps | `b0e64da` |
+| V0.1.31 | `v0.1.31` | A1 | Security | Trusted proxy and lockout hardening | `807e12f` |
+| V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes | `61b576f` |
+| V0.1.33 | `v0.1.33` | A2 | Enhancement | Secret pattern expansion and Basic token decoding | `bff360d` |
+| V0.1.34 | `v0.1.34` | A2 | Feature | Postman environments and globals | `f5c3110` |
+| V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules | `00911f8` |
+| V0.1.36 | `v0.1.36` | A2 | Enhancement | Scoring model v2 | `a50f91e` |
+| V0.1.37 | `v0.1.37` | A3 | Feature | Config file, baselines and suppressions | `53e2814` |
+| V0.1.38 | `v0.1.38` | A3 | Enhancement | Precise SARIF locations, report schema, HTML report | `ae025e7` |
+| V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server | `a5c4b6f` |
+| V0.1.40 | `v0.1.40` | A4 | Security, Feature | Library encryption at rest, audit log, proxy identity | `9d6f5d0` |
+| V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift | `1df0a2c` |
+| V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | `6a2acfa` |
+| V0.1.43 | `v0.1.43` | A5 | Enhancement | Performance: code splitting, virtualization, budgets | `1f86c00` |
+| V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests | `0f6e5b8` |
+| V0.1.45 | `v0.1.45` | A6 | Security, Chore | Tailwind CSS 4 migration and dependency refresh | |
+| V0.2.0 | `v0.2.0` | B0 | Feature | Rule packs, identity category, compliance metadata | |
+| V0.2.1 | `v0.2.1` | B0 | Feature | Identity context extraction and platform fingerprinting | |
+| V0.2.2 | `v0.2.2` | B1 AM | Feature | OAuth 2.0 and OIDC flow rules | |
+| V0.2.3 | `v0.2.3` | B1 AM | Feature | JWT inspection rules | |
+| V0.2.4 | `v0.2.4` | B1 AM | Feature | SAML, sessions and token revocation coverage | |
+| V0.2.5 | `v0.2.5` | B2 IGA | Feature | SCIM 2.0 provisioning analysis | |
+| V0.2.6 | `v0.2.6` | B2 IGA | Feature | Joiner, mover, leaver coverage map | |
+| V0.2.7 | `v0.2.7` | B2 IGA | Feature | Governance APIs and personal data exposure | |
+| V0.2.8 | `v0.2.8` | B3 PAM | Feature | PAM and secrets vault API rules | |
+| V0.2.9 | `v0.2.9` | B3 PAM | Feature | Privileged and admin-plane operations inventory | |
+| V0.2.10 | `v0.2.10` | B4 | Feature | Platform profiles: access management and CIAM | |
+| V0.2.11 | `v0.2.11` | B4 | Feature | Platform profiles: IGA, PAM and cloud IAM | |
+| V0.2.12 | `v0.2.12` | B5 | Feature | Identity page | |
+| V0.2.13 | `v0.2.13` | B5 | Feature | IAM reporting and compliance mapping | |
+| V0.2.14 | `v0.2.14` | B5 | Enhancement | IAM repair fixes | |
+| V0.2.15 | `v0.2.15` | B5 | Feature, Docs | IAM sample collections and guide | |
 
 ---
 

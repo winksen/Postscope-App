@@ -20,27 +20,70 @@ export interface SecretMatch {
 }
 
 export const SECRET_PATTERNS: SecretPattern[] = [
-  { id: 'private-key', label: 'Private key block', regex: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g },
+  {
+    id: 'private-key',
+    label: 'Private key block',
+    regex: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g,
+  },
   { id: 'aws-access-key', label: 'AWS access key ID', regex: /\b(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA|ANVA|AIPA)[0-9A-Z]{16}\b/g },
   { id: 'github-token', label: 'GitHub token', regex: /\b(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{22,255})\b/g },
   { id: 'gitlab-token', label: 'GitLab token', regex: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
   { id: 'slack-token', label: 'Slack token', regex: /\bxox[abposr]-[A-Za-z0-9-]{10,}\b/g },
-  { id: 'slack-webhook', label: 'Slack webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[A-Za-z0-9]+\/B[A-Za-z0-9]+\/[A-Za-z0-9]+/g },
+  {
+    id: 'slack-webhook',
+    label: 'Slack webhook URL',
+    regex: /https:\/\/hooks\.slack\.com\/services\/T[A-Za-z0-9]+\/B[A-Za-z0-9]+\/[A-Za-z0-9]+/g,
+  },
   { id: 'stripe-key', label: 'Stripe live key', regex: /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b/g },
   { id: 'google-api-key', label: 'Google API key', regex: /\bAIza[0-9A-Za-z_-]{35}\b/g },
   { id: 'anthropic-key', label: 'Anthropic API key', regex: /\bsk-ant-[A-Za-z0-9]{2,10}-[A-Za-z0-9_-]{32,}\b/g },
-  { id: 'openai-key', label: 'OpenAI API key', regex: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{32,}\b|\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}\b/g },
+  {
+    id: 'openai-key',
+    label: 'OpenAI API key',
+    regex: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{32,}\b|\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}\b/g,
+  },
   { id: 'sendgrid-key', label: 'SendGrid API key', regex: /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/g },
   { id: 'twilio-key', label: 'Twilio API key', regex: /\bSK[0-9a-fA-F]{32}\b/g },
   { id: 'npm-token', label: 'npm access token', regex: /\bnpm_[A-Za-z0-9]{36}\b/g },
   { id: 'azure-storage-key', label: 'Azure storage account key', regex: /AccountKey=[A-Za-z0-9+/]{40,}={0,2}/g },
   { id: 'jwt', label: 'JSON Web Token', regex: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
   {
+    id: 'entra-client-secret',
+    label: 'Microsoft Entra ID client secret',
+    regex: /(?<![A-Za-z0-9_~.-])[A-Za-z0-9_~.]{3}\dQ~[A-Za-z0-9_~.-]{31,34}(?![A-Za-z0-9_~.-])/g,
+  },
+  { id: 'okta-api-token', label: 'Okta API token', regex: /\bSSWS\s+00[A-Za-z0-9_=-]{40}(?![A-Za-z0-9_=-])/g },
+  { id: 'vault-service-token', label: 'HashiCorp Vault service token', regex: /\bhvs\.[A-Za-z0-9_-]{24,200}(?![A-Za-z0-9_-])/g },
+  { id: 'vault-batch-token', label: 'HashiCorp Vault batch token', regex: /\bhvb\.[A-Za-z0-9_-]{100,260}(?![A-Za-z0-9_-])/g },
+  { id: 'vault-recovery-token', label: 'HashiCorp Vault recovery token', regex: /\bhvr\.[A-Za-z0-9_-]{24,200}(?![A-Za-z0-9_-])/g },
+  { id: 'postman-api-key', label: 'Postman API key', regex: /\bPMAK-[0-9a-f]{24}-[0-9a-f]{34}\b/g },
+  { id: 'atlassian-token', label: 'Atlassian API token', regex: /\bATATT3[A-Za-z0-9_=-]{150,250}(?![A-Za-z0-9_=-])/g },
+  { id: 'shopify-token', label: 'Shopify access token', regex: /\bshp(?:at|ss|ca|pa)_[a-fA-F0-9]{32}\b/g },
+  { id: 'digitalocean-token', label: 'DigitalOcean token', regex: /\bdo[por]_v1_[a-f0-9]{64}\b/g },
+  { id: 'dockerhub-token', label: 'Docker Hub access token', regex: /\bdckr_pat_[A-Za-z0-9_-]{27,}(?![A-Za-z0-9_-])/g },
+  { id: 'grafana-service-account', label: 'Grafana service account token', regex: /\bglsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}\b/g },
+  { id: 'grafana-cloud-token', label: 'Grafana Cloud token', regex: /\bglc_[A-Za-z0-9+/]{32,400}={0,3}/g },
+  { id: 'huggingface-token', label: 'Hugging Face token', regex: /\b(?:hf|api_org)_[A-Za-z]{34}\b/g },
+  { id: 'databricks-token', label: 'Databricks access token', regex: /\bdapi[a-f0-9]{32}(?:-\d)?\b/g },
+  { id: 'pypi-token', label: 'PyPI upload token', regex: /\bpypi-AgE[A-Za-z0-9_-]{50,1000}(?![A-Za-z0-9_-])/g },
+  {
+    id: 'square-token',
+    label: 'Square access token',
+    regex: /\b(?:sq0atp-[A-Za-z0-9_-]{22}|sq0csp-[A-Za-z0-9_-]{43}|EAAA[A-Za-z0-9_-]{60})(?![A-Za-z0-9_-])/g,
+  },
+  {
     id: 'connection-string',
     label: 'Connection string with password',
-    regex: /\b(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|mariadb|rediss?|amqps?|mssql|sqlserver):\/\/[^\s:@/{}"']+:[^\s@/{}"']+@[^\s/"']+/gi,
+    regex:
+      /\b(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|mariadb|rediss?|amqps?|mssql|sqlserver):\/\/[^\s:@/{}"']+:[^\s@/{}"']+@[^\s/"']+/gi,
   },
 ]
+
+/** `Authorization` values that start with a known scheme followed by a credential. */
+export const AUTH_HEADER_SCHEME = /^(Bearer|Basic|Token|Digest|Hawk|ApiKey|Api-Key|JWT|AWS4-HMAC-SHA256|SharedKey|OAuth)\s+\S+/i
+export const TOKEN_HEADER = /^(x-(auth|access|session|refresh|vault)-token|x-amz-security-token|private-token)$/i
+/** A session-like cookie inside a `Cookie` header value: `[1]` is the name, `[2]` the value. */
+export const SESSION_COOKIE = /(?:^|;\s*)([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i
 
 /** Above this size only the first chunk is scanned so pathological inputs cannot stall the UI. */
 const MAX_SCAN_LENGTH = 512_000
@@ -63,8 +106,10 @@ export function containsSecretPattern(text: string | undefined | null): boolean 
   return findSecretPatterns(text, 1).length > 0
 }
 
-const SENSITIVE_KEY = /(password|passwd|passphrase|(^|[-_.])pass$|^pwd$|secret|token|api[-_.]?key|apikey|access[-_.]?key|private[-_.]?key|client[-_.]?assertion|credential|auth[-_.]?key|session[-_.]?(id|key)|signing[-_.]?key|bearer|^cookie$|^jwt$|^sid$)/i
-const NON_SECRET_SUFFIX = /(url|uri|endpoint|host|type|name|expiry|expires(_?in)?|expiration|ttl|length|header|prefix|field|path|location|count|hint|policy|format|version|enabled|required|mode|placement|addTo|add_to)$/i
+const SENSITIVE_KEY =
+  /(password|passwd|passphrase|(^|[-_.])pass$|^pwd$|secret|token|api[-_.]?key|apikey|access[-_.]?key|private[-_.]?key|client[-_.]?assertion|credential|auth[-_.]?key|session[-_.]?(id|key)|signing[-_.]?key|bearer|^cookie$|^jwt$|^sid$)/i
+const NON_SECRET_SUFFIX =
+  /(url|uri|endpoint|host|type|name|expiry|expires(_?in)?|expiration|ttl|length|header|prefix|field|path|location|count|hint|policy|format|version|enabled|required|mode|placement|addTo|add_to)$/i
 const PAGINATION_TOKEN = /^(page|next|prev|previous|continuation|cursor|sync|delta|start)[-_.]?token$/i
 
 /** Heuristic for names (header, field, variable, query param) whose values are usually credentials. */
@@ -98,7 +143,8 @@ export function isSensitiveHeader(key: string | undefined | null): boolean {
   return SENSITIVE_HEADERS.has(name) || isSensitiveKey(name)
 }
 
-const PLACEHOLDER_VALUE = /^(<[^>]*>|\[[^\]]*\]|x{3,}|\*{3,}|•{3,}|\.{3,}|-+|_+|changeme|change[-_ ]?me|replace[-_ ]?me|your[-_ ].*|todo|tbd|n\/a|placeholder|example|sample|dummy|test|null|undefined|none|nil|true|false|string|secret|password|token|value|bearer|basic)$/i
+const PLACEHOLDER_VALUE =
+  /^(<[^>]*>|\[[^\]]*\]|x{3,}|\*{3,}|•{3,}|\.{3,}|-+|_+|changeme|change[-_ ]?me|replace[-_ ]?me|your[-_ ].*|todo|tbd|n\/a|placeholder|example|sample|dummy|test|null|undefined|none|nil|true|false|string|secret|password|token|value|bearer|basic)$/i
 const PLACEHOLDER_PREFIX = /^(demo|sample|example|fake|dummy|mock|placeholder|your|my|test)[-_ .]/i
 
 /** A literal value that plausibly holds a credential (not empty, not a variable, not a placeholder). */
@@ -139,4 +185,53 @@ export function redactSecretsInText(text: string, replacer: (match: string) => s
 export function evidencePreview(value: string, maxLength = 80): string {
   const masked = maskSecret(value)
   return masked.length > maxLength ? `${masked.slice(0, maxLength - 1)}…` : masked
+}
+
+/** Shannon entropy in bits per character. */
+export function shannonEntropy(text: string): number {
+  if (!text) return 0
+  const counts = new Map<string, number>()
+  for (const char of text) counts.set(char, (counts.get(char) ?? 0) + 1)
+  let entropy = 0
+  const length = [...text].length
+  for (const count of counts.values()) {
+    const probability = count / length
+    entropy -= probability * Math.log2(probability)
+  }
+  return entropy
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PURE_HEX = /^[0-9a-f]+$/i
+
+/**
+ * A literal that looks machine generated: at least 20 characters with at least 3.5 bits of entropy per
+ * character. UUIDs, URLs, sentences and short hexadecimal ids (below 32 characters) are not treated as secrets.
+ */
+export function isHighEntropyLiteral(value: string, { minLength = 20, minEntropy = 3.5 } = {}): boolean {
+  const text = value.replace(AUTH_SCHEME, '').trim()
+  if (text.length < minLength || /\s/.test(text)) return false
+  if (!isLikelySecretValue(text) || UUID.test(text) || /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return false
+  if (PURE_HEX.test(text) && text.length < 32) return false
+  return shannonEntropy(text) >= minEntropy
+}
+
+/** Decodes `Basic <base64>` (or a bare base64 token) into `user:password`. Null when it is not valid credentials. */
+export function decodeBasicCredentials(value: string): { username: string; password: string } | null {
+  const token = value.trim().replace(/^Basic\s+/i, '')
+  if (!token || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(token)) return null
+  try {
+    const binary = atob(token.replace(/-/g, '+').replace(/_/g, '/'))
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)))
+    const separator = decoded.indexOf(':')
+    if (separator <= 0) return null
+    return { username: decoded.slice(0, separator), password: decoded.slice(separator + 1) }
+  } catch {
+    return null
+  }
+}
+
+/** `j***` style label so evidence can name the account without printing it in full. */
+export function maskUsername(username: string): string {
+  return username.length <= 1 ? '•' : `${username[0]}${'•'.repeat(Math.min(6, username.length - 1))}`
 }

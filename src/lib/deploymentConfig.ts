@@ -1,6 +1,7 @@
 import type { StorageMode } from './storagePreferences'
 import { parseLoggingMode, type LoggingMode } from './parseLoggingMode'
 import { sanitizeAuditOptions, type AuditOptions } from './auditor'
+import { DEFAULT_SCORE_WEIGHTS, sanitizeScoreWeights, type ScoreWeights } from './severity'
 
 export type { LoggingMode }
 export { parseLoggingMode }
@@ -20,8 +21,12 @@ export interface AppConfig {
   maxCollectionBytes: number
   libraryAllowDelete: boolean
   libraryRedactSecrets: boolean
+  /** The server encrypts stored collections at rest (LIBRARY_ENCRYPTION_KEY). */
+  libraryEncrypted: boolean
   /** Team audit policy defaults (disabled rules, severity overrides). */
   auditPolicy: AuditOptions
+  /** Points per finding severity used by the score (scoring model v2). */
+  scoreWeights: ScoreWeights
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -34,7 +39,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   maxCollectionBytes: DEFAULT_MAX_COLLECTION_BYTES,
   libraryAllowDelete: true,
   libraryRedactSecrets: false,
+  libraryEncrypted: false,
   auditPolicy: {},
+  scoreWeights: DEFAULT_SCORE_WEIGHTS,
 }
 
 function parseBooleanFlag(value: unknown): boolean {
@@ -74,7 +81,9 @@ export async function fetchAppConfig(): Promise<AppConfig> {
       maxCollectionBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : DEFAULT_MAX_COLLECTION_BYTES,
       libraryAllowDelete: body.libraryAllowDelete !== false,
       libraryRedactSecrets: body.libraryRedactSecrets === true,
+      libraryEncrypted: body.libraryEncrypted === true,
       auditPolicy: sanitizeAuditOptions(body.auditPolicy),
+      scoreWeights: sanitizeScoreWeights(body.scoreWeights),
     }
   } finally {
     clearTimeout(timer)
@@ -107,11 +116,7 @@ export function requiresUploadConsent(loggingMode: LoggingMode, storageMode: Sto
   return loggingMode === 'hybrid' && storageMode === 'history'
 }
 
-export function canSaveToAppStorage(
-  loggingMode: LoggingMode,
-  storageMode: StorageMode,
-  hasConsent: boolean
-): boolean {
+export function canSaveToAppStorage(loggingMode: LoggingMode, storageMode: StorageMode, hasConsent: boolean): boolean {
   if (loggingMode === 'on') return true
   if (loggingMode === 'off') return false
   return storageMode === 'history' && hasConsent

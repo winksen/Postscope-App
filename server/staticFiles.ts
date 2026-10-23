@@ -131,20 +131,19 @@ export function serveStatic(req: IncomingMessage, res: ServerResponse, rootDir: 
     return
   }
 
+  // Browser navigations (Accept: text/html) to unknown paths get the app, so a link such as
+  // /analyze/requests/v1.2%2FList%20users opens even though its last segment looks like a file name.
+  const isNavigation = /\btext\/html\b/i.test(String(req.headers.accept ?? ''))
   const resolved = resolveStaticPath(rootDir, pathname === '/' ? '/index.html' : pathname)
-  if (!resolved) {
-    sendText(res, 404, 'Not found')
-    return
-  }
-
-  const stat = statFile(resolved)
-  if (stat) {
+  const stat = resolved ? statFile(resolved) : null
+  if (resolved && stat) {
     sendFile(req, res, resolved, stat, rootDir)
     return
   }
 
-  const ext = path.extname(resolved)
-  if (ext && ext !== '.html') {
+  const ext = resolved ? path.extname(resolved) : ''
+  const looksLikeAsset = !resolved || (ext !== '' && ext !== '.html')
+  if (looksLikeAsset && !isNavigation) {
     sendText(res, 404, 'Not found')
     return
   }

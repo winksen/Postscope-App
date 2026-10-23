@@ -1,39 +1,31 @@
-import { useState } from 'react'
-import {
-  CheckCircle,
-  ArrowSquareOut,
-  FunnelSimple,
-  Info,
-  ShieldWarning,
-  Warning,
-  X,
-} from '@phosphor-icons/react'
+import { CheckCircle, ArrowSquareOut, FunnelSimple, Info, ShieldWarning, Warning, X } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import { FindingEvidence } from '../components/FindingEvidence'
 import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
+import type { SuppressedFinding } from '../lib/suppressions'
 import { affectedLabels } from '../lib/findingDisplay'
 import type { ParsedCollection } from '../lib/parser'
 import type { ScoreBreakdown } from '../lib/scorer'
+import type { AppLocation } from '../lib/appRoutes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
 interface SecurityPageProps {
   parsed: ParsedCollection
   findings: Finding[]
+  /** Occurrences hidden by reviewed suppressions; shown under the "Suppressed" view and never scored. */
+  suppressed?: SuppressedFinding[]
   score: ScoreBreakdown
   search: string
+  /** Filters and the open finding come from the address, so they can be shared and the back button works. */
+  location: AppLocation
+  onLocationChange: (next: AppLocation, replace?: boolean) => void
 }
 
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
@@ -52,17 +44,28 @@ function findingMatchesQuery(f: Finding, q: string, requests: ParsedCollection['
   )
 }
 
-export function SecurityPage({ parsed, findings, score, search }: SecurityPageProps) {
-  const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
-  const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
-  const [detail, setDetail] = useState<Finding | null>(null)
+export function SecurityPage({ parsed, findings, suppressed = [], score, search, location, onLocationChange }: SecurityPageProps) {
+  const view = location.view === 'suppressed' ? 'suppressed' : 'active'
+  const severityFilter: (typeof SEVERITIES)[number] = location.severity ?? 'all'
+  const categoryFilter: (typeof CATEGORIES)[number] = location.category ?? 'all'
+  const ruleFilter = location.rule
+  const update = (patch: Partial<AppLocation>, replace = true) => onLocationChange({ ...location, ...patch }, replace)
+  const setSeverityFilter = (value: (typeof SEVERITIES)[number]) => update({ severity: value === 'all' ? undefined : value })
+  const setCategoryFilter = (value: (typeof CATEGORIES)[number]) => update({ category: value === 'all' ? undefined : value })
+  const setView = (value: 'active' | 'suppressed') => update({ view: value === 'suppressed' ? 'suppressed' : undefined })
+  const clearAllFilters = () => update({ severity: undefined, category: undefined, rule: undefined })
 
   const criticalCount = findings.filter((f) => f.severity === 'critical').length
   const warningCount = findings.filter((f) => f.severity === 'warning').length
   const infoCount = findings.filter((f) => f.severity === 'info').length
   const affectedRequests = new Set(findings.flatMap((finding) => finding.affected)).size
 
-  const filtered = findings.filter((f) => {
+  const showingSuppressed = view === 'suppressed' && suppressed.length > 0
+  const shown = showingSuppressed ? suppressed : findings
+  const detail: Finding | null = (location.finding && shown.find((f) => f.ruleId === location.finding)) || null
+  const setDetail = (finding: Finding | null) => update({ finding: finding?.ruleId }, finding === null)
+  const filtered = shown.filter((f) => {
+    if (ruleFilter && f.ruleId !== ruleFilter) return false
     if (severityFilter !== 'all' && f.severity !== severityFilter) return false
     if (categoryFilter !== 'all' && f.category !== categoryFilter) return false
     if (!findingMatchesQuery(f, search, parsed.requests)) return false
@@ -74,15 +77,14 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
   const activeFilters = [
     severityFilter !== 'all' ? { key: 'severity', value: severityFilter, label: severityFilter } : null,
     categoryFilter !== 'all' ? { key: 'category', value: categoryFilter, label: categoryFilter } : null,
+    ruleFilter ? { key: 'rule', value: ruleFilter, label: ruleFilter } : null,
   ].filter(Boolean) as { key: string; value: string; label: string }[]
 
   return (
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security findings</h1>
-        <p className="text-sm text-muted-foreground">
-          Audit results with filters and full recommendation detail.
-        </p>
+        <p className="text-sm text-muted-foreground">Audit results with filters and full recommendation detail.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -128,11 +130,15 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
             <FunnelSimple className="h-4 w-4 text-muted-foreground" weight="fill" />
             <CardTitle className="text-base">Filters</CardTitle>
           </div>
-          <CardDescription>Narrow the table by severity and category</CardDescription>
+          <CardDescription>
+            Narrow the table by severity and category{suppressed.length > 0 ? ', or switch to the suppressed findings' : ''}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
           <div className="grid w-full gap-2 sm:w-48">
-            <Label htmlFor="sev" className="text-xs">Severity</Label>
+            <Label htmlFor="sev" className="text-xs">
+              Severity
+            </Label>
             <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as (typeof SEVERITIES)[number])}>
               <SelectTrigger id="sev" className="transition-colors duration-200 h-9">
                 <SelectValue placeholder="Severity" />
@@ -147,7 +153,9 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
             </Select>
           </div>
           <div className="grid w-full gap-2 sm:w-48">
-            <Label htmlFor="cat" className="text-xs">Category</Label>
+            <Label htmlFor="cat" className="text-xs">
+              Category
+            </Label>
             <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as (typeof CATEGORIES)[number])}>
               <SelectTrigger id="cat" className="transition-colors duration-200 h-9">
                 <SelectValue placeholder="Category" />
@@ -161,6 +169,22 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
               </SelectContent>
             </Select>
           </div>
+          {suppressed.length > 0 && (
+            <div className="grid w-full gap-2 sm:w-48">
+              <Label htmlFor="view" className="text-xs">
+                Show
+              </Label>
+              <Select value={view} onValueChange={(v) => setView(v as 'active' | 'suppressed')}>
+                <SelectTrigger id="view" className="transition-colors duration-200 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active findings</SelectItem>
+                  <SelectItem value="suppressed">Suppressed ({suppressed.length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <Badge variant={scoreBadgeVariant} className="text-xs tabular-nums">
               Score {score.total}/100
@@ -177,6 +201,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                   onClick={() => {
                     if (f.key === 'severity') setSeverityFilter('all')
                     if (f.key === 'category') setCategoryFilter('all')
+                    if (f.key === 'rule') update({ rule: undefined })
                   }}
                   className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
                 >
@@ -184,13 +209,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                   <X className="h-3 w-3" weight="fill" />
                 </button>
               ))}
-              <button
-                onClick={() => {
-                  setSeverityFilter('all')
-                  setCategoryFilter('all')
-                }}
-                className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-              >
+              <button onClick={clearAllFilters} className="text-xs text-muted-foreground underline-offset-2 hover:underline">
                 Clear all
               </button>
             </div>
@@ -202,18 +221,19 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Findings</CardTitle>
           <CardDescription>
-            {filtered.length} of {findings.length} rows
+            {filtered.length} of {showingSuppressed ? suppressed.length : findings.length} rows
+            {showingSuppressed ? ' (suppressed, not scored)' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
-                <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" weight="fill" />
+                <CheckCircle className="h-7 w-7 text-[hsl(var(--success-text))]" weight="fill" />
               </div>
               <p className="text-lg font-medium">Nothing to show</p>
               <p className="max-w-md text-sm text-muted-foreground">
-                {findings.length === 0
+                {(showingSuppressed ? suppressed.length : findings.length) === 0
                   ? 'No issues detected for this collection.'
                   : 'Adjust filters or search to see more results.'}
               </p>
@@ -243,7 +263,9 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                       <TableCell className="text-xs uppercase text-muted-foreground">{f.category}</TableCell>
                       <TableCell className="max-w-[320px]">
                         <span className="line-clamp-2 text-sm font-medium">{f.title}</span>
-                        <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">{f.description}</span>
+                        <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">
+                          {'suppressions' in f ? `Suppressed: ${(f as SuppressedFinding).suppressions[0]?.reason ?? ''}` : f.description}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">
                         {f.affected.length ? `${f.affected.length} paths` : '-'}
@@ -252,7 +274,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="gap-1 text-muted-foreground opacity-60 transition-opacity hover:text-foreground group-hover:opacity-100"
+                          className="gap-1 text-muted-foreground transition-colors hover:text-foreground"
                           onClick={(e) => {
                             e.stopPropagation()
                             setDetail(f)
@@ -289,13 +311,27 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
 
             <div className="space-y-5 p-6 max-h-[60vh] overflow-y-auto">
               <p className="text-sm text-muted-foreground">{detail.description}</p>
+              {'suppressions' in detail && (
+                <div className="rounded-lg bg-muted/45 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Suppressed</p>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {(detail as SuppressedFinding).suppressions.slice(0, 10).map((item, index) => (
+                      <li key={index}>
+                        {item.reason}{' '}
+                        <span className="text-xs text-muted-foreground">
+                          ({item.source}
+                          {item.expires ? `, expires ${item.expires}` : ''})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {detail.affected.length > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Affected</p>
                   <p className="mt-1 text-sm text-foreground">
-                    {affectedLabels(detail, parsed.requests)
-                      .slice(0, 8)
-                      .join(', ')}
+                    {affectedLabels(detail, parsed.requests).slice(0, 8).join(', ')}
                     {detail.affected.length > 8 ? ` +${detail.affected.length - 8}` : ''}
                   </p>
                 </div>

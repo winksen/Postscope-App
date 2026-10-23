@@ -1,8 +1,9 @@
 import path from 'node:path'
 import { ensureAppEnv } from './loadEnv'
 import { log } from './logger'
+import { resolveEncryptionState, type EncryptionState } from './libraryCrypto'
 import { sanitizeAuditOptions, type AuditOptions } from '../src/lib/auditor'
-import { isSeverity } from '../src/lib/severity'
+import { isSeverity, parseScoreWeights, type ScoreWeights } from '../src/lib/severity'
 
 /**
  * Optional hardening and operations settings. Every value is read lazily from the environment
@@ -109,6 +110,19 @@ export function isTrustProxyEnabled(): boolean {
   return parseFlag(env('TRUST_PROXY'), false)
 }
 
+/**
+ * Number of trusted reverse proxies in front of the app (only used with TRUST_PROXY=true). The client address
+ * is taken that many entries from the right of X-Forwarded-For; entries further left are client-controlled.
+ */
+export function getTrustProxyHops(): number {
+  return Math.floor(parseNumber('TRUST_PROXY_HOPS', 1, { min: 1, max: 10 }))
+}
+
+/** When false, the unauthenticated /api/health endpoint omits the application version. */
+export function isHealthVersionExposed(): boolean {
+  return parseFlag(env('HEALTH_EXPOSE_VERSION'), true)
+}
+
 export function isHstsEnabled(): boolean {
   return parseFlag(env('ENABLE_HSTS'), false)
 }
@@ -149,6 +163,53 @@ export function getAuditPolicy(): AuditOptions {
   const unknown = disabledRules.filter((rule) => !sanitized.disabledRules?.includes(rule as never))
   if (unknown.length) warnOnce('AUDIT_DISABLED_RULES', `Unknown rule ids in AUDIT_DISABLED_RULES: ${unknown.join(', ')}`)
   return sanitized
+}
+
+/**
+ * Score weights shared with every browser: SCORE_WEIGHTS=critical=20,warning=8,info=2 (any subset, 0 to 100).
+ * Invalid entries are ignored with a warning.
+ */
+export function getScoreWeights(): ScoreWeights {
+  const { weights, errors } = parseScoreWeights(env('SCORE_WEIGHTS'))
+  if (errors.length) warnOnce('SCORE_WEIGHTS', `Ignoring invalid SCORE_WEIGHTS entries: ${errors.join('; ')}.`)
+  return weights
+}
+
+/**
+ * Library encryption at rest. `LIBRARY_ENCRYPTION_KEY` (or `LIBRARY_ENCRYPTION_KEY_FILE`, for Docker secrets) holds a
+ * 32 byte key as 64 hex characters or base64. `LIBRARY_ENCRYPTION_KEY_PREVIOUS[_FILE]` lists older keys that may
+ * still decrypt records until they are rewritten with `library.js encrypt`.
+ */
+export function getLibraryEncryption(): EncryptionState {
+  return resolveEncryptionState({
+    key: env('LIBRARY_ENCRYPTION_KEY'),
+    keyFile: env('LIBRARY_ENCRYPTION_KEY_FILE'),
+    previous: env('LIBRARY_ENCRYPTION_KEY_PREVIOUS'),
+    previousFile: env('LIBRARY_ENCRYPTION_KEY_PREVIOUS_FILE'),
+  })
+}
+
+/** Append-only audit log of library saves, opens and removals. On by default whenever the library is enabled. */
+export function isLibraryAuditLogEnabled(): boolean {
+  return parseFlag(env('LIBRARY_AUDIT_LOG'), true)
+}
+
+export function getAuditLogDir(): string {
+  return path.join(getDataDir(), 'audit')
+}
+
+/**
+ * Name of the request header a trusted reverse proxy sets to the signed-in user (for example `X-Forwarded-User` or
+ * `X-Auth-Request-Email`). Only used when TRUST_PROXY=true; anything that is not a valid header name is ignored.
+ */
+export function getTrustedUserHeader(): string | null {
+  const name = env('TRUSTED_USER_HEADER')
+  if (!name) return null
+  if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/.test(name)) {
+    warnOnce('TRUSTED_USER_HEADER', `Ignoring invalid TRUSTED_USER_HEADER "${name}".`)
+    return null
+  }
+  return name.toLowerCase()
 }
 
 /** Only http(s) URLs are allowed for outbound links so a misconfiguration cannot inject `javascript:` URLs. */

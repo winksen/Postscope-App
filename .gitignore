@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+dist-node/
 
 # Vite
 *.local
@@ -41,3 +42,8 @@ Desktop.ini
 
 # Shared collection history (app filesystem storage)
 data/
+
+# Playwright
+test-results/
+playwright-report/
+visual/__screenshots__/
