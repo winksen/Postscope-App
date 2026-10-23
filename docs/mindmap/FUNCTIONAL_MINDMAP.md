@@ -139,7 +139,7 @@ Every finding becomes a repair suggestion. **Auto** fixes can be selected and ap
 | Risk | Selected by default | Examples |
 |---|---|---|
 | Low | Yes | Move API key headers or Basic auth to variables, disable empty headers, add starter variables |
-| Medium | Yes (descriptions: no) | Replace base URLs with `{{baseUrl}}`, move tokens, passwords, query secrets, and auth-helper secrets to variables, clear secret collection variables |
+| Medium | Yes (descriptions: no) | Replace base URLs with variables (one per host, the most used host keeps `{{baseUrl}}`), move tokens, passwords, query secrets, and auth-helper secrets to variables, clear secret collection variables |
 | Medium | No | Re-enable TLS verification |
 | High | No | Upgrade `http://` endpoints to `https://` |
 | Manual | n/a | Scripts, saved responses, credentials in URLs, provider tokens, naming and structure |

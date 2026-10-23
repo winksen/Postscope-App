@@ -210,7 +210,7 @@ export function buildMarkdownReport(ctx: ReportContext): string {
   }
 
   if (!ctx.findings.length) {
-    lines.push('No findings. 🎉', '')
+    lines.push('No findings.', '')
     return lines.join('\n')
   }
 

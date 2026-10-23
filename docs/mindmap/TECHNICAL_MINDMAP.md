@@ -174,7 +174,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 | Kind | Patch |
 |---|---|
-| `hardcodedBaseUrl`, `environmentUrl` | URL origin → `{{baseUrl}}` |
+| `hardcodedBaseUrl`, `environmentUrl` | Each literal origin → its own collection variable. `buildOriginVariableMap` ranks origins by request count: the most frequent keeps `baseUrl`, the others are named from the first host label (`auth.example.com` → `authBaseUrl`, collisions get `2`, `3`, ...). An existing `baseUrl` variable keeps its meaning (reused only for the origin it points at). The map is stored on the fix (`originVariables`) and listed in its description. URLs are split as written (never through `new URL`), so `{{vars}}` in paths and the `#hash` survive; object URLs get `host` replaced and `protocol`/`port` removed, `path`, `query` and `variable` kept |
 | `hardcodedAuthToken` | Authorization (any scheme), token headers, session cookies → variables (disabled headers included) |
 | `hardcodedApiKey` | API key headers → `{{apiKey}}` |
 | `basicAuthCredentials` | Finds the **effective** auth owner (request/folder/collection) and patches it once |
@@ -188,7 +188,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 ### 2.6 Redaction (`redaction.ts`)
 
-`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. Script literals are replaced in place with `{{REDACTED}}` (the exec lines are scanned as one source so multi-line objects are covered; line count is preserved). Raw bodies are edited structurally when they are JSON (indentation and unquoted variables preserved) and field by field otherwise (XML elements, `key=value` pairs). Descriptions (collection, folder, request, URL path variable docs) get `{{REDACTED}}` in place of credentials, folder and request `variable[]` values are emptied like collection variables, and path variable values with credential-like names become `{{name}}`. It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
+`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. `redactedCount` counts each removed secret once (query array entries and their raw URL copy are not double counted; a string URL counts every credential pair). Script literals are replaced in place with `{{REDACTED}}` (the exec lines are scanned as one source so multi-line objects are covered; line count is preserved). Raw bodies are edited structurally when they are JSON (indentation and unquoted variables preserved) and field by field otherwise (XML elements, `key=value` pairs). Descriptions (collection, folder, request, URL path variable docs) get `{{REDACTED}}` in place of credentials, folder and request `variable[]` values are emptied like collection variables, and path variable values with credential-like names become `{{name}}`. It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
 
 ### 2.7 Reports (`reportExport.ts`)
 
@@ -380,3 +380,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.29 | `HARDCODED_BASEURL` and `HARDCODED_ENV_URL` look at the URL host only (more environment labels, host evidence); `MISSING_AUTH` respects API key headers, cookies, query credentials and auth scripts and shows the route |
 | V0.1.30 | `scriptSecrets.ts` shared scanner: header/`pm.sendRequest`/`pm.request.auth`/`btoa` literals detected and scrubbed in place; auth header regexes moved to `secretPatterns.ts` |
 | V0.1.31 | Client IP from trusted proxy hops only (`TRUST_PROXY_HOPS`), lockout table can no longer be flushed, global sign-in back-off, `HEALTH_EXPOSE_VERSION` |
+| V0.1.32 | Base URL repair maps each host to its own variable, keeps path variables and ports clean; sanitized export counts query secrets; Markdown report without emoji |

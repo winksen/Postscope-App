@@ -135,3 +135,46 @@ test('sanitized copy keeps unquoted variables, indentation and XML structure in 
   assert.equal(second.request.body.raw, '<s:Envelope><wsse:Password Type="x">{{Password}}</wsse:Password><user>{{user}}</user></s:Envelope>')
   assert.ok(!JSON.stringify(sanitized).includes(FAKE.password))
 })
+
+test('redaction counts every secret in query parameters exactly once', () => {
+  const original = {
+    info: { name: 'Counts' },
+    item: [
+      { name: 'String URL', request: { method: 'GET', url: `https://x.test/a?api_key=${FAKE.apiKey}&token=${FAKE.bearer}&page=2` } },
+      {
+        name: 'Object URL',
+        request: {
+          method: 'GET',
+          url: {
+            raw: `https://x.test/b?api_key=${FAKE.apiKey}&page=2`,
+            query: [{ key: 'api_key', value: FAKE.apiKey }, { key: 'page', value: '2' }],
+          },
+        },
+      },
+    ],
+  }
+  const { json, redactedCount } = redactCollection(original)
+  assert.equal(redactedCount, 3)
+  const serialized = JSON.stringify(json)
+  assert.ok(!serialized.includes(FAKE.apiKey) && !serialized.includes(FAKE.bearer))
+  assert.equal(redactCollection(json).redactedCount, 0)
+})
+
+test('sanitized bodies keep their original indentation', () => {
+  for (const indent of [2, 4, '\t'] as const) {
+    const raw = JSON.stringify({ user: 'admin', password: FAKE.password, nested: { client_secret: FAKE.clientSecret } }, null, indent)
+    const { json } = redactCollection({ info: { name: 'Indent' }, item: [{ name: 'R', request: { method: 'POST', url: 'https://x.test', body: { mode: 'raw', raw } } }] })
+    const sanitized = (json as { item: Array<{ request: { body: { raw: string } } }> }).item[0].request.body.raw
+    assert.equal(sanitized, JSON.stringify({ user: 'admin', password: '{{password}}', nested: { client_secret: '{{client_secret}}' } }, null, indent))
+  }
+})
+
+test('markdown report has no emoji, including when there are no findings', () => {
+  const clean = parseCollection({ info: { name: 'Clean' }, item: [] })
+  const findings = runAudit(clean)
+  const markdown = buildMarkdownReport({ parsed: clean, findings: [], score: calculateScore(clean, findings), appVersion: '0.0.0' })
+  assert.match(markdown, /No findings\./)
+  const risky = parseCollection(kitchenSinkCollection())
+  const report = buildMarkdownReport({ parsed: risky, findings: runAudit(risky), score: calculateScore(risky, runAudit(risky)), appVersion: '0.0.0' })
+  for (const text of [markdown, report]) assert.ok(!/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/u.test(text))
+})

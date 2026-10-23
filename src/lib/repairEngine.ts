@@ -66,12 +66,22 @@ export interface RepairFix {
   variablesToEnsure?: RepairVariable[]
   generatedDescriptions?: Record<string, string>
   manualReason?: string
+  /** For base URL fixes: which collection variable replaces the host of each origin. */
+  originVariables?: OriginVariable[]
   /** For `secretVariables`: folder and request variables whose values are cleared. */
   scopedVariables?: Array<{ ownerPath: number[]; key: string }>
   /** For `secretVariables`: collection variable keys whose values are cleared. */
   variableKeys?: string[]
   /** For `bodySecrets`: which body classifier the fix targets. */
   bodyRule?: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET'
+}
+
+/** One literal origin (`https://auth.example.com`) and the collection variable that replaces it. */
+export interface OriginVariable {
+  origin: string
+  variable: string
+  /** Requests in the collection that use this origin. */
+  requestCount: number
 }
 
 export interface RepairPlan {
@@ -159,35 +169,87 @@ function currentUrlString(url: string | PostmanUrl | undefined): string {
   return typeof url === 'string' ? url : url.raw || postmanUrlToString(url)
 }
 
+/**
+ * Splits an absolute http(s) URL into its origin and the rest (path, query, hash), exactly as written.
+ * The rest is never re-encoded, so `{{variables}}` in the path survive. Hosts that contain a variable are not
+ * literal origins and return null.
+ */
 export function parseUrlParts(value: string | PostmanUrl | undefined): UrlParts | null {
   if (!value) return null
-  const source = currentUrlString(value)
-  if (!/^https?:\/\//i.test(source)) return null
-
-  try {
-    const parsed = new URL(source)
-    const pathQuery = parsed.pathname === '/' && !parsed.search ? '' : `${parsed.pathname}${parsed.search}`
-    return {
-      origin: parsed.origin,
-      pathQuery,
-    }
-  } catch {
-    return null
-  }
+  const source = currentUrlString(value).trim()
+  const match = source.match(/^(https?):\/\/([^/?#]*)([\s\S]*)$/i)
+  if (!match) return null
+  const authority = match[2].replace(/^[^@]*@/, '').toLowerCase()
+  if (!authority || authority.includes('{{')) return null
+  const scheme = match[1].toLowerCase()
+  const defaultPort = scheme === 'https' ? ':443' : ':80'
+  const host = authority.endsWith(defaultPort) ? authority.slice(0, -defaultPort.length) : authority
+  const rest = match[3]
+  return { origin: `${scheme}://${host}`, pathQuery: rest === '/' ? '' : rest }
 }
 
-export function replaceUrlHostWithBaseUrl(url: string | PostmanUrl | undefined): {
+/** `auth.example.com` becomes `authBaseUrl`; IP addresses and unusual hosts become `hostBaseUrl`. */
+function baseUrlVariableName(origin: string): string {
+  const host = origin.replace(/^https?:\/\//, '').replace(/:\d+$/, '')
+  const label = /^[\d.]+$/.test(host) || host.includes(':') ? 'host' : host.split('.')[0]
+  const words = label.split(/[^A-Za-z0-9]+/).filter(Boolean)
+  const camel = words.map((word, index) => (index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())).join('')
+  const name = /^[A-Za-z]/.test(camel) ? camel : `host${camel}`
+  return `${name || 'host'}BaseUrl`
+}
+
+/**
+ * Maps every literal origin used by the collection to a collection variable. The most frequent origin keeps
+ * `baseUrl`; the others get a readable name from the first host label (`authBaseUrl`), with a numeric suffix on
+ * collisions. An existing `baseUrl` variable keeps its meaning: it is only reused for the origin it points at.
+ */
+export function buildOriginVariableMap(parsed: ParsedCollection): OriginVariable[] {
+  const counts = new Map<string, number>()
+  for (const request of parsed.requests) {
+    const origin = parseUrlParts(request.url)?.origin
+    if (origin) counts.set(origin, (counts.get(origin) ?? 0) + 1)
+  }
+  const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  const existing = new Map((parsed.collectionVariables ?? []).map((variable) => [variable.key, variable.value]))
+  const used = new Set(existing.keys())
+  const result: OriginVariable[] = []
+
+  const existingBaseOrigin = existing.has('baseUrl') ? parseUrlParts(existing.get('baseUrl'))?.origin : undefined
+  const baseOrigin = existing.has('baseUrl') ? (existingBaseOrigin && counts.has(existingBaseOrigin) ? existingBaseOrigin : undefined) : ordered[0]?.[0]
+  if (baseOrigin) {
+    used.add('baseUrl')
+    result.push({ origin: baseOrigin, variable: 'baseUrl', requestCount: counts.get(baseOrigin) ?? 0 })
+  }
+  for (const [origin, requestCount] of ordered) {
+    if (origin === baseOrigin) continue
+    const stem = baseUrlVariableName(origin)
+    let variable = stem
+    for (let suffix = 2; used.has(variable); suffix += 1) variable = `${stem}${suffix}`
+    used.add(variable)
+    result.push({ origin, variable, requestCount })
+  }
+  return result.sort((a, b) => b.requestCount - a.requestCount || a.origin.localeCompare(b.origin))
+}
+
+export function replaceUrlHostWithBaseUrl(
+  url: string | PostmanUrl | undefined,
+  variableFor: (origin: string) => string | undefined = () => 'baseUrl'
+): {
   before: string
   after: string
   origin: string
+  variable: string
 } | null {
   if (!url) return null
   const parts = parseUrlParts(url)
   if (!parts) return null
+  const variable = variableFor(parts.origin)
+  if (!variable) return null
   return {
     before: currentUrlString(url),
-    after: `{{baseUrl}}${parts.pathQuery}`,
+    after: `{{${variable}}}${parts.pathQuery}`,
     origin: parts.origin,
+    variable,
   }
 }
 
@@ -326,7 +388,7 @@ function authVariablesForTargets(targets: RepairTarget[], parsed: ParsedCollecti
 
 export function buildGeneratedDescription(request: ParsedRequest): string {
   const parts = parseUrlParts(request.url)
-  let target = parts?.pathQuery.split('?')[0] || request.url || request.name
+  let target = parts?.pathQuery.split(/[?#]/)[0] || request.url || request.name
   if (target.startsWith('{{baseUrl}}')) target = target.replace('{{baseUrl}}', '') || '/'
   if (!target.startsWith('/') && !/^https?:\/\//i.test(target)) target = `/${target}`
   return `Sends a ${request.method} request to ${target}.`
@@ -349,21 +411,25 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
 
   if (kind === 'hardcodedBaseUrl' || kind === 'environmentUrl') {
     const targetRequests = parsed.requests.filter((request) => finding.affected.includes(request.id))
-    const origins = originSetForRequests(targetRequests)
-    const example = affectedRequest ? replaceUrlHostWithBaseUrl(affectedRequest.url) : null
-    const multipleHosts = origins.length > 1
+    const targetOrigins = new Set(originSetForRequests(targetRequests))
+    const originVariables = buildOriginVariableMap(parsed).filter((entry) => targetOrigins.has(entry.origin))
+    const variableFor = (origin: string) => originVariables.find((entry) => entry.origin === origin)?.variable
+    const example = affectedRequest ? replaceUrlHostWithBaseUrl(affectedRequest.url, variableFor) : null
+    const mappings = originVariables.map((entry) => `${entry.origin} becomes {{${entry.variable}}}`).join('; ')
     return {
       ...base,
       status: 'auto',
       title: kind === 'hardcodedBaseUrl' ? 'Replace hardcoded base URL' : 'Parameterize environment URL',
-      description: multipleHosts
-        ? `Replaces literal hosts with {{baseUrl}} while preserving paths and query strings. Multiple hosts were detected; ${origins[0]} will be used as the default baseUrl value.`
-        : 'Replaces the literal scheme and host with {{baseUrl}} while preserving paths and query strings.',
+      description:
+        originVariables.length > 1
+          ? `Replaces literal hosts with collection variables while preserving paths and query strings. Each host gets its own variable so requests keep calling the same server: ${mappings}.`
+          : `Replaces the literal scheme and host with ${originVariables[0] ? `{{${originVariables[0].variable}}}` : '{{baseUrl}}'} while preserving paths and query strings.`,
       risk: 'medium',
       selectedByDefault: true,
       beforeSnippet: example?.before,
       afterSnippet: example?.after,
-      variablesToEnsure: [{ key: 'baseUrl', value: origins[0] || '' }],
+      originVariables,
+      variablesToEnsure: originVariables.map((entry) => ({ key: entry.variable, value: entry.origin })),
     }
   }
 
@@ -597,6 +663,7 @@ function applyUrlPatch(collection: unknown, fix: RepairFix): {
 } {
   let changed = 0
   const skipped: SkippedRepair[] = []
+  const variableByOrigin = new Map((fix.originVariables ?? []).map((entry) => [entry.origin, entry.variable]))
 
   for (const target of fix.affectedRequests) {
     const item = getItemAtPath(collection, target.itemPath)
@@ -606,10 +673,16 @@ function applyUrlPatch(collection: unknown, fix: RepairFix): {
     }
 
     const url = item.request.url
-    const replacement = replaceUrlHostWithBaseUrl(url)
+    const replacement = replaceUrlHostWithBaseUrl(url, (origin) => variableByOrigin.get(origin))
     if (!replacement) {
       if (VARIABLE_PATTERN.test(currentUrlString(url))) continue
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'URL was not an absolute HTTP URL.' })
+      const known = parseUrlParts(url)
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: known ? `No variable was planned for ${known.origin}.` : 'URL was not an absolute HTTP URL.',
+      })
       continue
     }
 
@@ -617,8 +690,9 @@ function applyUrlPatch(collection: unknown, fix: RepairFix): {
       item.request.url = replacement.after
     } else if (isRecord(url)) {
       url.raw = replacement.after
-      url.host = ['{{baseUrl}}']
+      url.host = [`{{${replacement.variable}}}`]
       delete url.protocol
+      delete url.port
     } else {
       item.request.url = replacement.after
     }
@@ -1156,7 +1230,7 @@ export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan
       const result = applyUrlPatch(fixedJson, fix)
       changed = result.changed
       localSkipped = result.skipped
-      action = `Replaced URL hosts with {{baseUrl}} in ${changed} request(s).`
+      action = `Replaced URL hosts with collection variables in ${changed} request(s).`
     } else if (fix.kind === 'hardcodedAuthToken' || fix.kind === 'hardcodedApiKey' || fix.kind === 'emptyHeaders') {
       const result = patchHeaders(fixedJson, fix)
       changed = result.changed
