@@ -2,6 +2,8 @@ import type { ParsedCollection, ParsedRequest, KeyValue } from './parser'
 import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
 import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
 import { secretFieldsFor } from './authSchemes'
+import { parseTemplatedJson } from './jsonBody'
+import { scanRawBodyFields } from './rawBody'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
   evidencePreview,
@@ -50,7 +52,6 @@ const HEADER_PASSWORD_KEY = /passw|password|passwd/i
 const API_KEY_HEADER = /api.?key|x-api-key|apikey/i
 const PASSWORD_FIELD = /passw/i
 const BODY_SECRET_FIELD = /secret|access_?token|refresh_?token|id_?token|api_?key|apikey|private_?key|client_?assertion/i
-const LEGACY_BODY_SECRET = /secret|client_secret|access_token/i
 export const AUTH_HEADER_SCHEME = /^(Bearer|Basic|Token|Digest|Hawk|ApiKey|Api-Key|JWT|AWS4-HMAC-SHA256|SharedKey|OAuth)\s+\S+/i
 export const TOKEN_HEADER = /^(x-(auth|access|session|refresh)-token|x-amz-security-token|private-token)$/i
 export const SESSION_COOKIE = /(?:^|;\s*)([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i
@@ -229,15 +230,9 @@ function walkJson(value: unknown, visit: (key: string, value: string, path: stri
   }
 }
 
+/** Parses a JSON body, tolerating unquoted Postman variables such as `{"id": {{userId}}}`. */
 function tryParseJson(text: string | undefined): unknown {
-  if (!text) return undefined
-  const trimmed = text.trim()
-  if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) return undefined
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    return undefined
-  }
+  return text ? parseTemplatedJson(text)?.value : undefined
 }
 
 function checkBody(req: ParsedRequest, out: FindingCollector): void {
@@ -264,9 +259,9 @@ function checkBody(req: ParsedRequest, out: FindingCollector): void {
     return
   }
 
-  // Non-JSON raw bodies (XML, text): keep the historical keyword heuristic.
-  if (LEGACY_BODY_SECRET.test(req.bodyRaw) && !/\{\{[^{}]+\}\}/.test(req.bodyRaw)) {
-    out.add('HARDCODED_SECRET', req.id, { location: 'raw body', preview: 'Contains secret-like keyword with literal value' })
+  // Non-JSON raw bodies (XML/SOAP, form-like text, JSON that does not parse): look at individual fields.
+  for (const field of scanRawBodyFields(req.bodyRaw)) {
+    checkSecretField(req, field.key, field.value, `raw body ${field.key}`, out)
   }
 }
 

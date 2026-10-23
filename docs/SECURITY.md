@@ -48,7 +48,7 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 |---|---|
 | Headers | `Authorization` / `Proxy-Authorization` (any scheme), `X-API-Key`, `X-Auth-Token`, session cookies, password headers |
 | Auth helpers (request, folder, collection; inheritance-aware) | Bearer token, API key value, OAuth1/OAuth2 secrets and tokens, AWS secret key, Digest/NTLM passwords, Hawk, Akamai, JWT, ASAP |
-| Bodies | JSON (nested objects and arrays), urlencoded, form-data, GraphQL variables |
+| Bodies | JSON (nested objects and arrays, including unquoted `{{variables}}`), XML/SOAP elements, `key=value` text, urlencoded, form-data, GraphQL variables |
 | URLs | Credential query parameters (`api_key`, `token`, `sig`, …), `user:password@host` |
 | Scripts | `pm.*.set("token", "literal")`, literal assignments, provider tokens, `console.log` of credentials |
 | Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable |

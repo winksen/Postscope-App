@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.27
+
+- Fixed secrets being missed in JSON bodies that contain unquoted Postman variables
+- Enhanced detection for XML and form-like raw bodies
+- Repair and sanitized exports now handle these bodies without breaking the variables
+
 ## V0.1.26
 
 - Security fix: disabled headers, query params and form fields are now checked for secrets

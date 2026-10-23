@@ -125,6 +125,8 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 
 Entries that are switched off in Postman (disabled headers, query params, form fields, scripts) are still checked for secrets, because they stay in the exported file. Their evidence is labelled `(disabled)` and the Requests page shows them greyed out with a **Disabled** badge. Repair and the sanitized copy cover them too.
 
+Raw bodies are checked even when they contain Postman variables: `{"id": {{userId}}, "password": "S3cret!"}` is flagged, and so are SOAP/XML bodies (`<wsse:Password>literal</wsse:Password>`) and form-like text (`client_secret=...`). Repair and the sanitized copy replace only the literal and keep the variables and the body layout intact.
+
 Values that are clearly placeholders (`<string>`, `changeme`, `your-api-key`, `demo-…`) or variables (`{{token}}`, `{{auth-token}}`) are not reported.
 
 ## 4. Acting on the results

@@ -128,3 +128,22 @@ test('repair patches secrets in disabled headers, query params and form fields',
   assert.equal(request.header[0].value, 'Bearer {{token}}')
   assert.deepEqual(runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'), [])
 })
+
+test('repair keeps unquoted variables, indentation and XML in raw bodies', () => {
+  const original = {
+    info: { name: 'Bodies' },
+    variable: [{ key: 'baseUrl', value: 'https://x.test' }],
+    item: [
+      { name: 'JSON', request: { method: 'POST', auth: { type: 'noauth' }, description: 'd', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{\n    "id": {{userId}},\n    "password": "${FAKE.password}"\n}` } } },
+      { name: 'SOAP', request: { method: 'POST', auth: { type: 'noauth' }, description: 'd', url: '{{baseUrl}}/s', body: { mode: 'raw', raw: `<Password>${FAKE.password}</Password>` } } },
+      { name: 'Pairs', request: { method: 'POST', auth: { type: 'noauth' }, description: 'd', url: '{{baseUrl}}/p', body: { mode: 'raw', raw: `a=1&client_secret=${FAKE.clientSecret}` } } },
+    ],
+  }
+  const { plan } = analyze(original)
+  const { fixedJson } = applyRepairPlan(original, plan.defaultSelectedFixIds, plan)
+  const bodies = (fixedJson as { item: Array<{ request: { body: { raw: string } } }> }).item.map((item) => item.request.body.raw)
+  assert.equal(bodies[0], '{\n    "id": {{userId}},\n    "password": "{{password}}"\n}')
+  assert.equal(bodies[1], '<Password>{{Password}}</Password>')
+  assert.equal(bodies[2], 'a=1&client_secret={{client_secret}}')
+  assert.deepEqual(runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'), [])
+})
