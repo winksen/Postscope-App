@@ -6,6 +6,7 @@ import { cloneJson } from './repairEngine'
 import { detectIndent, parseTemplatedJson } from './jsonBody'
 import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
 import { scrubDescription } from './descriptions'
+import { scrubScript } from './scriptSecrets'
 
 /** Marker for places that cannot hold a usable variable (saved responses, scripts, free text). */
 export const REDACTED = '{{REDACTED}}'
@@ -23,7 +24,6 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 const RESPONSE_JSON_SECRET =
   /("(?:access_token|accessToken|refresh_token|refreshToken|id_token|idToken|token|password|client_secret|clientSecret|api_key|apiKey|secret|session_id|sessionId)"\s*:\s*")([^"\\]{4,})(")/g
-const SCRIPT_SET_CALL = /(pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`]+)\2\s*,\s*(['"`]))([^'"`]*)(\4)/g
 const URL_CREDENTIALS = /^([a-z][a-z0-9+.-]*:\/\/)([^\s/@:{}]+):([^\s/@{}]+)@/i
 const COOKIE_PAIR = /([^=;\s]+)=([^;]*)/g
 
@@ -212,17 +212,22 @@ class Redactor {
     if (!Array.isArray(events)) return
     for (const event of events) {
       if (!isRecord(event) || !isRecord(event.script)) continue
-      const scrub = (line: string) => {
-        let next = line.replace(SCRIPT_SET_CALL, (match, prefix: string, _q: string, key: string, _q2: string, value: string, suffix: string) =>
-          isSensitiveKey(key) && isLikelySecretValue(value) ? `${prefix}${REDACTED}${suffix}` : match
-        )
-        next = redactSecretsInText(next, () => REDACTED)
-        if (next !== line) this.count += 1
-        return next
-      }
       const exec = event.script.exec
-      if (Array.isArray(exec)) event.script.exec = exec.map((line) => (typeof line === 'string' ? scrub(line) : line))
-      else if (typeof exec === 'string') event.script.exec = scrub(exec)
+      if (Array.isArray(exec)) {
+        // Scan the joined source so multi-line objects (`{ key: ..., value: ... }`) are seen; lines never gain newlines.
+        const source = exec.map((line) => (typeof line === 'string' ? line : '')).join('\n')
+        const result = scrubScript(source, REDACTED)
+        if (result.count) {
+          event.script.exec = result.text.split('\n')
+          this.count += result.count
+        }
+      } else if (typeof exec === 'string') {
+        const result = scrubScript(exec, REDACTED)
+        if (result.count) {
+          event.script.exec = result.text
+          this.count += result.count
+        }
+      }
     }
   }
 
