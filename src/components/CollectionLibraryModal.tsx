@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  ArrowsLeftRight,
   Books,
   Clock,
   DownloadSimple,
@@ -39,6 +40,8 @@ interface CollectionLibraryModalProps {
   allowDelete?: boolean
   /** The server stores collections encrypted at rest (LIBRARY_ENCRYPTION_KEY). */
   encrypted?: boolean
+  /** Compare a saved collection with the one that is open. Only offered while a collection is open. */
+  onCompare?: (id: string) => void
 }
 
 export function CollectionLibraryModal({
@@ -49,6 +52,7 @@ export function CollectionLibraryModal({
   onLibraryChange,
   allowDelete = true,
   encrypted = false,
+  onCompare,
 }: CollectionLibraryModalProps) {
   const { notify } = useToast()
   const [collections, setCollections] = useState<SavedCollectionMeta[]>([])
@@ -81,6 +85,11 @@ export function CollectionLibraryModal({
     } finally {
       setBusyId(null)
     }
+  }
+
+  const handleCompare = (id: string) => {
+    onCompare?.(id)
+    onOpenChange(false)
   }
 
   const handleExport = async (meta: SavedCollectionMeta) => {
@@ -209,6 +218,18 @@ export function CollectionLibraryModal({
                         >
                           Open
                         </Button>
+                        {onCompare && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 gap-1 px-2.5 text-xs"
+                            disabled={isBusy || isActive}
+                            onClick={() => handleCompare(item.id)}
+                          >
+                            <ArrowsLeftRight className="h-3.5 w-3.5" weight="fill" />
+                            Compare
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"

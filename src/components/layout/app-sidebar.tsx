@@ -1,6 +1,7 @@
 import type { ElementType } from "react";
 import {
   CaretLeft,
+  ArrowsLeftRight,
   CaretRight,
   ChatCircleText,
   Gauge,
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { GITHUB_REPO_URL } from "@/components/marketing/marketing-shell";
 
-export type NavId = "overview" | "requests" | "security" | "hygiene" | "repair" | "score";
+export type NavId = "overview" | "requests" | "security" | "hygiene" | "repair" | "score" | "compare";
 
 type SidebarIcon = ElementType;
 
@@ -32,6 +33,7 @@ const nav: { id: NavId; label: string; icon: SidebarIcon; activeIcon: SidebarIco
   { id: "hygiene", label: "Hygiene", icon: Sparkle, activeIcon: Sparkle },
   { id: "repair", label: "Repair", icon: GearSix, activeIcon: GearSix },
   { id: "score", label: "Score", icon: Gauge, activeIcon: Gauge },
+  { id: "compare", label: "Compare", icon: ArrowsLeftRight, activeIcon: ArrowsLeftRight },
 ];
 
 interface AppSidebarProps {

@@ -11,6 +11,7 @@ import { RequestsPage } from './RequestsPage'
 import { SecurityPage } from './SecurityPage'
 import { HygienePage } from './HygienePage'
 import { ScorePage } from './ScorePage'
+import { ComparePage } from './ComparePage'
 import { RepairPage } from './RepairPage'
 import { analyzeCollectionText, describeAnalysisError } from '../lib/analyzeCollection'
 import { detectEnvironmentKind, isCollectionJson, parseEnvironment, withActiveEnvironment } from '../lib/environment'
@@ -55,6 +56,7 @@ import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportF
 import { redactCollection, redactEnvironment } from '../lib/redaction'
 import { attachEvidencePointers } from '../lib/evidencePointers'
 import { downloadTextFile } from '../lib/download'
+import type { CompareInput } from '../lib/compare'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { NavId } from '../components/layout/app-sidebar'
 
@@ -109,6 +111,10 @@ export function AnalyzeApp({
   const [landingLoading, setLandingLoading] = useState(false)
   const [restoringSession, setRestoringSession] = useState(true)
   const [savingToLibrary, setSavingToLibrary] = useState(false)
+  /** Older version used by the Compare page. It is analyzed with the current rule settings and never saved. */
+  const [referenceRaw, setReferenceRaw] = useState<string | null>(null)
+  const [reference, setReference] = useState<CompareInput | null>(null)
+  const [referenceLoading, setReferenceLoading] = useState(false)
   const [storageMode, setStorageModeState] = useState<StorageMode>(() => getStorageMode())
   const [uploadConsent, setUploadConsentState] = useState(() => hasUploadConsent())
   const [userAuditPrefs, setUserAuditPrefs] = useState<AuditOptions | null>(() => loadAuditPreferences())
@@ -144,6 +150,31 @@ export function AnalyzeApp({
       setSuppressed(result.suppressed)
     }
   }, [auditOptions, parsed])
+
+  useEffect(() => {
+    if (referenceRaw === null) {
+      setReference(null)
+      return
+    }
+    let cancelled = false
+    setReferenceLoading(true)
+    analyzeCollectionText(referenceRaw, auditOptions)
+      .then((result) => {
+        if (!cancelled) setReference({ parsed: result.parsed, findings: result.findings })
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        setReferenceRaw(null)
+        notify({ variant: 'error', title: 'Could not analyze the older version', description: describeAnalysisError(e) })
+      })
+      .finally(() => {
+        if (!cancelled) setReferenceLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [referenceRaw, auditOptions, notify])
 
   const handleStorageModeChange = useCallback(
     (mode: StorageMode) => {
@@ -294,9 +325,16 @@ export function AnalyzeApp({
   }, [loggingMode, storageMode, uploadConsent, notify])
 
   const runImport = useCallback(
-    (raw: string, environments: string[] = []) => {
+    (raw: string, environments: string[] = [], olderRaw?: string) => {
       setLandingLoading(true)
       void applyCollectionJson(raw, null, environments)
+        .then((applied) => {
+          // Two collections were dropped: the first is the older version, the second opens as the current one.
+          if (applied && olderRaw !== undefined) {
+            setReferenceRaw(olderRaw)
+            setActive('compare')
+          }
+        })
         .catch((e) => {
           console.error(e)
           notify({ variant: 'error', title: 'Import failed', description: describeAnalysisError(e) })
@@ -345,14 +383,19 @@ export function AnalyzeApp({
             notify({ variant: 'error', title: 'Add a collection', description: 'Environment and globals files are analyzed together with a Postman collection.' })
             return
           }
-          if (collections.length > 1) {
+          if (collections.length > 2) {
             setLandingLoading(false)
-            notify({ variant: 'error', title: 'Add one collection at a time', description: 'Drop a single collection together with any environment or globals files.' })
+            notify({ variant: 'error', title: 'Add at most two collections', description: 'Drop one collection, or two to compare them (older first), together with any environment or globals files.' })
             return
           }
           if (collections.length === 0) {
             setLandingLoading(false)
             notify({ variant: 'error', title: 'Not a Postman file', description: `${unknown} is neither a collection nor an environment export.` })
+            return
+          }
+          if (collections.length === 2) {
+            notify({ title: 'Comparing two collections', description: 'The first file is the older version, the second one is opened.' })
+            runImport(collections[1], environments, collections[0])
             return
           }
           runImport(collections[0], environments)
@@ -388,6 +431,7 @@ export function AnalyzeApp({
     setOriginalRawJson(null)
     setEnvironmentTexts([])
     setCurrentLibraryId(null)
+    setReferenceRaw(null)
     setSearch('')
     setSearchOpen(false)
     setFocusRequestId(null)
@@ -413,6 +457,46 @@ export function AnalyzeApp({
       }
     },
     [applyCollectionJson, refreshSavedCollections, notify]
+  )
+
+  const handleCompareWithLibrary = useCallback(
+    async (id: string) => {
+      try {
+        const record = await getSavedCollection(id)
+        if (!record) {
+          notify({ variant: 'error', title: 'Saved collection not found', description: 'It may have been removed by a teammate.' })
+          await refreshSavedCollections()
+          return
+        }
+        setReferenceRaw(record.rawJson)
+        setActive('compare')
+      } catch (e) {
+        console.error(e)
+        notify({ variant: 'error', title: 'Failed to open saved collection', description: e instanceof Error ? e.message : undefined })
+      }
+    },
+    [notify, refreshSavedCollections]
+  )
+
+  const handleChooseReferenceFile = useCallback(
+    async (file: File) => {
+      if (file.size === 0 || file.size > MAX_IMPORT_BYTES) {
+        notify({ variant: 'error', title: file.size === 0 ? 'File is empty' : 'File is too large', description: file.name })
+        return
+      }
+      try {
+        const text = await file.text()
+        const json = JSON.parse(text) as unknown
+        if (!isCollectionJson(json)) {
+          notify({ variant: 'error', title: 'Not a Postman collection', description: `${file.name} needs an item array.` })
+          return
+        }
+        setReferenceRaw(text)
+      } catch {
+        notify({ variant: 'error', title: 'Could not read the file', description: `${file.name} is not valid JSON.` })
+      }
+    },
+    [notify]
   )
 
   const handleSaveCurrentToLibrary = useCallback(async () => {
@@ -613,7 +697,7 @@ export function AnalyzeApp({
             onLoad={(id) => void handleLoadFromLibrary(id)}
             onLibraryChange={() => void refreshSavedCollections()}
             allowDelete={libraryAllowDelete}
-          encrypted={libraryEncrypted}
+            encrypted={libraryEncrypted}
           />
         )}
       </>
@@ -678,6 +762,18 @@ export function AnalyzeApp({
           />
         )}
         {active === 'score' && <ScorePage score={score} findings={findings} />}
+        {active === 'compare' && (
+          <ComparePage
+            current={{ parsed, findings, score }}
+            reference={reference}
+            loading={referenceLoading}
+            library={teamLibraryVisible ? savedCollections : []}
+            currentLibraryId={currentLibraryId}
+            onChooseFile={(file) => void handleChooseReferenceFile(file)}
+            onChooseLibrary={(id) => void handleCompareWithLibrary(id)}
+            onClear={() => setReferenceRaw(null)}
+          />
+        )}
       </DashboardShell>
 
       <RequestSearchModal
@@ -707,6 +803,7 @@ export function AnalyzeApp({
           onLibraryChange={() => void refreshSavedCollections()}
           allowDelete={libraryAllowDelete}
           encrypted={libraryEncrypted}
+          onCompare={(id) => void handleCompareWithLibrary(id)}
         />
       )}
     </>

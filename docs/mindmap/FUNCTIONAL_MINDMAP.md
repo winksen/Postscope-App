@@ -32,6 +32,10 @@ mindmap
         CWE / OWASP refs
       Hygiene notes
       Score and grade
+      Compare versions
+        New and resolved findings
+        Score change
+        Added and changed requests
     Act
       Repair center
         Safe auto fixes
@@ -55,6 +59,7 @@ mindmap
       CLI scan
       Fail on severity
       Minimum score
+      Diff two versions
     Protect
       Browser-only by default
       Basic auth gate
@@ -82,7 +87,7 @@ mindmap
 
 | Way in | Behavior |
 |---|---|
-| Drag and drop / Browse | Accepts `.json` and `*.postman_collection.json`, plus any number of `*.postman_environment.json` and `*.postman_globals.json` files in the same drop (one collection at a time; environment files alone are refused). Empty files and files over 50 MB are refused with a clear message. |
+| Drag and drop / Browse | Accepts `.json` and `*.postman_collection.json`, plus any number of `*.postman_environment.json` and `*.postman_globals.json` files in the same drop (one collection, or two collections to compare them with the older one first; environment files alone are refused). Empty files and files over 50 MB are refused with a clear message. |
 | Paste JSON | Validates that the text is JSON with `info` and an `item` array before importing. |
 | Sample collections | Four bundled demos: clean default, large messy enterprise collection, secrets + auth, intentionally vulnerable. |
 | Team library | "Recently saved" list on the import page and a full library dialog (open, export, remove). |
@@ -99,6 +104,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | **Requests** | Postman-like explorer: folder tree, request details (URL, query params, headers, body), and per-request findings with a health score. Credential values are **masked** until the user clicks the eye icon. |
 | **Security** | All security-impact findings with severity/category filters and search. The detail dialog shows the recommendation, affected requests, **masked evidence** (where each issue was found), and **CWE / OWASP API Top 10** references. |
 | **Hygiene** | Maintainability notes: missing descriptions, unused collection variables, duplicate or placeholder names, loose root requests, deep nesting, empty headers, GET requests with bodies. |
+| **Compare** | Compares the open collection (the newer version) with an older one chosen from a file or from the team library. Shows the score change, **new** findings (present now, not before), **resolved** findings, and requests that were added, removed or edited, plus new hosts and auth types. Requests are recognized by id, then by method and URL, so a rename or move does not count as a removal plus an addition, and the findings of a renamed request stay "unchanged". Nothing is stored. Also reachable from the library dialog (**Compare**) and by dropping two collections on the import page (older first). |
 | **Score** | A headline 0–100 score and letter grade (A–F) made of a **security score** (secrets, variables, auth; 85%) and a **hygiene score** (15%), per-category scores, a per-finding penalty breakdown, and improvement advice. A finding that affects more requests costs more points, up to a cap per rule, so one noisy rule cannot zero the score alone. Teams can change the point values with `SCORE_WEIGHTS`. |
 
 ### What gets detected
@@ -178,7 +184,7 @@ Available in `hybrid` and `on` modes.
 - **Consent first (hybrid):** users must accept an upload warning before anything is stored.
 - **No duplicates:** saving identical content returns the existing entry ("Already in the team library").
 - **Operator policies:** maximum items, retention in days, total size quota, optional server-side **secret redaction** before storing, and an option to **disable removal** for audit trails.
-- **Library dialog:** open, export JSON, or remove (when allowed). Load errors show a retry button instead of failing silently. When the operator uses single sign-on, each entry shows who saved it ("by alice@example.com").
+- **Library dialog:** open, compare with the open collection, export JSON, or remove (when allowed). Load errors show a retry button instead of failing silently. When the operator uses single sign-on, each entry shows who saved it ("by alice@example.com").
 - **Encryption at rest (optional):** with an operator-provided key, collections are stored encrypted on the server's disk and in its backups. The dialog says so. Tampered files are skipped.
 - **Audit trail (default on):** the server logs who saved, opened and removed which collection, and when. It never logs collection content.
 
@@ -200,6 +206,7 @@ Available in `hybrid` and `on` modes.
 | `--baseline file` | Report and fail only on findings that are not in the baseline file |
 | `--write-baseline file` | Record the current findings as a baseline and exit 0 |
 | `--auto-env` | Also analyze the environment and globals files stored next to each collection |
+| `postscope diff old.json new.json` | Compare two versions: new and resolved findings, score change, request changes. `--fail-on-new critical\|warning\|info\|none` (default critical) exits 1 when a finding at or above that severity is new; `--format text\|json\|markdown`; `--output file`; same rule options as `scan` |
 | `--list-rules` | Print the rule catalog |
 | `--version` | Print the PostScope version (same value as the app, Docker image and `/api/config`, from any directory) |
 
