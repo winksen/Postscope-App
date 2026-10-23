@@ -210,3 +210,28 @@ export function scopedSecretsCollection(): Record<string, unknown> {
     ],
   }
 }
+
+const rep = (char: string, count: number) => char.repeat(count)
+
+/**
+ * One sample per provider pattern, assembled at runtime so no token-shaped literal is committed.
+ * `near` values have the right prefix but the wrong length or alphabet and must not match.
+ */
+export const PROVIDER_SAMPLES: Record<string, { label: string; token: string; near: string }> = {
+  'entra-client-secret': { label: 'Microsoft Entra ID client secret', token: ['abc', '8Q', '~', rep('x1Y', 11)].join(''), near: ['abc', '8Q', '~', 'short'].join('') },
+  'okta-api-token': { label: 'Okta API token', token: ['SSWS', ' ', '00', rep('aB3_', 10)].join(''), near: ['SSWS', ' ', '00', 'tooshort'].join('') },
+  'vault-service-token': { label: 'HashiCorp Vault service token', token: ['hvs', '.', rep('aB3-', 12)].join(''), near: ['hvs', '.', 'short'].join('') },
+  'vault-batch-token': { label: 'HashiCorp Vault batch token', token: ['hvb', '.', rep('aB3-', 40)].join(''), near: ['hvb', '.', rep('aB3-', 10)].join('') },
+  'vault-recovery-token': { label: 'HashiCorp Vault recovery token', token: ['hvr', '.', rep('aB3-', 12)].join(''), near: ['hvr', '.', 'short'].join('') },
+  'postman-api-key': { label: 'Postman API key', token: ['PMAK', '-', rep('a1', 12), '-', rep('b2', 17)].join(''), near: ['PMAK', '-', rep('a1', 12), '-', rep('b2', 5)].join('') },
+  'atlassian-token': { label: 'Atlassian API token', token: ['ATATT', '3', rep('xY9_', 45)].join(''), near: ['ATATT', '3', rep('xY9_', 5)].join('') },
+  'shopify-token': { label: 'Shopify access token', token: ['shpat', '_', rep('0f', 16)].join(''), near: ['shpat', '_', rep('0f', 4)].join('') },
+  'digitalocean-token': { label: 'DigitalOcean token', token: ['dop', '_v1_', rep('0a', 32)].join(''), near: ['dop', '_v1_', rep('0a', 8)].join('') },
+  'dockerhub-token': { label: 'Docker Hub access token', token: ['dckr', '_pat_', rep('aB3_', 8)].join(''), near: ['dckr', '_pat_', 'short'].join('') },
+  'grafana-service-account': { label: 'Grafana service account token', token: ['glsa', '_', rep('aB', 16), '_', rep('0f', 4)].join(''), near: ['glsa', '_', rep('aB', 4), '_', rep('0f', 4)].join('') },
+  'grafana-cloud-token': { label: 'Grafana Cloud token', token: ['glc', '_', rep('aB3/', 12)].join(''), near: ['glc', '_', 'short'].join('') },
+  'huggingface-token': { label: 'Hugging Face token', token: ['hf', '_', rep('aBcDe', 7).slice(0, 34)].join(''), near: ['hf', '_', rep('aBcDe', 7).slice(0, 20)].join('') },
+  'databricks-token': { label: 'Databricks access token', token: ['dapi', rep('0a', 16)].join(''), near: ['dapi', rep('0a', 4)].join('') },
+  'pypi-token': { label: 'PyPI upload token', token: ['pypi', '-', 'AgE', rep('xY9_', 20)].join(''), near: ['pypi', '-', 'AgE', 'short'].join('') },
+  'square-token': { label: 'Square access token', token: ['sq0atp', '-', rep('aB3_', 5), 'aB'].join(''), near: ['sq0atp', '-', 'short'].join('') },
+}

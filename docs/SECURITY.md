@@ -58,7 +58,9 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 | Descriptions | Provider tokens and `key: value` credential fragments in collection, folder and request descriptions (replaced with `{{REDACTED}}` in sanitized copies) |
 | Path variables | Credential-like `url.variable` entries such as `:token` |
 | Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization`, query credentials and body secrets in the original request |
-| Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords |
+| Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords, Microsoft Entra ID client secrets, Okta API tokens, HashiCorp Vault tokens, Postman API keys, Atlassian, Shopify, DigitalOcean, Docker Hub, Grafana, Hugging Face, Databricks, PyPI and Square tokens |
+| Basic Authorization | The base64 value is decoded; only a literal password is reported, so `Basic` tokens that encode `{{variables}}` are not false positives |
+| Credential-named fields | Long random-looking literals (20+ characters, high entropy) in sensitive header, query, form and JSON field names that no other rule recognized (`HIGH_ENTROPY_LITERAL`) |
 | Disabled entries | Headers, query params, form fields and scripts switched off in Postman are still in the export, so they go through the same secret rules (evidence is labelled `(disabled)`) |
 | Transport | `http://` / `ws://` to non-local hosts (including a `{{baseUrl}}` that resolves to one), `strictSSL: false` |
 

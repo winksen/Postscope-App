@@ -103,7 +103,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.1.29 | `v0.1.29` | A1 | Bug | URL and auth rule accuracy | `b971633` |
 | V0.1.30 | `v0.1.30` | A1 | Bug, Enhancement | Script credential detection gaps | `b0e64da` |
 | V0.1.31 | `v0.1.31` | A1 | Security | Trusted proxy and lockout hardening | `807e12f` |
-| V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes | |
+| V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes | `61b576f` |
 | V0.1.33 | `v0.1.33` | A2 | Enhancement | Secret pattern expansion and Basic token decoding | |
 | V0.1.34 | `v0.1.34` | A2 | Feature | Postman environments and globals | |
 | V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules | |

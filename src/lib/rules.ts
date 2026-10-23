@@ -19,6 +19,7 @@ export type RuleId =
   | 'INSECURE_HTTP'
   | 'TLS_VERIFICATION_DISABLED'
   | 'SECRET_LOGGED_IN_SCRIPT'
+  | 'HIGH_ENTROPY_LITERAL'
   | 'MISSING_DESCRIPTION'
   | 'NO_COLLECTION_VARIABLES'
   | 'INCONSISTENT_AUTH'
@@ -211,6 +212,15 @@ const definitions: RuleDefinition[] = [
     severity: 'warning',
     category: 'secrets',
     cwe: 'CWE-532',
+  },
+  {
+    id: 'HIGH_ENTROPY_LITERAL',
+    title: 'High-entropy literal in a credential position',
+    description: 'A header, query parameter or body field with a credential-like name holds a long, random-looking literal that no other secret rule recognized.',
+    recommendation: 'If the value is a credential, move it to a {{variable}} defined in a private environment or vault.',
+    severity: 'warning',
+    category: 'secrets',
+    cwe: 'CWE-798',
   },
 
   // Info

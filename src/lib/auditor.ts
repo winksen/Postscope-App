@@ -11,11 +11,14 @@ import {
   AUTH_HEADER_SCHEME,
   SESSION_COOKIE,
   TOKEN_HEADER,
+  decodeBasicCredentials,
   evidencePreview,
   findSecretPatterns,
+  isHighEntropyLiteral,
   isLikelySecretValue,
   isSensitiveHeader,
   isSensitiveKey,
+  maskUsername,
   redactSecretsInText,
 } from './secretPatterns'
 
@@ -109,6 +112,15 @@ class FindingCollector {
     if (description) hits.description = description
   }
 
+  /** `requestId|location` keys already reported by any of the given rules. */
+  flaggedLocations(ruleIds: RuleId[]): Set<string> {
+    const keys = new Set<string>()
+    for (const ruleId of ruleIds) {
+      for (const evidence of this.hits.get(ruleId)?.evidence ?? []) keys.add(`${evidence.requestId ?? ''}|${evidence.location}`)
+    }
+    return keys
+  }
+
   has(ruleId: RuleId): boolean {
     return this.hits.has(ruleId)
   }
@@ -178,6 +190,18 @@ function checkHeaderList(req: ParsedRequest, headers: KeyValue[], suffix: string
     const isAuthorization = lower === 'authorization' || lower === 'proxy-authorization'
     if (isAuthorization) {
       const value = h.value.trim()
+      const basic = /^Basic\s+\S+$/i.test(value) ? decodeBasicCredentials(value) : null
+      if (basic) {
+        // The token is readable: only a literal password makes it a leak (a variable or placeholder is fine).
+        if (isLikelySecretValue(basic.password)) {
+          const account = /^api$/i.test(basic.username) && /^key-[0-9a-f]{32}$/.test(basic.password) ? ' (Mailgun API key)' : ''
+          out.add('HARDCODED_TOKEN', req.id, {
+            location: `header ${key}${suffix} (basic credentials for user ${maskUsername(basic.username)})${account}`,
+            preview: evidencePreview(basic.password),
+          })
+        }
+        continue
+      }
       if (AUTH_HEADER_SCHEME.test(value) || (!/\s/.test(value) && value.length >= 16)) {
         out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(value) })
       }
@@ -262,6 +286,38 @@ function checkBody(req: ParsedRequest, out: FindingCollector): void {
   // Non-JSON raw bodies (XML/SOAP, form-like text, JSON that does not parse): look at individual fields.
   for (const field of scanRawBodyFields(req.bodyRaw)) {
     checkSecretField(req, field.key, field.value, `raw body ${field.key}`, out)
+  }
+}
+
+/**
+ * Long random-looking literals in credential positions (sensitive header, query, form or JSON field names)
+ * that no other secret rule reported at the same place.
+ */
+function checkHighEntropy(parsed: ParsedCollection, out: FindingCollector): void {
+  const flagged = out.flaggedLocations(SECRET_RULES)
+  const report = (req: ParsedRequest, location: string, value: string) => {
+    if (flagged.has(`${req.id}|${location}`) || !isHighEntropyLiteral(value) || findSecretPatterns(value, 1).length) return
+    out.add('HIGH_ENTROPY_LITERAL', req.id, { location, preview: evidencePreview(value) })
+  }
+  for (const req of parsed.requests) {
+    for (const [headers, suffix] of [[req.headers, ''], [req.disabledHeaders ?? [], DISABLED_SUFFIX]] as const) {
+      for (const header of headers) {
+        const lower = header.key.trim().toLowerCase()
+        // Cookies and readable Basic tokens are judged by the header rules, not by entropy.
+        if (lower === 'cookie' || (/^Basic\s/i.test(header.value.trim()) && decodeBasicCredentials(header.value))) continue
+        if (isSensitiveHeader(header.key)) report(req, `header ${header.key.trim()}${suffix}`, header.value)
+      }
+    }
+    for (const [params, suffix] of [[req.queryParams ?? [], ''], [req.disabledQueryParams ?? [], DISABLED_SUFFIX]] as const) {
+      for (const param of params) if (isSensitiveKey(param.key)) report(req, `query ${param.key.trim()}${suffix}`, param.value)
+    }
+    for (const [fields, suffix] of [[req.bodyFields ?? [], ''], [req.disabledBodyFields ?? [], DISABLED_SUFFIX]] as const) {
+      for (const field of fields) if (isSensitiveKey(field.key)) report(req, `body field ${field.key}${suffix}`, field.value)
+    }
+    if (!req.bodyFields?.length && req.bodyRaw && req.bodyMode !== 'graphql') {
+      const json = tryParseJson(req.bodyRaw)
+      if (json !== undefined) walkJson(json, (key, value, path) => isSensitiveKey(key) && report(req, `body ${path}`, value))
+    }
   }
 }
 
@@ -828,6 +884,7 @@ export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): 
   checkCollectionVariables(parsed, out)
   checkKnownPatterns(parsed, out)
   checkDescriptions(parsed, out)
+  checkHighEntropy(parsed, out)
 
   runWarningChecks(parsed, out)
   runInfoChecks(parsed, out)

@@ -61,7 +61,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 
 - **Import by drag-and-drop, file picker or pasted JSON**: accepts `.json` and typical `*.postman_collection.json` exports
 - **Collection parsing**: folders, HTTP methods, URLs, headers, bodies, auth inheritance, scripts, saved responses, GraphQL and other request protocols, `{{variable}}` usage vs. defined collection variables
-- **Automated audit** with 27 rules, severities (critical / warning / info), categories (secrets, variables, auth, hygiene) and 16 provider secret patterns
+- **Automated audit** with 28 rules, severities (critical / warning / info), categories (secrets, variables, auth, hygiene) and 32 provider secret patterns
 - **Overview**: stat cards, method and auth distribution charts, request tree with search
 - **Requests, Security and Hygiene**: filterable findings with masked evidence and per-request context
 - **Repair**: guided fixes (secrets to variables, base URL variables, auth cleanup and more) and a sanitized download
