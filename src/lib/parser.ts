@@ -2,6 +2,7 @@ import type { PostmanAuth, PostmanCollection } from '../types/postman'
 import { detectRequestProtocol, type RequestProtocol } from './requestProtocol'
 import { getAuthEntries, isInheritedAuth, normalizeAuthType, type AuthEntry } from './authSchemes'
 import { extractVariableNames } from './variables'
+import { MAX_DESCRIPTION_LENGTH } from './descriptions'
 
 export type { RequestProtocol }
 
@@ -22,6 +23,10 @@ export interface ParsedSavedResponse {
   /** Disabled headers of the saved request. They still ship in the export, so they are audited. */
   disabledRequestHeaders?: KeyValue[]
   requestUrl?: string
+  /** Query parameters of the saved request (kept for scanning). */
+  requestQuery?: KeyValue[]
+  /** Truncated body text of the saved request (raw text, or form fields as `key=value` pairs). */
+  requestBody?: string
   requestAuthType?: string
   requestAuthFields?: AuthEntry[]
 }
@@ -50,6 +55,8 @@ export interface ParsedRequest {
   /** Entries of the effective auth helper (all types except basic). */
   authFields?: AuthEntry[];
   queryParams?: KeyValue[];
+  /** Path variables (`:id` segments) from `url.variable`. */
+  pathVariables?: KeyValue[];
   /** Query params switched off in Postman (kept in `url.query`, absent from `url.raw`). */
   disabledQueryParams?: KeyValue[];
   bodyMode?: string;
@@ -80,6 +87,28 @@ export interface ParsedScript {
   disabled?: boolean
 }
 
+/** Free-text documentation of the collection, a folder or a request. */
+export interface ParsedDescription {
+  kind: 'collection' | 'folder' | 'request'
+  /** `collection`, the folder path joined with ` / `, or the request id. */
+  owner: string
+  /** Item path of the owner; `[]` for the collection. */
+  ownerPath: number[]
+  /** Set for request descriptions. */
+  requestId?: string
+  /** Truncated to 64 KB. */
+  text: string
+}
+
+/** A variable defined on a folder or a request (not on the collection). */
+export interface ParsedScopedVariable extends ParsedVariable {
+  scope: 'folder' | 'request'
+  /** The folder path joined with ` / ` or the request id. */
+  owner: string
+  ownerPath: number[]
+  requestId?: string
+}
+
 /** A collection or folder that defines its own auth (requests may inherit it). */
 export interface ParsedAuthOwner {
   /** `collection` or the folder path joined with ` / `. */
@@ -108,6 +137,10 @@ export interface ParsedCollection {
   requests: ParsedRequest[];
   folders: ParsedFolder[];
   collectionVariables?: ParsedVariable[];
+  /** Folder and request level variables. */
+  scopedVariables?: ParsedScopedVariable[];
+  /** Collection, folder and request descriptions. */
+  descriptions?: ParsedDescription[];
   collectionAuthType?: string;
   /** Collection- and folder-level auth definitions. */
   authOwners?: ParsedAuthOwner[];
@@ -173,6 +206,14 @@ function parseQueryFromRaw(rawUrl: string): KeyValue[] {
       const value = eq === -1 ? '' : pair.slice(eq + 1)
       return { key: safeDecode(key), value: safeDecode(value) }
     })
+}
+
+function getPathVariables(url: unknown): KeyValue[] {
+  if (!isRecord(url) || !Array.isArray(url.variable)) return []
+  return url.variable
+    .filter(isRecord)
+    .map((entry) => ({ key: asText(entry.key), value: asText(entry.value) }))
+    .filter((entry) => entry.key)
 }
 
 function safeDecode(value: string): string {
@@ -284,6 +325,13 @@ function readEvents(events: unknown): Array<{ listen: string; source: string; di
     .filter((event) => event.source.trim())
 }
 
+/** Saved request body as scannable text: raw text, or form fields as `key=value` pairs. */
+function savedRequestBody(body: unknown): string | undefined {
+  const info = readBody(body)
+  const text = info.raw ?? (info.fields ?? []).map((entry) => `${entry.key}=${entry.value}`).join('&')
+  return text ? text.slice(0, MAX_RESPONSE_BODY_SCAN) : undefined
+}
+
 function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
   if (!Array.isArray(responses)) return []
   return responses
@@ -302,6 +350,8 @@ function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
         requestHeaders: originalHeaders.filter((header) => !header.disabled).map(({ key, value }) => ({ key, value })),
         disabledRequestHeaders: disabledRequestHeaders.length ? disabledRequestHeaders : undefined,
         requestUrl: original ? getUrlString(original.url) || undefined : undefined,
+        requestQuery: original ? getQueryParams(original.url, getUrlString(original.url)).active : undefined,
+        requestBody: original ? savedRequestBody(original.body) : undefined,
         requestAuthType: originalAuth && !isInheritedAuth(originalAuth) ? normalizeAuthType(originalAuth.type) : undefined,
         requestAuthFields: originalAuth && !isInheritedAuth(originalAuth) ? getAuthEntries(originalAuth) : undefined,
       }
@@ -337,7 +387,21 @@ interface ParseAccumulator {
   idCounts: Map<string, number>
   scripts: ParsedScript[]
   authOwners: ParsedAuthOwner[]
+  scopedVariables: ParsedScopedVariable[]
+  descriptions: ParsedDescription[]
   warnings: string[]
+}
+
+function readScopedVariables(variables: unknown, scope: ParsedScopedVariable['scope'], owner: string, ownerPath: number[], requestId?: string): ParsedScopedVariable[] {
+  return readCollectionVariables(variables).map((variable) => ({ ...variable, scope, owner, ownerPath, requestId }))
+}
+
+function addDescription(acc: ParseAccumulator, kind: ParsedDescription['kind'], owner: string, ownerPath: number[], value: unknown, requestId?: string): void {
+  const text = descriptionText(value)
+  if (!text.trim()) return
+  const duplicate = acc.descriptions.some((entry) => entry.owner === owner && entry.kind === kind && entry.text === text.slice(0, MAX_DESCRIPTION_LENGTH))
+  if (duplicate) return
+  acc.descriptions.push({ kind, owner, ownerPath, requestId, text: text.slice(0, MAX_DESCRIPTION_LENGTH) })
 }
 
 function warn(acc: ParseAccumulator, message: string): void {
@@ -392,6 +456,7 @@ function parseItem(
     })
 
     const queryParams = getQueryParams(req.url, url)
+    const pathVariables = getPathVariables(req.url)
     const events = readEvents(rawItem.event)
     const joinSources = (listen: string, disabled: boolean) =>
       events.filter((e) => e.listen === listen && e.disabled === disabled).map((e) => e.source).join('\n') || undefined
@@ -448,7 +513,12 @@ function parseItem(
       scripts,
       savedResponses: savedResponses.length ? savedResponses : undefined,
       tlsVerificationDisabled: strictSSL === false ? true : undefined,
+      pathVariables: pathVariables.length ? pathVariables : undefined,
     })
+
+    addDescription(acc, 'request', id, itemPath, req.description, id)
+    addDescription(acc, 'request', id, itemPath, rawItem.description, id)
+    acc.scopedVariables.push(...readScopedVariables(rawItem.variable, 'request', id, itemPath, id))
   }
 
   if (rawItem.item !== undefined && rawItem.item !== null) {
@@ -470,6 +540,9 @@ function parseItem(
         fields: getAuthEntries(folderAuth),
       })
     }
+
+    addDescription(acc, 'folder', newPath.join(' / '), itemPath, rawItem.description)
+    acc.scopedVariables.push(...readScopedVariables(rawItem.variable, 'folder', newPath.join(' / '), itemPath))
 
     for (const event of readEvents(rawItem.event)) {
       acc.scripts.push({ owner: newPath.join(' / '), ownerPath: itemPath, listen: event.listen, source: event.source, disabled: event.disabled || undefined })
@@ -504,6 +577,8 @@ export function parseCollection(json: unknown): ParsedCollection {
     idCounts: new Map<string, number>(),
     scripts: [],
     authOwners: [],
+    scopedVariables: [],
+    descriptions: [],
     warnings: [],
   }
 
@@ -523,6 +598,8 @@ export function parseCollection(json: unknown): ParsedCollection {
       fields: getAuthEntries(collectionAuth),
     })
   }
+
+  addDescription(acc, 'collection', 'collection', [], isRecord(col.info) ? col.info.description : undefined)
 
   for (const event of readEvents(col.event)) {
     acc.scripts.push({ owner: 'collection', ownerPath: [], listen: event.listen, source: event.source, disabled: event.disabled || undefined })
@@ -577,6 +654,8 @@ export function parseCollection(json: unknown): ParsedCollection {
     requests: acc.requests,
     folders,
     collectionVariables,
+    scopedVariables: acc.scopedVariables,
+    descriptions: acc.descriptions,
     collectionAuthType: collectionAuth ? normalizeAuthType(collectionAuth.type) : undefined,
     authOwners: acc.authOwners,
     scripts: acc.scripts,
