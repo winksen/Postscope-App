@@ -32,6 +32,8 @@ export type RuleId =
   | 'ROOT_LEVEL_REQUESTS'
   | 'DEEP_FOLDER_NESTING'
   | 'GET_WITH_BODY'
+  | 'SUPPRESSION_EXPIRED'
+  | 'SUPPRESSION_INVALID'
 
 export interface RuleDefinition {
   id: RuleId
@@ -321,6 +323,22 @@ const definitions: RuleDefinition[] = [
     title: 'GET or HEAD request with a body',
     description: 'GET/HEAD requests carry a request body, which many servers, proxies, and CDNs silently drop.',
     recommendation: 'Move the payload to query parameters or switch the request to POST.',
+    severity: 'info',
+    category: 'hygiene',
+  },
+  {
+    id: 'SUPPRESSION_EXPIRED',
+    title: 'Expired suppression',
+    description: 'A suppression passed its expiry date and no longer hides anything, so the findings it covered are active again.',
+    recommendation: 'Fix the underlying findings, or review the suppression and set a new expiry date with a fresh reason.',
+    severity: 'info',
+    category: 'hygiene',
+  },
+  {
+    id: 'SUPPRESSION_INVALID',
+    title: 'Malformed suppression',
+    description: 'A postscope-ignore line in a description is missing a reason, names an unknown rule, or has a bad expiry date, so it was not applied.',
+    recommendation: 'Use "postscope-ignore RULE_ID: reason", optionally with expires=YYYY-MM-DD after the rule id.',
     severity: 'info',
     category: 'hygiene',
   },

@@ -1,5 +1,6 @@
 import { parseCollection } from './parser'
-import { runAudit, type AuditOptions } from './auditor'
+import { runAuditDetailed, type AuditOptions } from './auditor'
+import type { SuppressedFinding } from './suppressions'
 import { attachEnvironments } from './environment'
 import type { ParsedCollection } from './parser'
 import type { Finding } from './auditor'
@@ -7,6 +8,8 @@ import type { Finding } from './auditor'
 export interface AnalysisResult {
   parsed: ParsedCollection
   findings: Finding[]
+  /** Occurrences hidden by reviewed suppressions (inline `postscope-ignore` lines). */
+  suppressed: SuppressedFinding[]
 }
 
 /** Analyses that take longer than this are aborted so a pathological file cannot hang the tab. */
@@ -27,8 +30,8 @@ export async function analyzeCollection(json: unknown, options?: AuditOptions, e
   await yieldToMain()
   const parsed = attachEnvironments(parseCollection(json), environments)
   await yieldToMain()
-  const findings = runAudit(parsed, options)
-  return { parsed, findings }
+  const { findings, suppressed } = runAuditDetailed(parsed, options)
+  return { parsed, findings, suppressed }
 }
 
 /** Friendly message for invalid JSON / non-collection input. */
@@ -49,6 +52,7 @@ interface WorkerResponse {
   ok: boolean
   parsed?: ParsedCollection
   findings?: Finding[]
+  suppressed?: SuppressedFinding[]
   error?: string
 }
 
@@ -98,7 +102,7 @@ function getWorker(): Worker | null {
     pending.delete(event.data.id)
     clearTimeout(job.timer)
     if (event.data.ok && event.data.parsed && event.data.findings) {
-      job.resolve({ parsed: event.data.parsed, findings: event.data.findings })
+      job.resolve({ parsed: event.data.parsed, findings: event.data.findings, suppressed: event.data.suppressed ?? [] })
     } else {
       job.reject(new Error(event.data.error || 'Analysis failed'))
     }

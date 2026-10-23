@@ -137,3 +137,109 @@ test('--weights changes the score and invalid weights are usage errors', () => {
   assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '80', '--weights', 'critical=1,warning=1,info=0').code, 0)
   assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '80').code, 1)
 })
+
+/** A small project folder with its own config; the CLI looks for `.postscope.json` above the scanned file. */
+function project(config: unknown, collection: unknown = kitchenSinkCollection()) {
+  const dir = fs.mkdtempSync(path.join(tmp, 'project-'))
+  const nested = path.join(dir, 'collections', 'api')
+  fs.mkdirSync(nested, { recursive: true })
+  const file = path.join(nested, 'api.postman_collection.json')
+  fs.writeFileSync(file, JSON.stringify(collection))
+  if (config !== undefined) fs.writeFileSync(path.join(dir, '.postscope.json'), JSON.stringify(config))
+  return { dir, file }
+}
+
+const rulesIn = (stdout: string) => (JSON.parse(stdout).findings as Array<{ ruleId: string; severity: string }>)
+
+test('a project config is found above the scanned file and applies rules, severities and weights', () => {
+  const { file, dir } = project({ disabledRules: ['GET_WITH_BODY', 'MISSING_DESCRIPTION'], severityOverrides: { INSECURE_HTTP: 'critical' }, weights: { critical: 0, warning: 0, info: 0 } })
+  const result = cli(file, '--format', 'json', '--fail-on', 'none')
+  assert.equal(result.code, 0)
+  const findings = rulesIn(result.stdout)
+  assert.ok(!findings.some((finding) => finding.ruleId === 'GET_WITH_BODY' || finding.ruleId === 'MISSING_DESCRIPTION'))
+  assert.equal(findings.find((finding) => finding.ruleId === 'INSECURE_HTTP')?.severity, 'critical')
+  assert.equal(JSON.parse(result.stdout).score.total, 100)
+  assert.match(result.stderr, new RegExp(`Config: ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
+
+  assert.ok(rulesIn(cli(file, '--no-config', '--format', 'json', '--fail-on', 'none').stdout).some((finding) => finding.ruleId === 'GET_WITH_BODY'))
+  const elsewhere = path.join(dir, 'other-config.json')
+  fs.writeFileSync(elsewhere, JSON.stringify({ disabledRules: ['INSECURE_HTTP'] }))
+  const explicit = rulesIn(cli(file, '--config', elsewhere, '--format', 'json', '--fail-on', 'none').stdout)
+  assert.ok(!explicit.some((finding) => finding.ruleId === 'INSECURE_HTTP') && explicit.some((finding) => finding.ruleId === 'GET_WITH_BODY'))
+})
+
+test('command line flags add to and override the config', () => {
+  const { file } = project({ disabledRules: ['GET_WITH_BODY'], severityOverrides: { INSECURE_HTTP: 'critical' } })
+  const findings = rulesIn(cli(file, '--format', 'json', '--fail-on', 'none', '--disable', 'MISSING_DESCRIPTION', '--severity', 'INSECURE_HTTP=info').stdout)
+  assert.ok(!findings.some((finding) => ['GET_WITH_BODY', 'MISSING_DESCRIPTION'].includes(finding.ruleId)))
+  assert.equal(findings.find((finding) => finding.ruleId === 'INSECURE_HTTP')?.severity, 'info')
+})
+
+test('an invalid config is a usage error that lists every problem', () => {
+  const { file } = project({ disabledRule: [], suppressions: [{ ruleId: 'MISSING_AUTH' }] })
+  const result = cli(file)
+  assert.equal(result.code, 2)
+  assert.match(result.stderr, /invalid project config/)
+  assert.match(result.stderr, /unknown key "disabledRule"/)
+  assert.match(result.stderr, /suppressions\[0\]\.reason is required/)
+  assert.equal(cli(clean, '--config', path.join(tmp, 'nope.json')).code, 2)
+  assert.equal(cli(clean, '--config', path.join(tmp, 'x.json'), '--no-config').code, 2)
+})
+
+test('suppressions with a reason hide findings from the result, the exit code and the score but not from reports', () => {
+  const { file } = project(undefined)
+  const withoutSuppression = JSON.parse(cli(file, '--format', 'json', '--fail-on', 'none', '--no-config').stdout)
+  const critical = (withoutSuppression.findings as Array<{ ruleId: string; severity: string }>).filter((finding) => finding.severity === 'critical').map((finding) => finding.ruleId)
+  assert.ok(critical.length > 0)
+  assert.equal(cli(file).code, 1)
+
+  const accepted = project({ suppressions: critical.map((ruleId) => ({ ruleId, reason: 'Accepted for the demo collection', expires: '2999-01-01' })) })
+  const result = cli(accepted.file, '--format', 'json')
+  assert.equal(result.code, 0, result.stderr)
+  const report = JSON.parse(result.stdout)
+  assert.ok(report.findings.every((finding: { severity: string }) => finding.severity !== 'critical'))
+  assert.ok(report.suppressed.length > 0)
+  assert.ok(report.score.total > withoutSuppression.score.total)
+  assert.match(result.stderr, /Suppressed: \d+ occurrence\(s\)/)
+  assert.ok(!result.stdout.includes(FAKE.githubToken))
+})
+
+test('expired config suppressions are reported and no longer hide anything', () => {
+  const { file } = project({ suppressions: [{ ruleId: 'HARDCODED_API_KEY', reason: 'Temporary', expires: '2020-01-01' }] })
+  const report = JSON.parse(cli(file, '--format', 'json', '--fail-on', 'none').stdout)
+  const ids = (report.findings as Array<{ ruleId: string }>).map((finding) => finding.ruleId)
+  assert.ok(ids.includes('HARDCODED_API_KEY') && ids.includes('SUPPRESSION_EXPIRED'))
+})
+
+test('--write-baseline records today and --baseline only reports what is new', () => {
+  const { file, dir } = project(undefined)
+  const baselineFile = path.join(dir, 'postscope-baseline.json')
+  const written = cli(file, '--write-baseline', baselineFile)
+  assert.equal(written.code, 0)
+  assert.match(written.stderr, /baseline of \d+ occurrence\(s\) written/)
+  const baseline = JSON.parse(fs.readFileSync(baselineFile, 'utf8'))
+  assert.equal(baseline.version, 1)
+  assert.ok(baseline.entries.length > 10)
+  for (const secret of Object.values(FAKE)) assert.ok(!JSON.stringify(baseline).includes(secret))
+
+  const unchanged = cli(file, '--baseline', baselineFile, '--format', 'json')
+  assert.equal(unchanged.code, 0, unchanged.stderr)
+  assert.deepEqual(JSON.parse(unchanged.stdout).findings, [])
+  assert.equal(JSON.parse(unchanged.stdout).baseline.hiddenOccurrences, baseline.entries.length)
+
+  const grown = kitchenSinkCollection() as { item: unknown[] }
+  grown.item.push({ name: 'Leaky new request', request: { method: 'GET', url: 'https://new.example.com/x', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] } })
+  fs.writeFileSync(file, JSON.stringify(grown))
+  const regression = cli(file, '--baseline', baselineFile, '--format', 'json')
+  assert.equal(regression.code, 1)
+  const findings = JSON.parse(regression.stdout).findings as Array<{ ruleId: string; affected: Array<{ id: string }> }>
+  assert.ok(findings.some((finding) => finding.ruleId === 'HARDCODED_API_KEY' && finding.affected.every((item) => item.id === 'Leaky new request')))
+})
+
+test('baseline problems are usage errors', () => {
+  assert.equal(cli(clean, '--baseline', path.join(tmp, 'missing-baseline.json')).code, 2)
+  const broken = path.join(tmp, 'broken-baseline.json')
+  fs.writeFileSync(broken, '{"version": 9}')
+  assert.match(cli(clean, '--baseline', broken).stderr, /unsupported baseline version/)
+  assert.equal(cli(clean, '--baseline', broken, '--write-baseline', broken).code, 2)
+})

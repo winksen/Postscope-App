@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.37
+
+- Added a project config file for rules, severities and weights
+- Added baseline files so CI only fails on new findings
+- Added reviewed suppressions with a mandatory reason
+
 ## V0.1.36
 
 - Enhanced scoring to account for how many requests each finding affects

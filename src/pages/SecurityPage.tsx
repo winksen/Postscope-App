@@ -12,6 +12,7 @@ import { SeverityBadge } from '../components/SeverityBadge'
 import { FindingEvidence } from '../components/FindingEvidence'
 import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
+import type { SuppressedFinding } from '../lib/suppressions'
 import { affectedLabels } from '../lib/findingDisplay'
 import type { ParsedCollection } from '../lib/parser'
 import type { ScoreBreakdown } from '../lib/scorer'
@@ -32,6 +33,8 @@ import { Label } from '@/components/ui/label'
 interface SecurityPageProps {
   parsed: ParsedCollection
   findings: Finding[]
+  /** Occurrences hidden by reviewed suppressions; shown under the "Suppressed" view and never scored. */
+  suppressed?: SuppressedFinding[]
   score: ScoreBreakdown
   search: string
 }
@@ -52,7 +55,8 @@ function findingMatchesQuery(f: Finding, q: string, requests: ParsedCollection['
   )
 }
 
-export function SecurityPage({ parsed, findings, score, search }: SecurityPageProps) {
+export function SecurityPage({ parsed, findings, suppressed = [], score, search }: SecurityPageProps) {
+  const [view, setView] = useState<'active' | 'suppressed'>('active')
   const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
   const [detail, setDetail] = useState<Finding | null>(null)
@@ -62,7 +66,8 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
   const infoCount = findings.filter((f) => f.severity === 'info').length
   const affectedRequests = new Set(findings.flatMap((finding) => finding.affected)).size
 
-  const filtered = findings.filter((f) => {
+  const showingSuppressed = view === 'suppressed' && suppressed.length > 0
+  const filtered = (showingSuppressed ? suppressed : findings).filter((f) => {
     if (severityFilter !== 'all' && f.severity !== severityFilter) return false
     if (categoryFilter !== 'all' && f.category !== categoryFilter) return false
     if (!findingMatchesQuery(f, search, parsed.requests)) return false
@@ -128,7 +133,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
             <FunnelSimple className="h-4 w-4 text-muted-foreground" weight="fill" />
             <CardTitle className="text-base">Filters</CardTitle>
           </div>
-          <CardDescription>Narrow the table by severity and category</CardDescription>
+          <CardDescription>Narrow the table by severity and category{suppressed.length > 0 ? ', or switch to the suppressed findings' : ''}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
           <div className="grid w-full gap-2 sm:w-48">
@@ -161,6 +166,20 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
               </SelectContent>
             </Select>
           </div>
+          {suppressed.length > 0 && (
+            <div className="grid w-full gap-2 sm:w-48">
+              <Label htmlFor="view" className="text-xs">Show</Label>
+              <Select value={view} onValueChange={(v) => setView(v as 'active' | 'suppressed')}>
+                <SelectTrigger id="view" className="transition-colors duration-200 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active findings</SelectItem>
+                  <SelectItem value="suppressed">Suppressed ({suppressed.length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <Badge variant={scoreBadgeVariant} className="text-xs tabular-nums">
               Score {score.total}/100
@@ -202,7 +221,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Findings</CardTitle>
           <CardDescription>
-            {filtered.length} of {findings.length} rows
+            {filtered.length} of {showingSuppressed ? suppressed.length : findings.length} rows{showingSuppressed ? ' (suppressed, not scored)' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -213,7 +232,7 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
               </div>
               <p className="text-lg font-medium">Nothing to show</p>
               <p className="max-w-md text-sm text-muted-foreground">
-                {findings.length === 0
+                {(showingSuppressed ? suppressed.length : findings.length) === 0
                   ? 'No issues detected for this collection.'
                   : 'Adjust filters or search to see more results.'}
               </p>
@@ -243,7 +262,9 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
                       <TableCell className="text-xs uppercase text-muted-foreground">{f.category}</TableCell>
                       <TableCell className="max-w-[320px]">
                         <span className="line-clamp-2 text-sm font-medium">{f.title}</span>
-                        <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">{f.description}</span>
+                        <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">
+                          {'suppressions' in f ? `Suppressed: ${(f as SuppressedFinding).suppressions[0]?.reason ?? ''}` : f.description}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">
                         {f.affected.length ? `${f.affected.length} paths` : '-'}
@@ -289,6 +310,18 @@ export function SecurityPage({ parsed, findings, score, search }: SecurityPagePr
 
             <div className="space-y-5 p-6 max-h-[60vh] overflow-y-auto">
               <p className="text-sm text-muted-foreground">{detail.description}</p>
+              {'suppressions' in detail && (
+                <div className="rounded-lg bg-muted/45 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Suppressed</p>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {(detail as SuppressedFinding).suppressions.slice(0, 10).map((item, index) => (
+                      <li key={index}>
+                        {item.reason} <span className="text-xs text-muted-foreground">({item.source}{item.expires ? `, expires ${item.expires}` : ''})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {detail.affected.length > 0 && (
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Affected</p>
