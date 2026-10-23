@@ -275,3 +275,51 @@ test('the JSON report is version 2 and every evidence entry names a pointer wher
   const evidence = report.findings.flatMap((finding: { evidence: Array<{ pointer?: string }> }) => finding.evidence)
   assert.ok(evidence.filter((entry: { pointer?: string }) => entry.pointer).length / evidence.length > 0.9)
 })
+
+test('folders and quoted globs are expanded by the CLI, and `scan` is accepted as a subcommand', () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'tree-'))
+  fs.mkdirSync(path.join(dir, 'a', 'b'), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'one.postman_collection.json'), JSON.stringify(cleanCollection()))
+  fs.writeFileSync(path.join(dir, 'a', 'b', 'two.postman_collection.json'), JSON.stringify(kitchenSinkCollection()))
+  fs.writeFileSync(path.join(dir, 'a', 'ignored.json'), '{}')
+
+  const folder = JSON.parse(cli('scan', dir, '--no-config', '--format', 'json', '--fail-on', 'none').stdout) as Array<{ collection: { name: string } }>
+  assert.deepEqual(folder.map((report) => report.collection.name), ['Kitchen sink', 'Clean'])
+  const glob = JSON.parse(cli(path.join(dir, '**', '*.postman_collection.json'), '--no-config', '--format', 'json', '--fail-on', 'none').stdout) as unknown[]
+  assert.equal(glob.length, 2)
+  assert.equal(cli('scan', path.join(dir, 'a', '*.nothing')).code, 2)
+  assert.match(cli(path.join(dir, 'empty-*')).stderr, /no files match this pattern/)
+  assert.equal(cli('scan', dir, '--no-config', '--sanitize', path.join(tmp, 'x.json')).code, 2)
+})
+
+test('--auto-env analyzes the environment files stored next to each collection', () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'auto-env-'))
+  fs.writeFileSync(path.join(dir, 'api.postman_collection.json'), JSON.stringify(cleanCollection()))
+  fs.writeFileSync(path.join(dir, 'api.postman_environment.json'), JSON.stringify(environmentExport()))
+  const names = (args: string[]) => (JSON.parse(cli(...args, '--no-config', '--format', 'json', '--fail-on', 'none').stdout).collection.environments ?? []).map((item: { name: string }) => item.name)
+  assert.deepEqual(names([path.join(dir, 'api.postman_collection.json')]), [])
+  assert.deepEqual(names([path.join(dir, 'api.postman_collection.json'), '--auto-env']), ['Staging'])
+  assert.deepEqual(names([dir, '--auto-env', '-e', path.join(dir, 'api.postman_environment.json')]), ['Staging'])
+})
+
+test('--format junit produces well-formed XML with failures, passes and skips', () => {
+  const { file } = project({ suppressions: [{ ruleId: 'HARDCODED_API_KEY', reason: 'Sandbox key', expires: '2999-01-01' }] })
+  const result = cli(file, '--format', 'junit', '--fail-on', 'critical')
+  assert.equal(result.code, 1)
+  const xml = result.stdout
+  const stack: string[] = []
+  for (const tag of xml.replace(/<\?xml[^>]*\?>/, '').matchAll(/<(\/?)([A-Za-z-]+)[^>]*?(\/?)>/g)) {
+    if (tag[3] === '/') continue
+    if (tag[1] === '/') assert.equal(stack.pop(), tag[2])
+    else stack.push(tag[2])
+  }
+  assert.deepEqual(stack, [])
+  assert.match(xml, /<testsuites name="PostScope" tests="\d+" failures="[1-9]\d*" errors="0" skipped="[1-9]/)
+  assert.match(xml, /<failure message="[^"]+" type="critical">/)
+  assert.match(xml, /<skipped message="Suppressed: Sandbox key"\/>/)
+  assert.match(xml, /<system-out>/)
+  for (const secret of Object.values(FAKE)) assert.ok(!xml.includes(secret))
+  const lenient = cli(file, '--format', 'junit', '--fail-on', 'none').stdout
+  assert.match(lenient, /failures="0"/)
+  assert.ok(!/<failure/.test(lenient))
+})

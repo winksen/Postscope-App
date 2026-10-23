@@ -58,10 +58,11 @@ mindmap
       maintenance job
       graceful shutdown
     Tooling
-      CLI scan
+      CLI scan (compiled, folders, globs, junit)
       node:test suite
       GitHub Actions CI
-      Docker non-root image
+      Docker non-root image (compiled server, no node_modules)
+      GitHub Action (action.yml)
       release:check (version sync)
       CHANGELOG + release tags
 ```
@@ -99,7 +100,9 @@ flowchart LR
 | `src/workers/analysis.worker.ts` | Web Worker entry: `JSON.parse` → `parseCollection` → `runAudit` |
 | `src/pages/`, `src/components/` | React UI (pages, layout, shadcn-style primitives in `components/ui`) |
 | `server/` | Node HTTP server and Vite dev/preview middleware |
-| `cli/postscope.ts` | CI scanner |
+| `cli/postscope.ts`, `cli/inputs.ts` | CI scanner; `inputs.ts` expands folders and globs and finds sibling environment files |
+| `action.yml` | Composite GitHub Action (builds the CLI with esbuild, scans, writes SARIF and a job summary) |
+| `dist-node/` | Build output of `npm run build:node` (gitignored): `cli.js` and `server.js` |
 | `tests/` | `node:test` suites run through `tsx` (`npm test`) |
 | `scripts/` | Demo collection generator, test runner, `release-check.mjs` |
 | `public/samples/` | Bundled sample collections |
@@ -359,11 +362,12 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | Typecheck | `npm run typecheck` | `tsconfig.json` (browser) + `tsconfig.server.json` (server, CLI, tests, Vite config) |
 | Build | `npm run build` | Typecheck + Vite build; vendor chunks `react`, `charts`, `motion`; worker emitted separately |
 | Tests | `npm test` | `scripts/run-tests.mjs` → `node --import tsx --test tests/*.test.ts` |
+| Compile | `npm run build:node` | `scripts/build-node.mjs` bundles `cli/postscope.ts` (shebang, executable) and `server/index.ts` with esbuild to ESM for Node 20. Both bundles import only `node:` modules, so they run with no `node_modules`, no tsx and no sources; `bin.postscope` points at `dist-node/cli.js`. The version comes from `../package.json` next to `dist-node/`, then `APP_VERSION`. `server/loadEnv.ts` parses `.env` files itself (it used Vite's `loadEnv`, which dragged a dev tool into the runtime) |
 | CLI | `npm run scan -- file.json` | See the functional mindmap (`-e/--environment`, `--globals` for environment files). `--version` reads `package.json` relative to the module (works from any directory), then `APP_VERSION` |
 | Release check | `npm run release:check` | `scripts/release-check.mjs` fails when `package.json`, `package-lock.json`, `Dockerfile` `ARG APP_VERSION`, `compose.yaml` default and the newest `CHANGELOG.md` heading disagree |
 | Dependency audit | `npm run audit:deps` | Runtime dependencies, high severity |
-| CI | `.github/workflows/ci.yml` | Node 20 and 22: install, release check, test, build, CLI smoke scan, audit |
-| Docker | `docker build` / `compose.yaml` | Non-root, healthcheck, `no-new-privileges`, all capabilities dropped |
+| CI | `.github/workflows/ci.yml` | Node 20 and 22: install, release check, test, build, CLI smoke scan, compile (`build:node`), compiled folder scan with JUnit output, audit |
+| Docker | `docker build` / `compose.yaml` | Multi-stage: build installs dependencies, builds `dist/` and `dist-node/`; runtime copies only those and `package.json`, runs `node dist-node/server.js` as the `node` user. Healthcheck, `no-new-privileges`, all capabilities dropped |
 
 ### Test suites
 
@@ -381,10 +385,13 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
+| `inputs.test.ts` | Glob compilation, folder search (skips node_modules and .git), duplicates, sibling environments |
+| `compiled.test.ts` | Builds `dist-node` into a temp folder and runs the compiled CLI (folders, globs, junit, html, sarif, `--auto-env`) and the compiled server (starts with no node_modules, health, config, `.env`) |
+| `loadEnv.test.ts` | `.env` parsing and file precedence without Vite |
 | `jsonPositions.test.ts` | Pointer to line and column mapping (pretty, minified, tabs, CRLF, CR, unicode, escapes, large files, malformed input) |
 | `reportsV2.test.ts` | JSON schema validation, evidence pointers, SARIF regions, truncation note, HTML safety and escaping |
 | `suppressions.test.ts` | sha256, fingerprints, globs, config and inline suppressions, expiry, reports, baselines, project config validation |
-| `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors, environment and globals flags, sanitized environment files |
+| `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors, environment and globals flags, sanitized environment files, folders/globs, `--auto-env`, JUnit shape, config, baselines, scoring flags |
 | `environment.test.ts` | Environment parsing and detection, `SECRET_IN_ENVIRONMENT`, URL resolution through the selected environment, variable precedence, `redactEnvironment`, report sections |
 | `variableUsage.test.ts` | Reference and definition scopes, script gets/sets, environments, severity downgrade, unused variables, repair |
 | `collectionSession.test.ts` | Session restore with environments, backward compatibility, size limit |
@@ -438,3 +445,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.36 | Scoring model v2: request-scaled capped penalties, separate security and hygiene scores (`total = 0.85 * security + 0.15 * hygiene`), `SCORE_WEIGHTS` and `--weights`, penalty breakdown on the Score page |
 | V0.1.37 | `.postscope.json` project config, occurrence fingerprints, baselines (`--baseline`, `--write-baseline`), config and inline suppressions with mandatory reason and expiry (33 rules), Suppressed view |
 | V0.1.38 | `jsonPositions.ts`, evidence pointers and SARIF line/column regions; JSON report v2 with schema; self-contained HTML report (UI export and CLI `--format html`) |
+| V0.1.39 | Compiled server and CLI (`npm run build:node`, `bin.postscope`), folder/glob input, `--auto-env`, `--format junit`, GitHub composite action, `docs/CI.md`, Docker runtime image without node_modules; server no longer depends on Vite at run time |

@@ -182,11 +182,11 @@ Available in `hybrid` and `on` modes.
 
 ## 6. CI automation (CLI)
 
-`npm run scan -- <collection.json …>` runs the exact same audit outside the browser.
+`postscope scan <file | folder | glob …>` (or `npm run scan -- …` from a clone) runs the exact same audit outside the browser. Folders are searched for `*.postman_collection.json`, quoted globs such as `"collections/**/*.postman_collection.json"` are expanded by the tool, and `--auto-env` adds the environment and globals files stored next to each collection. The CLI is compiled to a single JavaScript file, so CI needs only Node.js 20.6 or newer. Ready-made setups for GitHub Actions (a composite action with SARIF upload), GitLab CI, Azure DevOps and a pre-commit hook are in [../CI.md](../CI.md).
 
 | Flag | Effect |
 |---|---|
-| `--format text|json|sarif|markdown|html` | Report format (multiple files merge into one JSON array, one SARIF log or one HTML document) |
+| `--format text|json|sarif|markdown|html|junit` | Report format (multiple files merge into one JSON array, one SARIF log, one HTML document or one JUnit file). `junit` is for the tests tab of GitLab, Azure DevOps and Jenkins: findings at or above `--fail-on` are failed tests, lower ones pass with details, suppressed ones are skipped |
 | `--fail-on critical|warning|info|none` | Exit code 1 when findings at or above this severity exist (default: critical) |
 | `--min-score N` | Exit code 1 when a collection scores below N (headline score; thresholds chosen before V0.1.36 may need adjusting) |
 | `--weights critical=N,warning=N,info=N` | Override the points deducted per finding severity |
@@ -197,6 +197,7 @@ Available in `hybrid` and `on` modes.
 | `--config file`, `--no-config` | Use a specific project config, or ignore the `.postscope.json` that would be found above the scanned file |
 | `--baseline file` | Report and fail only on findings that are not in the baseline file |
 | `--write-baseline file` | Record the current findings as a baseline and exit 0 |
+| `--auto-env` | Also analyze the environment and globals files stored next to each collection |
 | `--list-rules` | Print the rule catalog |
 | `--version` | Print the PostScope version (same value as the app, Docker image and `/api/config`, from any directory) |
 

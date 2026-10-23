@@ -2,7 +2,7 @@
 
 This guide is for teams that want to deploy PostScope locally for internal users, including offline or air-gapped environments.
 
-PostScope can run as a single Docker image. The image contains the production web bundle, the small Node server used for runtime configuration and optional shared collection storage, and the installed Node dependencies. After the image is pulled or loaded on a host, it can run without internet access.
+PostScope can run as a single Docker image. The image contains the production web bundle and the small Node server (compiled to one JavaScript file) used for runtime configuration and optional shared collection storage. It ships no `node_modules` and no TypeScript sources. After the image is pulled or loaded on a host, it can run without internet access.
 
 ## Implementation Plan
 
@@ -22,7 +22,7 @@ The deployment work in this repository is scoped to these actions and configurat
 The app has two runtime parts:
 
 - The browser UI, built by Vite into `dist/`.
-- A Node HTTP server started by `npm run start`, which serves `dist/`, returns `/api/config`, and optionally stores shared collection history in `/app/data/library`.
+- A Node HTTP server (`node dist-node/server.js` in the image, `npm run start` from source), which serves `dist/`, returns `/api/config`, and optionally stores shared collection history in `/app/data/library`.
 
 Core collection parsing and auditing still run in the user's browser. The server only handles app configuration, static files, and optional shared library storage.
 
@@ -67,6 +67,13 @@ Steps:
 npm install
 npm run build
 LOGGING_MODE=hybrid PUBLIC_LANDING_PAGE=false PORT=3010 npm run start
+```
+
+To run the compiled server (one JavaScript file that needs no dependencies, the same one the Docker image runs), build it once and start it with plain `node`:
+
+```bash
+npm run build && npm run build:node
+LOGGING_MODE=hybrid PORT=3010 npm run start:node
 ```
 
 On Windows PowerShell:
@@ -449,6 +456,16 @@ The image is immutable; shared history lives in the mounted volume.
 - Put authentication, TLS, and organization-specific access control at the reverse proxy or platform layer.
 - Review saved `data/library/*.json` files as sensitive data.
 
-## Current Packaging Trade-Off
+## Packaging
 
-The runtime image includes the Node dependencies needed to run the TypeScript server entrypoint with the existing `npm run start` script. This favors reliability and a straightforward single-image deployment. A future optimization could compile the server into plain JavaScript and prune development-only dependencies to reduce image size.
+The image is built in stages. A build stage installs the dependencies, builds the web bundle (`dist/`) and compiles the server and the CLI with esbuild into `dist-node/server.js` and `dist-node/cli.js`. The runtime stage copies only `dist/`, `dist-node/` and `package.json`, so it contains no `node_modules`, no tsx and no TypeScript sources, and the process is started with `node dist-node/server.js`. Compared with the earlier image, which carried every npm dependency in order to run the TypeScript entry point, this removes the whole dependency tree from the runtime image and from its attack surface.
+
+The compiled server reads `.env` files itself (`.env`, `.env.local`, `.env.production`, `.env.production.local`) instead of using Vite, so it works with no dependencies at all.
+
+The same image also contains the CLI, for ad hoc scans on a host without Node.js:
+
+```bash
+docker run --rm -v "$PWD:/work" postscope:<version> node dist-node/cli.js scan /work/collections
+```
+
+See [CI.md](CI.md) for pipelines (GitHub Actions, GitLab CI, Azure DevOps) and the pre-commit hook.

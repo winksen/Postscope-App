@@ -29,6 +29,10 @@ jobs:
         run: npm run build
       - name: Scan sample collections with the CLI
         run: npm run scan -- public/samples/default.postman_collection.json --fail-on none --format markdown
+      - name: Compile the CLI and server
+        run: npm run build:node
+      - name: Scan with the compiled CLI (folder, junit)
+        run: node dist-node/cli.js scan public/samples --fail-on none --format junit --output postscope-junit.xml
       - name: Dependency audit (runtime)
         run: npm run audit:deps
         continue-on-error: true

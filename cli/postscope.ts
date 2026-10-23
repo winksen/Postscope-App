@@ -14,6 +14,8 @@ import { runAuditDetailed, sanitizeAuditOptions, type AuditOptions, type Finding
 import { calculateScore } from '../src/lib/scorer'
 import { buildJsonReport, buildMarkdownReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
 import { renderHtmlReports } from '../src/lib/htmlReport'
+import { buildJunitReport } from '../src/lib/junitReport'
+import { expandInputs, findSiblingEnvironments } from './inputs'
 import { attachEvidencePointers } from '../src/lib/evidencePointers'
 import { redactCollection, redactEnvironment } from '../src/lib/redaction'
 import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src/lib/projectConfig'
@@ -23,7 +25,7 @@ import { RULE_LIST } from '../src/lib/rules'
 import { readPackageVersion } from '../server/appVersion'
 import { isSeverity, parseScoreWeights, severityRank, type ScoreWeights, type Severity } from '../src/lib/severity'
 
-type Format = 'text' | 'json' | 'sarif' | 'markdown' | 'html'
+type Format = 'text' | 'json' | 'sarif' | 'markdown' | 'html' | 'junit'
 type FailOn = Severity | 'none'
 
 interface CliOptions {
@@ -42,16 +44,23 @@ interface CliOptions {
   sanitize?: string
   /** Postman environment and globals export files (applied to every collection). */
   environments: Array<{ file: string; globals: boolean }>
+  /** Also analyze the environment and globals files stored next to each collection. */
+  autoEnv: boolean
   quiet: boolean
 }
 
 const HELP = `PostScope CLI: audit Postman collections for secrets, auth gaps, and hygiene.
 
-Usage: npm run scan -- [options] <collection.json ...>   (use "-" to read stdin)
+Usage: postscope [scan] [options] <collection.json | folder | glob ...>   (use "-" to read stdin)
+       npm run scan -- [options] <...>
+
+Folders are searched for *.postman_collection.json. Quote globs so the tool expands them on every shell:
+  postscope scan "collections/**/*.postman_collection.json" --fail-on warning
 
 Options:
-  -f, --format <text|json|sarif|markdown|html>
-                                           Report format (default: text). html is one self-contained file without scripts
+  -f, --format <text|json|sarif|markdown|html|junit>
+                                           Report format (default: text). html is one self-contained file without scripts;
+                                           junit is for the tests tab of GitLab, Azure DevOps and Jenkins
   -o, --output <file>                      Write the report to a file instead of stdout
       --fail-on <critical|warning|info|none>
                                            Exit 1 when a finding at or above this severity exists (default: critical)
@@ -66,6 +75,7 @@ Options:
                                            Points deducted per finding severity (default critical=20,warning=8,info=2)
       --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input).
                                            Environment files are written next to it as <name>.sanitized.postman_environment.json
+      --auto-env                           Also use the *.postman_environment.json and *.postman_globals.json next to each collection
   -e, --environment <file>                 Postman environment export to analyze with the collections (repeatable)
       --globals <file>                     Postman globals export to analyze with the collections (repeatable)
       --list-rules                         Print every rule id and exit
@@ -80,8 +90,10 @@ function readVersion(): string {
   return readPackageVersion() ?? process.env.APP_VERSION ?? 'unknown'
 }
 
-function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
-  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, environments: [], noConfig: false, quiet: false }
+function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules' {
+  // `postscope scan <paths>` is the documented form; the bare form keeps working for existing scripts.
+  const argv = rawArgv[0] === 'scan' ? rawArgv.slice(1) : rawArgv
+  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, environments: [], autoEnv: false, noConfig: false, quiet: false }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
 
@@ -104,7 +116,7 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
       case '-f':
       case '--format': {
         const format = value()
-        if (!['text', 'json', 'sarif', 'markdown', 'html'].includes(format)) throw new UsageError(`Unknown format "${format}"`)
+        if (!['text', 'json', 'sarif', 'markdown', 'html', 'junit'].includes(format)) throw new UsageError(`Unknown format "${format}"`)
         options.format = format as Format
         break
       }
@@ -162,6 +174,9 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
       case '--globals':
         options.environments.push({ file: value(), globals: true })
         break
+      case '--auto-env':
+        options.autoEnv = true
+        break
       case '-q':
       case '--quiet':
         options.quiet = true
@@ -178,7 +193,6 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
   options.audit = sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides })
 
   if (!options.inputs.length) throw new UsageError('Provide at least one collection file.')
-  if (options.sanitize && options.inputs.length > 1) throw new UsageError('--sanitize works with a single input.')
   if (options.baseline && options.writeBaseline) throw new UsageError('Use either --baseline or --write-baseline, not both.')
   if (options.config && options.noConfig) throw new UsageError('Use either --config or --no-config, not both.')
   return options
@@ -338,10 +352,11 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
   return lines.join('\n')
 }
 
-function render(files: AnalyzedFile[], format: Format, appVersion: string): string {
+function render(files: AnalyzedFile[], format: Format, appVersion: string, failOn: FailOn): string {
   if (format === 'text') return textReport(files, appVersion)
   if (format === 'markdown') return files.map(({ ctx }) => buildMarkdownReport(ctx)).join('\n\n---\n\n')
   if (format === 'html') return renderHtmlReports(files.map(({ ctx }) => ctx))
+  if (format === 'junit') return buildJunitReport(files.map(({ ctx }) => ctx), { failOn })
   if (format === 'json') {
     const reports = files.map(({ ctx }) => JSON.parse(buildJsonReport(ctx)) as unknown)
     return JSON.stringify(reports.length === 1 ? reports[0] : reports, null, 2)
@@ -380,9 +395,13 @@ export function main(argv: string[]): number {
 
   const files: AnalyzedFile[] = []
   try {
-    const environments = loadEnvironments(options.environments)
+    const explicit = options.environments
     const baseline = options.baseline ? loadBaseline(options.baseline) : undefined
-    for (const input of options.inputs) {
+    const inputs = expandInputs(options.inputs)
+    if (options.sanitize && inputs.length > 1) throw new UsageError('--sanitize works with a single input.')
+    for (const input of inputs) {
+      const extra = options.autoEnv ? findSiblingEnvironments(input).filter((file) => !explicit.some((entry) => path.resolve(entry.file) === path.resolve(file))).map((file) => ({ file, globals: /\.postman_globals\.json$/i.test(file) })) : []
+      const environments = loadEnvironments([...explicit, ...extra])
       const { result, json } = analyzeFile(input, options, appVersion, environments, baseline)
       files.push(result)
       if (options.sanitize) {
@@ -402,7 +421,7 @@ export function main(argv: string[]): number {
     return 2
   }
 
-  const report = render(files, options.format, appVersion)
+  const report = render(files, options.format, appVersion, options.failOn)
   if (options.output) fs.writeFileSync(options.output, report)
   else process.stdout.write(report.endsWith('\n') ? report : `${report}\n`)
 
@@ -437,5 +456,15 @@ export function main(argv: string[]): number {
   return passed ? 0 : 1
 }
 
-const invokedDirectly = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+/** True when this file is the program being run, also when started through a symlink such as node_modules/.bin/postscope. */
+function isEntryPoint(): boolean {
+  if (!process.argv[1]) return false
+  try {
+    return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  }
+}
+
+const invokedDirectly = isEntryPoint()
 if (invokedDirectly) process.exitCode = main(process.argv.slice(2))
