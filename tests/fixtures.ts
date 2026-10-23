@@ -160,3 +160,53 @@ export function cleanCollection(): Record<string, unknown> {
     ],
   }
 }
+
+/** Secrets hidden in documentation, folder/request variables, path variables and saved example requests. */
+export function scopedSecretsCollection(): Record<string, unknown> {
+  return {
+    info: {
+      name: 'Scoped secrets',
+      description: { content: `Internal collection. Maintainer token: ${FAKE.githubToken}`, type: 'text/markdown' },
+    },
+    variable: [{ key: 'baseUrl', value: 'https://api.example.com' }, { key: 'a', value: '1' }, { key: 'b', value: '2' }],
+    item: [
+      {
+        name: 'Admin',
+        description: `Run with password: ${FAKE.password} on staging.\nAuthorization: Bearer ${FAKE.bearer}`,
+        variable: [
+          { key: 'clientSecret', value: FAKE.clientSecret },
+          { key: 'region', value: 'eu-west-1' },
+        ],
+        item: [
+          {
+            name: 'Get user',
+            description: 'Looks up a user. The token: required for every call. Set api_key=your-api-key first.',
+            variable: [{ key: 'apiKey', value: FAKE.apiKey }],
+            request: {
+              method: 'GET',
+              auth: { type: 'noauth' },
+              url: {
+                raw: '{{baseUrl}}/users/:token',
+                host: ['{{baseUrl}}'],
+                path: ['users', ':token'],
+                variable: [{ key: 'token', value: FAKE.refreshToken }, { key: 'id', value: '42' }],
+              },
+              description: 'Fetches one user.',
+            },
+            response: [
+              {
+                name: 'Example',
+                originalRequest: {
+                  method: 'POST',
+                  url: { raw: '{{baseUrl}}/login?api_key=' + FAKE.apiKey, query: [{ key: 'api_key', value: FAKE.apiKey }] },
+                  body: { mode: 'raw', raw: JSON.stringify({ username: 'admin', password: FAKE.password }) },
+                },
+                body: '{}',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}

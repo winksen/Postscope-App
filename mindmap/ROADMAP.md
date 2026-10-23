@@ -98,7 +98,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 |---|---|---|---|---|---|
 | V0.1.25 | `v0.1.25` | A1 | Chore, Docs, Bug | Version alignment, changelog, release tags, stale docs | `68d478a` |
 | V0.1.26 | `v0.1.26` | A1 | Security, Bug | Audit disabled headers, query params and form fields | `d693acc` |
-| V0.1.27 | `v0.1.27` | A1 | Bug | Variable-tolerant body parsing | |
+| V0.1.27 | `v0.1.27` | A1 | Bug | Variable-tolerant body parsing | `85e530d` |
 | V0.1.28 | `v0.1.28` | A1 | Security, Bug | Descriptions, item variables, path variables, saved request bodies | |
 | V0.1.29 | `v0.1.29` | A1 | Bug | URL and auth rule accuracy | |
 | V0.1.30 | `v0.1.30` | A1 | Bug, Enhancement | Script credential detection gaps | |

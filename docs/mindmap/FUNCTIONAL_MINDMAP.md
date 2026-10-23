@@ -112,8 +112,9 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret passed in query string | `?api_key=…`, `?sig=…` |
 | Critical | Credentials embedded in URL | `https://admin:pass@host` |
 | Critical | Hardcoded secret in script | `pm.environment.set("token", "abc…")` |
-| Critical | Secret stored in collection variable | `clientSecret = cs-0a1b…` exported with the collection |
-| Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example |
+| Critical | Secret stored in collection variable | `clientSecret = cs-0a1b…` exported with the collection, or defined on a folder or request |
+| Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
+| Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
 | Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, … |
 | Warning | Hardcoded base URL / environment URL | `https://api.prod.example.com/…` instead of `{{baseUrl}}` |
 | Warning | Potentially unprotected mutation request | `POST` without auth (inherited auth is respected) |

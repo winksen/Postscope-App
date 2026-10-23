@@ -1,9 +1,10 @@
-import type { ParsedCollection, ParsedRequest, KeyValue } from './parser'
+import type { ParsedCollection, ParsedRequest, ParsedScopedVariable, KeyValue } from './parser'
 import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
 import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
 import { secretFieldsFor } from './authSchemes'
 import { parseTemplatedJson } from './jsonBody'
 import { scanRawBodyFields } from './rawBody'
+import { findDescriptionSecrets } from './descriptions'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
   evidencePreview,
@@ -322,6 +323,11 @@ function checkQueryAndUrl(req: ParsedRequest, out: FindingCollector): void {
       out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}`, preview: evidencePreview(param.value) })
     }
   }
+  for (const variable of req.pathVariables ?? []) {
+    if (isQuerySecret(variable.key, variable.value)) {
+      out.add('SECRET_IN_QUERY', req.id, { location: `path variable ${variable.key.trim()}`, preview: evidencePreview(variable.value) })
+    }
+  }
   for (const param of req.disabledQueryParams ?? []) {
     if (isQuerySecret(param.key, param.value)) {
       out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}${DISABLED_SUFFIX}`, preview: evidencePreview(param.value) })
@@ -406,34 +412,84 @@ export interface LeakedVariable {
   reason?: string
 }
 
-/** Collection variables whose literal values look like credentials. Shared with the repair engine. */
-export function findLeakedCollectionVariables(parsed: ParsedCollection): LeakedVariable[] {
-  const leaked: LeakedVariable[] = []
-  for (const variable of parsed.collectionVariables ?? []) {
+function leakedFrom<T extends { key: string; value: string; type?: string }>(variables: T[]): Array<T & { reason?: string }> {
+  const leaked: Array<T & { reason?: string }> = []
+  for (const variable of variables) {
     if (!isLikelySecretValue(variable.value)) continue
     const pattern = findSecretPatterns(variable.value, 1)[0]
     if (isSensitiveKey(variable.key) || variable.type === 'secret' || pattern) {
-      leaked.push({ key: variable.key, value: variable.value, reason: pattern?.label })
+      leaked.push({ ...variable, reason: pattern?.label })
     }
   }
   return leaked
 }
 
+/** Collection variables whose literal values look like credentials. Shared with the repair engine. */
+export function findLeakedCollectionVariables(parsed: ParsedCollection): LeakedVariable[] {
+  return leakedFrom(parsed.collectionVariables ?? []).map(({ key, value, reason }) => ({ key, value, reason }))
+}
+
+export interface LeakedScopedVariable extends LeakedVariable {
+  scope: ParsedScopedVariable['scope']
+  owner: string
+  ownerPath: number[]
+  requestId?: string
+}
+
+/** Folder and request level variables whose literal values look like credentials. Shared with the repair engine. */
+export function findLeakedScopedVariables(parsed: ParsedCollection): LeakedScopedVariable[] {
+  return leakedFrom(parsed.scopedVariables ?? []).map(({ key, value, reason, scope, owner, ownerPath, requestId }) => ({
+    key,
+    value,
+    reason,
+    scope,
+    owner,
+    ownerPath,
+    requestId,
+  }))
+}
+
 function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollector): void {
   const leaked = findLeakedCollectionVariables(parsed)
-  if (!leaked.length) return
+  const leakedScoped = findLeakedScopedVariables(parsed)
+  const total = leaked.length + leakedScoped.length
+  if (!total) return
 
-  const leakedKeys = new Set(leaked.map((variable) => variable.key))
-  out.touch('SECRET_IN_COLLECTION_VARIABLE', `${plural(leaked.length, 'collection variable')} with credential-like names or values ${leaked.length === 1 ? 'has' : 'have'} a literal value that ships with every export.`)
+  const leakedKeys = new Set([...leaked, ...leakedScoped].map((variable) => variable.key))
+  const where = leakedScoped.length ? 'collection, folder or request level variable' : 'collection variable'
+  out.touch('SECRET_IN_COLLECTION_VARIABLE', `${plural(total, where)} with credential-like names or values ${total === 1 ? 'has' : 'have'} a literal value that ships with every export.`)
   for (const variable of leaked) {
     out.add('SECRET_IN_COLLECTION_VARIABLE', undefined, {
       location: `collection variable ${variable.key}${variable.reason ? ` (${variable.reason})` : ''}`,
       preview: evidencePreview(variable.value),
     })
   }
+  for (const variable of leakedScoped) {
+    const place = variable.scope === 'folder' ? `folder variable ${variable.key} (folder "${variable.owner}")` : `request variable ${variable.key}`
+    out.add('SECRET_IN_COLLECTION_VARIABLE', variable.requestId, {
+      location: `${place}${variable.reason ? ` (${variable.reason})` : ''}`,
+      preview: evidencePreview(variable.value),
+    })
+  }
   for (const req of parsed.requests) {
     if (extractVariableNames(requestText(req)).some((name) => leakedKeys.has(name))) {
       out.add('SECRET_IN_COLLECTION_VARIABLE', req.id)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Descriptions
+// ---------------------------------------------------------------------------
+
+function checkDescriptions(parsed: ParsedCollection, out: FindingCollector): void {
+  for (const description of parsed.descriptions ?? []) {
+    const place =
+      description.kind === 'collection' ? 'description (collection)' : description.kind === 'folder' ? `description (folder "${description.owner}")` : 'description'
+    for (const secret of findDescriptionSecrets(description.text)) {
+      const ruleId = secret.kind === 'pattern' ? 'KNOWN_SECRET_PATTERN' : 'HARDCODED_SECRET'
+      const label = secret.kind === 'pattern' ? ` (${secret.label})` : `: ${secret.label}`
+      out.add(ruleId, description.requestId, { location: `${place}${label}`, preview: evidencePreview(secret.value) })
     }
   }
 }
@@ -490,6 +546,27 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
       }
       for (const secret of findSecretPatterns(response.body, 3)) {
         out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} body (${secret.label})`, preview: evidencePreview(secret.match) })
+      }
+    }
+
+    for (const param of response.requestQuery ?? []) {
+      if (isQuerySecret(param.key, param.value)) {
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request query ${param.key.trim()}`, preview: evidencePreview(param.value) })
+      }
+    }
+
+    if (response.requestBody) {
+      const json = parseTemplatedJson(response.requestBody)
+      const fields: Array<{ key: string; value: string; path: string }> = []
+      if (json) walkJson(json.value, (key, value, path) => fields.push({ key, value, path }))
+      else for (const field of scanRawBodyFields(response.requestBody)) fields.push({ key: field.key, value: field.value, path: field.key })
+      for (const field of fields) {
+        if (classifyBodySecret(field.key, field.value)) {
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request body ${field.path}`, preview: evidencePreview(field.value) })
+        }
+      }
+      for (const secret of findSecretPatterns(response.requestBody, 3)) {
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request body (${secret.label})`, preview: evidencePreview(secret.match) })
       }
     }
 
@@ -713,6 +790,7 @@ export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): 
   checkScripts(parsed, out)
   checkCollectionVariables(parsed, out)
   checkKnownPatterns(parsed, out)
+  checkDescriptions(parsed, out)
 
   runWarningChecks(parsed, out)
   runInfoChecks(parsed, out)

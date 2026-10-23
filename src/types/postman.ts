@@ -46,6 +46,8 @@ export interface PostmanUrl {
   host?: string[] | string;
   path?: Array<string | { value?: string }> | string;
   query?: Array<{ key: string; value: string; disabled?: boolean }>;
+  /** Path variables (`:id` segments). */
+  variable?: Array<{ key: string; value?: string; description?: string }>;
 }
 
 export interface PostmanScript {
@@ -89,6 +91,8 @@ export interface PostmanItem {
   description?: string;
   auth?: PostmanAuth;
   event?: PostmanEvent[];
+  /** Folder or request level variables. */
+  variable?: PostmanVariable[];
   protocolProfileBehavior?: Record<string, unknown>;
 }
 

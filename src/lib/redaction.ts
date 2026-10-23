@@ -5,6 +5,7 @@ import { toVariableName } from './variables'
 import { cloneJson } from './repairEngine'
 import { detectIndent, parseTemplatedJson } from './jsonBody'
 import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
+import { scrubDescription } from './descriptions'
 
 /** Marker for places that cannot hold a usable variable (saved responses, scripts, free text). */
 export const REDACTED = '{{REDACTED}}'
@@ -127,6 +128,17 @@ class Redactor {
     }
     if (!isRecord(url)) return
     if (typeof url.raw === 'string') url.raw = scrub(url.raw)
+    if (Array.isArray(url.variable)) {
+      for (const variable of url.variable) {
+        if (isRecord(variable) && typeof variable.key === 'string' && typeof variable.value === 'string' && isQuerySecret(variable.key, variable.value)) {
+          variable.value = `{{${toVariableName(variable.key)}}}`
+          this.count += 1
+        }
+      }
+      for (const variable of url.variable) {
+        if (isRecord(variable) && typeof variable.description !== 'undefined') this.description(variable, 'description')
+      }
+    }
     if (Array.isArray(url.query)) {
       for (const param of url.query) {
         if (isRecord(param) && typeof param.key === 'string' && typeof param.value === 'string' && isQuerySecret(param.key, param.value)) {
@@ -233,7 +245,22 @@ class Redactor {
     }
   }
 
+  /** Descriptions are strings or `{ content, type }`; credentials in them become `{{REDACTED}}`. */
+  description(owner: UnknownRecord, key: string): void {
+    const value = owner[key]
+    if (typeof value === 'string') {
+      const result = scrubDescription(value, REDACTED)
+      if (result.count) {
+        owner[key] = result.text
+        this.count += result.count
+      }
+    } else if (isRecord(value) && typeof value.content === 'string') {
+      this.description(value, 'content')
+    }
+  }
+
   request(request: UnknownRecord): void {
+    this.description(request, 'description')
     this.auth(request.auth)
     this.headersOn(request, true)
     this.url(request)
@@ -244,6 +271,8 @@ class Redactor {
     if (!Array.isArray(items) || depth > 100) return
     for (const item of items) {
       if (!isRecord(item)) continue
+      this.description(item, 'description')
+      this.variables(item.variable)
       this.auth(item.auth)
       this.script(item.event)
       if (isRecord(item.request)) this.request(item.request)
@@ -275,6 +304,7 @@ export function redactCollection(input: unknown): RedactionResult {
   const json = cloneJson(input)
   if (!isRecord(json)) return { json, redactedCount: 0 }
   const redactor = new Redactor()
+  if (isRecord(json.info)) redactor.description(json.info, 'description')
   redactor.auth(json.auth)
   redactor.script(json.event)
   redactor.variables(json.variable)

@@ -51,8 +51,10 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 | Bodies | JSON (nested objects and arrays, including unquoted `{{variables}}`), XML/SOAP elements, `key=value` text, urlencoded, form-data, GraphQL variables |
 | URLs | Credential query parameters (`api_key`, `token`, `sig`, …), `user:password@host` |
 | Scripts | `pm.*.set("token", "literal")`, literal assignments, provider tokens, `console.log` of credentials |
-| Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable |
-| Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization` in the original request |
+| Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable; the same for folder and request variables |
+| Descriptions | Provider tokens and `key: value` credential fragments in collection, folder and request descriptions (replaced with `{{REDACTED}}` in sanitized copies) |
+| Path variables | Credential-like `url.variable` entries such as `:token` |
+| Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization`, query credentials and body secrets in the original request |
 | Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords |
 | Disabled entries | Headers, query params, form fields and scripts switched off in Postman are still in the export, so they go through the same secret rules (evidence is labelled `(disabled)`) |
 | Transport | `http://` / `ws://` to non-local hosts (including a `{{baseUrl}}` that resolves to one), `strictSSL: false` |

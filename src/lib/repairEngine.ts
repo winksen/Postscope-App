@@ -4,6 +4,7 @@ import {
   TOKEN_HEADER,
   classifyBodySecret,
   findLeakedCollectionVariables,
+  findLeakedScopedVariables,
   isQuerySecret,
   type Finding,
 } from './auditor'
@@ -14,6 +15,7 @@ import { isLikelySecretValue } from './secretPatterns'
 import { toVariableName } from './variables'
 import { detectIndent, parseTemplatedJson } from './jsonBody'
 import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
+import { scrubDescription } from './descriptions'
 
 export type RepairFixKind =
   | 'hardcodedBaseUrl'
@@ -64,6 +66,8 @@ export interface RepairFix {
   variablesToEnsure?: RepairVariable[]
   generatedDescriptions?: Record<string, string>
   manualReason?: string
+  /** For `secretVariables`: folder and request variables whose values are cleared. */
+  scopedVariables?: Array<{ ownerPath: number[]; key: string }>
   /** For `secretVariables`: collection variable keys whose values are cleared. */
   variableKeys?: string[]
   /** For `bodySecrets`: which body classifier the fix targets. */
@@ -515,17 +519,20 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
 
   if (kind === 'secretVariables') {
     const leaked = findLeakedCollectionVariables(parsed)
+    const leakedScoped = findLeakedScopedVariables(parsed)
+    const first = leaked[0] ?? leakedScoped[0]
     return {
       ...base,
       status: 'auto',
       title: 'Clear secret collection variable values',
       description:
-        'Empties the values of credential-like collection variables so the export no longer carries them. Set the real values in a private environment or vault afterwards.',
+        'Empties the values of credential-like collection, folder and request variables so the export no longer carries them. Set the real values in a private environment or vault afterwards.',
       risk: 'medium',
       selectedByDefault: true,
       variableKeys: leaked.map((variable) => variable.key),
-      beforeSnippet: leaked[0] ? `${leaked[0].key} = ***` : undefined,
-      afterSnippet: leaked[0] ? `${leaked[0].key} = ""` : undefined,
+      scopedVariables: leakedScoped.map((variable) => ({ ownerPath: variable.ownerPath, key: variable.key })),
+      beforeSnippet: first ? `${first.key} = ***` : undefined,
+      afterSnippet: first ? `${first.key} = ""` : undefined,
     }
   }
 
@@ -845,6 +852,23 @@ function replaceJsonSecrets(value: unknown, rule: 'HARDCODED_PASSWORD' | 'HARDCO
   return changed
 }
 
+/** Replaces credentials in a `description` that is a string or `{ content, type }`. Returns how many were replaced. */
+function scrubDescriptionOf(owner: unknown): number {
+  if (!isRecord(owner)) return 0
+  const description = owner.description
+  if (typeof description === 'string') {
+    const result = scrubDescription(description, '{{REDACTED}}')
+    if (result.count) owner.description = result.text
+    return result.count
+  }
+  if (isRecord(description) && typeof description.content === 'string') {
+    const result = scrubDescription(description.content, '{{REDACTED}}')
+    if (result.count) description.content = result.text
+    return result.count
+  }
+  return 0
+}
+
 function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
   const rule = fix.bodyRule ?? 'HARDCODED_SECRET'
   const variables = new Map<string, RepairVariable>()
@@ -910,6 +934,11 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
           }
         }
       }
+    }
+
+    if (rule === 'HARDCODED_SECRET') {
+      // Credentials pasted into the request documentation are reported under the same rule.
+      changedForRequest += scrubDescriptionOf(item) + scrubDescriptionOf(request)
     }
 
     if (changedForRequest === 0) {
@@ -998,6 +1027,15 @@ function patchSecretVariables(collection: unknown, fix: RepairFix): PatchResult 
     if (isRecord(variable) && keys.has(variable.key) && typeof variable.value === 'string' && variable.value) {
       variable.value = ''
       changed += 1
+    }
+  }
+  for (const target of fix.scopedVariables ?? []) {
+    const item = getItemAtPath(collection, target.ownerPath) as { variable?: unknown } | undefined
+    for (const variable of Array.isArray(item?.variable) ? item.variable : []) {
+      if (isRecord(variable) && variable.key === target.key && typeof variable.value === 'string' && variable.value) {
+        variable.value = ''
+        changed += 1
+      }
     }
   }
   return { changed, skipped: [], variables: [] }
