@@ -5,7 +5,7 @@ import { runAudit, sanitizeAuditOptions, type Finding } from '../src/lib/auditor
 import { calculateScore } from '../src/lib/scorer'
 import { requestHealthScore } from '../src/lib/requestFindings'
 import { RULE_LIST } from '../src/lib/rules'
-import { FAKE, cleanCollection, kitchenSinkCollection } from './fixtures'
+import { FAKE, PROVIDER_SAMPLES, cleanCollection, kitchenSinkCollection } from './fixtures'
 
 function audit(json: unknown) {
   const parsed = parseCollection(json)
@@ -313,4 +313,70 @@ test('collection and folder pre-request scripts that set Authorization suppress 
   assert.deepEqual(audit(unrelated).affectedNames('MISSING_AUTH'), ['At root'])
   const disabled = { ...json, event: [{ listen: 'prerequest', disabled: true, script: { exec: ["pm.request.headers.add('Authorization: Bearer x')"] } }] }
   assert.deepEqual(audit(disabled).affectedNames('MISSING_AUTH'), ['At root'])
+})
+
+function headerCollection(headers: Array<{ key: string; value: string }>, extra: Record<string, unknown> = {}) {
+  return {
+    info: { name: 'Headers' },
+    item: headers.map((header, index) => ({
+      name: `R${index}`,
+      request: { method: 'GET', url: '{{baseUrl}}/x', auth: { type: 'noauth' }, description: 'd', header: [header], ...extra },
+    })),
+  }
+}
+
+test('Basic Authorization headers are decoded before judging them', () => {
+  const basic = (text: string) => `Basic ${Buffer.from(text).toString('base64')}`
+  const { findings, byRule } = audit(
+    headerCollection([
+      { key: 'Authorization', value: basic('svc-account:{{password}}') },
+      { key: 'Authorization', value: basic('svc-account:changeme') },
+      { key: 'Authorization', value: basic(`svc-account:${FAKE.password}`) },
+      { key: 'Authorization', value: basic(`api:key-${'0123456789abcdef'.repeat(2)}`) },
+      { key: 'Authorization', value: 'Basic not*base64*but-long-enough-to-look-like-a-token' },
+    ])
+  )
+  const evidence = byRule.get('HARDCODED_TOKEN')?.evidence ?? []
+  assert.deepEqual(evidence.map((item) => item.requestId), ['R2', 'R3', 'R4'])
+  assert.equal(evidence[0].location, 'header Authorization (basic credentials for user s••••••)')
+  assert.equal(evidence[1].location, 'header Authorization (basic credentials for user a••) (Mailgun API key)')
+  assert.ok(evidence.every((item) => !JSON.stringify(item).includes(FAKE.password)))
+  assert.ok(!findings.some((finding) => finding.ruleId === 'HIGH_ENTROPY_LITERAL'))
+})
+
+test('Vault tokens and other sensitive headers are reported', () => {
+  const { byRule } = audit(
+    headerCollection([
+      { key: 'X-Vault-Token', value: 's.AbCdEfGhIjKlMnOpQrStUvWx' },
+      { key: 'X-Vault-Token', value: '{{vaultToken}}' },
+      { key: 'X-Custom', value: PROVIDER_SAMPLES['vault-service-token'].token },
+      { key: 'X-Webhook-Secret', value: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6' },
+    ])
+  )
+  assert.deepEqual(byRule.get('HARDCODED_TOKEN')?.evidence?.map((item) => item.requestId), ['R0'])
+  assert.deepEqual(byRule.get('KNOWN_SECRET_PATTERN')?.evidence?.map((item) => item.location), ['header X-Custom (HashiCorp Vault service token)'])
+  assert.deepEqual(byRule.get('HIGH_ENTROPY_LITERAL')?.evidence?.map((item) => item.location), ['header X-Webhook-Secret'])
+})
+
+test('HIGH_ENTROPY_LITERAL covers credential-named fields no other rule reported and skips the rest', () => {
+  const { byRule, affectedNames } = audit({
+    info: { name: 'Entropy' },
+    item: [
+      {
+        name: 'Body',
+        request: {
+          method: 'POST',
+          url: { raw: '{{baseUrl}}/a?signing_key=q8Zr2LmXa9PdW4sT7vBn3KcYe6&session_id=123e4567-e89b-12d3-a456-426614174000', query: [{ key: 'signing_key', value: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6' }, { key: 'session_id', value: '123e4567-e89b-12d3-a456-426614174000' }] },
+          auth: { type: 'noauth' },
+          description: 'd',
+          body: { mode: 'raw', raw: JSON.stringify({ signing_key: 'Zx8Qw3Lm9Pd2Vb7Kc4Ye1TrNs5', client_secret: 'Zx8Qw3Lm9Pd2Vb7Kc4Ye1TrNs5', username: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6', credential_hint: 'a plain sentence about credentials' }) },
+        },
+      },
+    ],
+  })
+  const locations = (byRule.get('HIGH_ENTROPY_LITERAL')?.evidence ?? []).map((item) => item.location)
+  assert.deepEqual(locations, ['body signing_key'])
+  assert.deepEqual(affectedNames('HIGH_ENTROPY_LITERAL'), ['Body'])
+  assert.equal(byRule.get('HIGH_ENTROPY_LITERAL')?.severity, 'warning')
+  assert.equal(byRule.get('HIGH_ENTROPY_LITERAL')?.category, 'secrets')
 })

@@ -1,6 +1,6 @@
 import { AUTH_HEADER_SCHEME, classifyBodySecret, isQuerySecret } from './auditor'
 import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsFor } from './authSchemes'
-import { isLikelySecretValue, isSensitiveHeader, isSensitiveKey, redactSecretsInText } from './secretPatterns'
+import { decodeBasicCredentials, isLikelySecretValue, isSensitiveHeader, isSensitiveKey, redactSecretsInText } from './secretPatterns'
 import { toVariableName } from './variables'
 import { cloneJson } from './repairEngine'
 import { detectIndent, parseTemplatedJson } from './jsonBody'
@@ -96,6 +96,9 @@ class Redactor {
         header.value = this.text(header.value)
         continue
       }
+      const basic = /^Basic\s+\S+$/i.test(header.value.trim()) ? decodeBasicCredentials(header.value) : null
+      // A Basic token that only encodes a variable or placeholder password carries no secret.
+      if (basic && !isLikelySecretValue(basic.password)) continue
       const scheme = header.value.trim().match(AUTH_HEADER_SCHEME)
       const variable = lower === 'authorization' || lower === 'proxy-authorization' ? 'token' : toVariableName(header.key, 'token')
       header.value = runnable ? `${scheme ? `${scheme[1]} ` : ''}{{${variable}}}` : REDACTED

@@ -115,7 +115,8 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret stored in collection variable | `clientSecret = cs-0a1b…` exported with the collection, or defined on a folder or request |
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
-| Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, … |
+| Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, Entra ID, Okta, Vault, Postman, Atlassian, Shopify, Grafana, Hugging Face, Databricks, PyPI, Square, … |
+| Warning | High-entropy literal in a credential field | A long random-looking value in a field such as `X-Webhook-Secret` or `signing_key` that no other rule recognized |
 | Warning | Hardcoded base URL / environment URL | `https://api.prod.example.com/…` instead of `{{baseUrl}}`; environment names are matched in the host (`prod`, `staging`, `uat`, `qa`, `dev`, `sandbox`, ...), not in path segments |
 | Warning | Potentially unprotected mutation request | `POST` without auth (inherited auth, API key headers, cookies, query credentials and scripts that set `Authorization` are respected) |
 | Warning | Basic auth with literal credentials | Username/password typed into Basic auth |
