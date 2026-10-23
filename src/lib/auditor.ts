@@ -38,18 +38,18 @@ export interface FindingEvidence {
 
 export interface Finding {
   /** Unique within one audit run; equals the rule id. */
-  id: string;
-  ruleId: RuleId;
-  severity: Severity;
-  category: FindingCategory;
-  title: string;
-  description: string;
+  id: string
+  ruleId: RuleId
+  severity: Severity
+  category: FindingCategory
+  title: string
+  description: string
   /** Stable request ids from the parser (not display names). */
-  affected: string[];
-  recommendation: string;
-  evidence?: FindingEvidence[];
-  cwe?: string;
-  owasp?: string;
+  affected: string[]
+  recommendation: string
+  evidence?: FindingEvidence[]
+  cwe?: string
+  owasp?: string
 }
 
 export interface AuditOptions {
@@ -159,7 +159,7 @@ class FindingCollector {
       findings.push({
         id: rule.id,
         ruleId: rule.id,
-        severity: isSeverity(override) ? override : hits.severity ?? rule.severity,
+        severity: isSeverity(override) ? override : (hits.severity ?? rule.severity),
         category: rule.category,
         title: rule.title,
         description: hits.description ?? rule.description,
@@ -316,7 +316,10 @@ function checkHighEntropy(parsed: ParsedCollection, out: FindingCollector): void
     out.add('HIGH_ENTROPY_LITERAL', req.id, { location, preview: evidencePreview(value) })
   }
   for (const req of parsed.requests) {
-    for (const [headers, suffix] of [[req.headers, ''], [req.disabledHeaders ?? [], DISABLED_SUFFIX]] as const) {
+    for (const [headers, suffix] of [
+      [req.headers, ''],
+      [req.disabledHeaders ?? [], DISABLED_SUFFIX],
+    ] as const) {
       for (const header of headers) {
         const lower = header.key.trim().toLowerCase()
         // Cookies and readable Basic tokens are judged by the header rules, not by entropy.
@@ -324,10 +327,16 @@ function checkHighEntropy(parsed: ParsedCollection, out: FindingCollector): void
         if (isSensitiveHeader(header.key)) report(req, `header ${header.key.trim()}${suffix}`, header.value)
       }
     }
-    for (const [params, suffix] of [[req.queryParams ?? [], ''], [req.disabledQueryParams ?? [], DISABLED_SUFFIX]] as const) {
+    for (const [params, suffix] of [
+      [req.queryParams ?? [], ''],
+      [req.disabledQueryParams ?? [], DISABLED_SUFFIX],
+    ] as const) {
       for (const param of params) if (isSensitiveKey(param.key)) report(req, `query ${param.key.trim()}${suffix}`, param.value)
     }
-    for (const [fields, suffix] of [[req.bodyFields ?? [], ''], [req.disabledBodyFields ?? [], DISABLED_SUFFIX]] as const) {
+    for (const [fields, suffix] of [
+      [req.bodyFields ?? [], ''],
+      [req.disabledBodyFields ?? [], DISABLED_SUFFIX],
+    ] as const) {
       for (const field of fields) if (isSensitiveKey(field.key)) report(req, `body field ${field.key}${suffix}`, field.value)
     }
     if (!req.bodyFields?.length && req.bodyRaw && req.bodyMode !== 'graphql') {
@@ -445,7 +454,8 @@ function checkScripts(parsed: ParsedCollection, out: FindingCollector): void {
   }
   for (const script of parsed.scripts ?? []) {
     const owner = script.owner === 'collection' ? 'collection' : `folder "${script.owner}"`
-    const kind = script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
+    const kind =
+      script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
     scanScript(script.source, `${owner} ${kind}${script.disabled ? DISABLED_SUFFIX : ''}`, undefined, out)
   }
 }
@@ -533,7 +543,10 @@ function checkEnvironments(parsed: ParsedCollection, out: FindingCollector): voi
   const leaked = findLeakedEnvironmentVariables(parsed)
   if (!leaked.length) return
   const names = new Set(leaked.map((variable) => variable.key))
-  out.touch('SECRET_IN_ENVIRONMENT', `${plural(leaked.length, 'environment variable')} with credential-like names, the secret type or token-shaped values ${leaked.length === 1 ? 'has' : 'have'} a literal value in the loaded environment or globals files.`)
+  out.touch(
+    'SECRET_IN_ENVIRONMENT',
+    `${plural(leaked.length, 'environment variable')} with credential-like names, the secret type or token-shaped values ${leaked.length === 1 ? 'has' : 'have'} a literal value in the loaded environment or globals files.`
+  )
   for (const variable of leaked) {
     const place = variable.kind === 'globals' ? `globals "${variable.environment}"` : `environment "${variable.environment}"`
     out.add('SECRET_IN_ENVIRONMENT', undefined, {
@@ -554,7 +567,10 @@ function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollecto
 
   const leakedKeys = new Set([...leaked, ...leakedScoped].map((variable) => variable.key))
   const where = leakedScoped.length ? 'collection, folder or request level variable' : 'collection variable'
-  out.touch('SECRET_IN_COLLECTION_VARIABLE', `${plural(total, where)} with credential-like names or values ${total === 1 ? 'has' : 'have'} a literal value that ships with every export.`)
+  out.touch(
+    'SECRET_IN_COLLECTION_VARIABLE',
+    `${plural(total, where)} with credential-like names or values ${total === 1 ? 'has' : 'have'} a literal value that ships with every export.`
+  )
   for (const variable of leaked) {
     out.add('SECRET_IN_COLLECTION_VARIABLE', undefined, {
       location: `collection variable ${variable.key}${variable.reason ? ` (${variable.reason})` : ''}`,
@@ -562,7 +578,8 @@ function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollecto
     })
   }
   for (const variable of leakedScoped) {
-    const place = variable.scope === 'folder' ? `folder variable ${variable.key} (folder "${variable.owner}")` : `request variable ${variable.key}`
+    const place =
+      variable.scope === 'folder' ? `folder variable ${variable.key} (folder "${variable.owner}")` : `request variable ${variable.key}`
     out.add('SECRET_IN_COLLECTION_VARIABLE', variable.requestId, {
       location: `${place}${variable.reason ? ` (${variable.reason})` : ''}`,
       preview: evidencePreview(variable.value),
@@ -582,7 +599,11 @@ function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollecto
 function checkDescriptions(parsed: ParsedCollection, out: FindingCollector): void {
   for (const description of parsed.descriptions ?? []) {
     const place =
-      description.kind === 'collection' ? 'description (collection)' : description.kind === 'folder' ? `description (folder "${description.owner}")` : 'description'
+      description.kind === 'collection'
+        ? 'description (collection)'
+        : description.kind === 'folder'
+          ? `description (folder "${description.owner}")`
+          : 'description'
     for (const secret of findDescriptionSecrets(description.text)) {
       const ruleId = secret.kind === 'pattern' ? 'KNOWN_SECRET_PATTERN' : 'HARDCODED_SECRET'
       const label = secret.kind === 'pattern' ? ` (${secret.label})` : `: ${secret.label}`
@@ -618,7 +639,10 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
       for (const field of secretFieldsFor(response.requestAuthType)) {
         const value = response.requestAuthFields.find((entry) => entry.key === field)?.value
         if (value && isLikelySecretValue(value)) {
-          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request ${response.requestAuthType} ${field}`, preview: evidencePreview(value) })
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+            location: `${label} original request ${response.requestAuthType} ${field}`,
+            preview: evidencePreview(value),
+          })
         }
       }
     }
@@ -648,7 +672,10 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
 
     for (const param of response.requestQuery ?? []) {
       if (isQuerySecret(param.key, param.value)) {
-        out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request query ${param.key.trim()}`, preview: evidencePreview(param.value) })
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+          location: `${label} original request query ${param.key.trim()}`,
+          preview: evidencePreview(param.value),
+        })
       }
     }
 
@@ -659,16 +686,25 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
       else for (const field of scanRawBodyFields(response.requestBody)) fields.push({ key: field.key, value: field.value, path: field.key })
       for (const field of fields) {
         if (classifyBodySecret(field.key, field.value)) {
-          out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request body ${field.path}`, preview: evidencePreview(field.value) })
+          out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+            location: `${label} original request body ${field.path}`,
+            preview: evidencePreview(field.value),
+          })
         }
       }
       for (const secret of findSecretPatterns(response.requestBody, 3)) {
-        out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request body (${secret.label})`, preview: evidencePreview(secret.match) })
+        out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+          location: `${label} original request body (${secret.label})`,
+          preview: evidencePreview(secret.match),
+        })
       }
     }
 
     for (const secret of findSecretPatterns(response.requestUrl, 2)) {
-      out.add('SECRET_IN_SAVED_RESPONSE', req.id, { location: `${label} original request URL (${secret.label})`, preview: evidencePreview(secret.match) })
+      out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+        location: `${label} original request URL (${secret.label})`,
+        preview: evidencePreview(secret.match),
+      })
     }
   }
 }
@@ -790,9 +826,7 @@ function hasCredentialsOutsideAuthHelper(req: ParsedRequest, parsed: ParsedColle
 
 /** `POST /v1/users` style label for triage; the origin and query string are dropped. */
 function requestRoute(req: ParsedRequest): string {
-  const path = req.url
-    .replace(/^\s*(?:[a-z][a-z0-9+.-]*:\/\/[^/?#]*|\{\{[^{}]+\}\})/i, '')
-    .split(/[?#]/)[0]
+  const path = req.url.replace(/^\s*(?:[a-z][a-z0-9+.-]*:\/\/[^/?#]*|\{\{[^{}]+\}\})/i, '').split(/[?#]/)[0]
   return `${req.method} ${path.startsWith('/') ? path : `/${path}`}`
 }
 
@@ -807,7 +841,10 @@ function checkVariableIntegrity(parsed: ParsedCollection, out: FindingCollector)
       : usage.hasDynamicSets
         ? ' Scripts also set variables with computed names, so some of these may be defined at runtime.'
         : ''
-    out.touch('UNDEFINED_VARIABLE', `${plural(usage.undefinedNames.size, 'variable')} ${usage.undefinedNames.size === 1 ? 'is' : 'are'} referenced but not defined anywhere in the export.${hint}`)
+    out.touch(
+      'UNDEFINED_VARIABLE',
+      `${plural(usage.undefinedNames.size, 'variable')} ${usage.undefinedNames.size === 1 ? 'is' : 'are'} referenced but not defined anywhere in the export.${hint}`
+    )
     for (const [name, references] of usage.undefinedNames) {
       for (const reference of references) {
         out.add('UNDEFINED_VARIABLE', reference.requestId || undefined, { location: `{{${name}}} in ${reference.place}` })
@@ -822,7 +859,10 @@ function checkVariableIntegrity(parsed: ParsedCollection, out: FindingCollector)
     return !(STARTER_VARIABLES.has(key) && !variable?.value)
   })
   if (unused.length > 0) {
-    out.touch('UNUSED_COLLECTION_VARIABLE', `${plural(unused.length, 'collection variable')} ${unused.length === 1 ? 'is' : 'are'} defined but never referenced.`)
+    out.touch(
+      'UNUSED_COLLECTION_VARIABLE',
+      `${plural(unused.length, 'collection variable')} ${unused.length === 1 ? 'is' : 'are'} defined but never referenced.`
+    )
     for (const key of unused) out.add('UNUSED_COLLECTION_VARIABLE', undefined, { location: `collection variable ${key}` })
   }
 }
@@ -970,7 +1010,9 @@ export interface AuditResult {
 
 function sortFindings(findings: Finding[]): Finding[] {
   const order = new Map(RULE_LIST.map((rule, index) => [rule.id, index]))
-  return findings.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || (order.get(a.ruleId) ?? 0) - (order.get(b.ruleId) ?? 0))
+  return findings.sort(
+    (a, b) => severityRank(a.severity) - severityRank(b.severity) || (order.get(a.ruleId) ?? 0) - (order.get(b.ruleId) ?? 0)
+  )
 }
 
 export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions = {}): AuditResult {

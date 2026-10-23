@@ -46,7 +46,10 @@ test('finding ids are stable rule ids and unique per run', () => {
   assert.equal(new Set(findings.map((f) => f.id)).size, findings.length)
   for (const finding of findings) assert.equal(finding.id, finding.ruleId)
   const again = runAudit(parseCollection(kitchenSinkCollection()))
-  assert.deepEqual(again.map((f) => f.id), findings.map((f) => f.id))
+  assert.deepEqual(
+    again.map((f) => f.id),
+    findings.map((f) => f.id)
+  )
 })
 
 test('findings are ordered critical, warning, info', () => {
@@ -78,13 +81,16 @@ test('pagination tokens are ignored and disabled fields are labelled', () => {
 function disabledCollection(): Record<string, unknown> {
   return {
     info: { name: 'Disabled entries' },
-    variable: [{ key: 'baseUrl', value: 'https://api.example.com' }, { key: 'a', value: '1' }, { key: 'b', value: '2' }, { key: 'c', value: '3' }],
+    variable: [
+      { key: 'baseUrl', value: 'https://api.example.com' },
+      { key: 'a', value: '1' },
+      { key: 'b', value: '2' },
+      { key: 'c', value: '3' },
+    ],
     item: [
       {
         name: 'Leaky request',
-        event: [
-          { listen: 'prerequest', disabled: true, script: { exec: [`pm.environment.set("accessToken", "${FAKE.refreshToken}")`] } },
-        ],
+        event: [{ listen: 'prerequest', disabled: true, script: { exec: [`pm.environment.set("accessToken", "${FAKE.refreshToken}")`] } }],
         request: {
           method: 'POST',
           auth: { type: 'noauth' },
@@ -111,7 +117,11 @@ function disabledCollection(): Record<string, unknown> {
         response: [
           {
             name: 'Example',
-            originalRequest: { method: 'POST', header: [{ key: 'X-API-Key', value: FAKE.apiKey, disabled: true }], url: '{{baseUrl}}/login' },
+            originalRequest: {
+              method: 'POST',
+              header: [{ key: 'X-API-Key', value: FAKE.apiKey, disabled: true }],
+              url: '{{baseUrl}}/login',
+            },
             body: '{}',
           },
         ],
@@ -140,7 +150,10 @@ test('disabled entries do not suppress auth or hygiene checks', () => {
 test('disabled placeholders and variables raise nothing', () => {
   const json = disabledCollection() as { item: Array<{ request: { header: unknown[] } }> }
   json.item[0].request.header = [{ key: 'Authorization', value: 'Bearer {{token}}', disabled: true }]
-  const { byRule } = audit({ ...json, item: [{ ...json.item[0], event: [], response: [], request: { ...json.item[0].request, url: '{{baseUrl}}/x', body: undefined } }] })
+  const { byRule } = audit({
+    ...json,
+    item: [{ ...json.item[0], event: [], response: [], request: { ...json.item[0].request, url: '{{baseUrl}}/x', body: undefined } }],
+  })
   assert.ok(!byRule.has('HARDCODED_TOKEN'))
   assert.ok(!byRule.has('SECRET_IN_QUERY'))
 })
@@ -150,13 +163,20 @@ test('inherited auth suppresses MISSING_AUTH and flags inherited credentials', (
   assert.ok(!affectedNames('MISSING_AUTH').includes('Login'))
   assert.ok(affectedNames('MISSING_AUTH').includes('Github hook'))
   assert.ok(affectedNames('BASIC_AUTH_PLAINTEXT').includes('Login'))
-  const locations = byRule.get('HARDCODED_AUTH_CREDENTIAL')?.evidence?.map((e) => e.location).join('|') ?? ''
+  const locations =
+    byRule
+      .get('HARDCODED_AUTH_CREDENTIAL')
+      ?.evidence?.map((e) => e.location)
+      .join('|') ?? ''
   assert.match(locations, /collection level/)
 })
 
 test('a clean collection has no secret, auth, or transport findings', () => {
   const { findings, parsed } = audit(cleanCollection())
-  assert.deepEqual(findings.filter((f) => f.severity !== 'info').map((f) => f.ruleId), [])
+  assert.deepEqual(
+    findings.filter((f) => f.severity !== 'info').map((f) => f.ruleId),
+    []
+  )
   assert.ok(calculateScore(parsed, findings).total >= 90)
 })
 
@@ -201,9 +221,26 @@ test('JSON bodies with unquoted variables still reveal literal secrets', () => {
   const { affectedNames, byRule } = audit({
     info: { name: 'Templated' },
     item: [
-      { name: 'Unquoted', request: { method: 'POST', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{"id": {{userId}}, "password": "${FAKE.password}"}` } } },
-      { name: 'Only variables', request: { method: 'POST', url: '{{baseUrl}}/b', body: { mode: 'raw', raw: '{"id": {{userId}}, "password": {{password}}, "n": "{{x}}"}' } } },
-      { name: 'Nested', request: { method: 'POST', url: '{{baseUrl}}/c', body: { mode: 'raw', raw: `{"a": [{{one}}, {"client_secret": "${FAKE.clientSecret}"}], "b": {{two}}}` } } },
+      {
+        name: 'Unquoted',
+        request: { method: 'POST', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{"id": {{userId}}, "password": "${FAKE.password}"}` } },
+      },
+      {
+        name: 'Only variables',
+        request: {
+          method: 'POST',
+          url: '{{baseUrl}}/b',
+          body: { mode: 'raw', raw: '{"id": {{userId}}, "password": {{password}}, "n": "{{x}}"}' },
+        },
+      },
+      {
+        name: 'Nested',
+        request: {
+          method: 'POST',
+          url: '{{baseUrl}}/c',
+          body: { mode: 'raw', raw: `{"a": [{{one}}, {"client_secret": "${FAKE.clientSecret}"}], "b": {{two}}}` },
+        },
+      },
     ],
   })
   assert.deepEqual(affectedNames('HARDCODED_PASSWORD'), ['Unquoted'])
@@ -215,26 +252,64 @@ test('XML, form-like and fragment raw bodies are scanned field by field', () => 
   const { affectedNames, byRule } = audit({
     info: { name: 'Raw bodies' },
     item: [
-      { name: 'SOAP', request: { method: 'POST', url: 'https://x.test/s', body: { mode: 'raw', raw: `<wsse:UsernameToken><wsse:Password Type="PasswordText">${FAKE.password}</wsse:Password></wsse:UsernameToken>` } } },
-      { name: 'SOAP variable', request: { method: 'POST', url: 'https://x.test/s', body: { mode: 'raw', raw: '<Password>{{pw}}</Password><Name>Bob</Name>' } } },
-      { name: 'Pairs', request: { method: 'POST', url: 'https://x.test/t', body: { mode: 'raw', raw: `grant_type=client_credentials&client_secret=${FAKE.clientSecret}&scope=read` } } },
-      { name: 'Fragment', request: { method: 'POST', url: 'https://x.test/f', body: { mode: 'raw', raw: `// note\n{"password": "${FAKE.password}", }` } } },
-      { name: 'Plain text', request: { method: 'POST', url: 'https://x.test/p', body: { mode: 'raw', raw: 'this mentions a secret but has no value' } } },
+      {
+        name: 'SOAP',
+        request: {
+          method: 'POST',
+          url: 'https://x.test/s',
+          body: {
+            mode: 'raw',
+            raw: `<wsse:UsernameToken><wsse:Password Type="PasswordText">${FAKE.password}</wsse:Password></wsse:UsernameToken>`,
+          },
+        },
+      },
+      {
+        name: 'SOAP variable',
+        request: { method: 'POST', url: 'https://x.test/s', body: { mode: 'raw', raw: '<Password>{{pw}}</Password><Name>Bob</Name>' } },
+      },
+      {
+        name: 'Pairs',
+        request: {
+          method: 'POST',
+          url: 'https://x.test/t',
+          body: { mode: 'raw', raw: `grant_type=client_credentials&client_secret=${FAKE.clientSecret}&scope=read` },
+        },
+      },
+      {
+        name: 'Fragment',
+        request: { method: 'POST', url: 'https://x.test/f', body: { mode: 'raw', raw: `// note\n{"password": "${FAKE.password}", }` } },
+      },
+      {
+        name: 'Plain text',
+        request: { method: 'POST', url: 'https://x.test/p', body: { mode: 'raw', raw: 'this mentions a secret but has no value' } },
+      },
     ],
   })
   assert.deepEqual(affectedNames('HARDCODED_PASSWORD'), ['SOAP', 'Fragment'])
   assert.deepEqual(affectedNames('HARDCODED_SECRET'), ['Pairs'])
-  assert.deepEqual(byRule.get('HARDCODED_PASSWORD')?.evidence?.map((e) => e.location), ['raw body Password', 'raw body password'])
+  assert.deepEqual(
+    byRule.get('HARDCODED_PASSWORD')?.evidence?.map((e) => e.location),
+    ['raw body Password', 'raw body password']
+  )
 })
 
-function urlCollection(requests: Array<{ name: string; method?: string; url: unknown; header?: unknown[]; auth?: unknown; event?: unknown[] }>, extra: Record<string, unknown> = {}) {
+function urlCollection(
+  requests: Array<{ name: string; method?: string; url: unknown; header?: unknown[]; auth?: unknown; event?: unknown[] }>,
+  extra: Record<string, unknown> = {}
+) {
   return {
     info: { name: 'Urls' },
     ...extra,
     item: requests.map((request) => ({
       name: request.name,
       event: request.event,
-      request: { method: request.method ?? 'GET', url: request.url, header: request.header, auth: request.auth ?? { type: 'noauth' }, description: 'd' },
+      request: {
+        method: request.method ?? 'GET',
+        url: request.url,
+        header: request.header,
+        auth: request.auth ?? { type: 'noauth' },
+        description: 'd',
+      },
     })),
   }
 }
@@ -268,7 +343,14 @@ test('environment URL detection looks at host labels, not path segments', () => 
       { name: 'Variable base', url: '{{baseUrl}}/prod/items' },
     ])
   )
-  assert.deepEqual(affectedNames('HARDCODED_ENV_URL'), ['UAT label', 'Staging label', 'Preprod label', 'Variable only in path', 'Localhost', 'Scheme-less'])
+  assert.deepEqual(affectedNames('HARDCODED_ENV_URL'), [
+    'UAT label',
+    'Staging label',
+    'Preprod label',
+    'Variable only in path',
+    'Localhost',
+    'Scheme-less',
+  ])
   assert.deepEqual(
     byRule.get('HARDCODED_ENV_URL')?.evidence?.map((item) => item.preview),
     ['api-uat.acme.io', 'staging.acme.io', 'api.preprod.acme.io', 'sandbox.acme.io', 'localhost', 'api.qa.acme.io']
@@ -282,8 +364,22 @@ test('requests with API keys, cookies, query credentials or auth scripts are not
         { name: 'Bare', method: 'POST', url: '{{baseUrl}}/users' },
         { name: 'API key header', method: 'POST', url: '{{baseUrl}}/a', header: [{ key: 'X-API-Key', value: '{{apiKey}}' }] },
         { name: 'Session cookie', method: 'PUT', url: '{{baseUrl}}/b', header: [{ key: 'Cookie', value: 'session={{session}}' }] },
-        { name: 'Query credential', method: 'PATCH', url: { raw: '{{baseUrl}}/c?api_key={{key}}', query: [{ key: 'api_key', value: '{{key}}' }] } },
-        { name: 'Own script', method: 'DELETE', url: '{{baseUrl}}/d', event: [{ listen: 'prerequest', script: { exec: ["pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.environment.get('t') })"] } }] },
+        {
+          name: 'Query credential',
+          method: 'PATCH',
+          url: { raw: '{{baseUrl}}/c?api_key={{key}}', query: [{ key: 'api_key', value: '{{key}}' }] },
+        },
+        {
+          name: 'Own script',
+          method: 'DELETE',
+          url: '{{baseUrl}}/d',
+          event: [
+            {
+              listen: 'prerequest',
+              script: { exec: ["pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.environment.get('t') })"] },
+            },
+          ],
+        },
         { name: 'CSRF only', method: 'POST', url: '{{baseUrl}}/e', header: [{ key: 'X-CSRF-Token', value: '{{csrf}}' }] },
         { name: 'Disabled key', method: 'POST', url: '{{baseUrl}}/f', header: [{ key: 'X-API-Key', value: '{{apiKey}}', disabled: true }] },
       ],
@@ -291,7 +387,10 @@ test('requests with API keys, cookies, query credentials or auth scripts are not
     )
   )
   assert.deepEqual(affectedNames('MISSING_AUTH'), ['Bare', 'CSRF only', 'Disabled key'])
-  assert.deepEqual(byRule.get('MISSING_AUTH')?.evidence?.map((item) => item.location), ['POST /users', 'POST /e', 'POST /f'])
+  assert.deepEqual(
+    byRule.get('MISSING_AUTH')?.evidence?.map((item) => item.location),
+    ['POST /users', 'POST /e', 'POST /f']
+  )
 })
 
 test('collection and folder pre-request scripts that set Authorization suppress MISSING_AUTH', () => {
@@ -311,7 +410,10 @@ test('collection and folder pre-request scripts that set Authorization suppress 
   assert.deepEqual(audit(json).affectedNames('MISSING_AUTH'), [])
   const unrelated = { ...json, event: script("console.log('hello')"), item: [json.item[0], json.item[1]] }
   assert.deepEqual(audit(unrelated).affectedNames('MISSING_AUTH'), ['At root'])
-  const disabled = { ...json, event: [{ listen: 'prerequest', disabled: true, script: { exec: ["pm.request.headers.add('Authorization: Bearer x')"] } }] }
+  const disabled = {
+    ...json,
+    event: [{ listen: 'prerequest', disabled: true, script: { exec: ["pm.request.headers.add('Authorization: Bearer x')"] } }],
+  }
   assert.deepEqual(audit(disabled).affectedNames('MISSING_AUTH'), ['At root'])
 })
 
@@ -337,7 +439,10 @@ test('Basic Authorization headers are decoded before judging them', () => {
     ])
   )
   const evidence = byRule.get('HARDCODED_TOKEN')?.evidence ?? []
-  assert.deepEqual(evidence.map((item) => item.requestId), ['R2', 'R3', 'R4'])
+  assert.deepEqual(
+    evidence.map((item) => item.requestId),
+    ['R2', 'R3', 'R4']
+  )
   assert.equal(evidence[0].location, 'header Authorization (basic credentials for user s••••••)')
   assert.equal(evidence[1].location, 'header Authorization (basic credentials for user a••) (Mailgun API key)')
   assert.ok(evidence.every((item) => !JSON.stringify(item).includes(FAKE.password)))
@@ -353,9 +458,18 @@ test('Vault tokens and other sensitive headers are reported', () => {
       { key: 'X-Webhook-Secret', value: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6' },
     ])
   )
-  assert.deepEqual(byRule.get('HARDCODED_TOKEN')?.evidence?.map((item) => item.requestId), ['R0'])
-  assert.deepEqual(byRule.get('KNOWN_SECRET_PATTERN')?.evidence?.map((item) => item.location), ['header X-Custom (HashiCorp Vault service token)'])
-  assert.deepEqual(byRule.get('HIGH_ENTROPY_LITERAL')?.evidence?.map((item) => item.location), ['header X-Webhook-Secret'])
+  assert.deepEqual(
+    byRule.get('HARDCODED_TOKEN')?.evidence?.map((item) => item.requestId),
+    ['R0']
+  )
+  assert.deepEqual(
+    byRule.get('KNOWN_SECRET_PATTERN')?.evidence?.map((item) => item.location),
+    ['header X-Custom (HashiCorp Vault service token)']
+  )
+  assert.deepEqual(
+    byRule.get('HIGH_ENTROPY_LITERAL')?.evidence?.map((item) => item.location),
+    ['header X-Webhook-Secret']
+  )
 })
 
 test('HIGH_ENTROPY_LITERAL covers credential-named fields no other rule reported and skips the rest', () => {
@@ -366,10 +480,24 @@ test('HIGH_ENTROPY_LITERAL covers credential-named fields no other rule reported
         name: 'Body',
         request: {
           method: 'POST',
-          url: { raw: '{{baseUrl}}/a?signing_key=q8Zr2LmXa9PdW4sT7vBn3KcYe6&session_id=123e4567-e89b-12d3-a456-426614174000', query: [{ key: 'signing_key', value: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6' }, { key: 'session_id', value: '123e4567-e89b-12d3-a456-426614174000' }] },
+          url: {
+            raw: '{{baseUrl}}/a?signing_key=q8Zr2LmXa9PdW4sT7vBn3KcYe6&session_id=123e4567-e89b-12d3-a456-426614174000',
+            query: [
+              { key: 'signing_key', value: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6' },
+              { key: 'session_id', value: '123e4567-e89b-12d3-a456-426614174000' },
+            ],
+          },
           auth: { type: 'noauth' },
           description: 'd',
-          body: { mode: 'raw', raw: JSON.stringify({ signing_key: 'Zx8Qw3Lm9Pd2Vb7Kc4Ye1TrNs5', client_secret: 'Zx8Qw3Lm9Pd2Vb7Kc4Ye1TrNs5', username: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6', credential_hint: 'a plain sentence about credentials' }) },
+          body: {
+            mode: 'raw',
+            raw: JSON.stringify({
+              signing_key: 'Zx8Qw3Lm9Pd2Vb7Kc4Ye1TrNs5',
+              client_secret: 'Zx8Qw3Lm9Pd2Vb7Kc4Ye1TrNs5',
+              username: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6',
+              credential_hint: 'a plain sentence about credentials',
+            }),
+          },
         },
       },
     ],

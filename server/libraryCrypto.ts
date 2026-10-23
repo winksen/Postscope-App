@@ -104,7 +104,13 @@ export function resolveEncryptionState(settings: RawKeySettings): EncryptionStat
 export function isEnvelope(value: unknown): value is Envelope {
   if (!value || typeof value !== 'object') return false
   const record = value as Partial<Envelope>
-  return record.v === 1 && record.alg === 'aes-256-gcm' && typeof record.iv === 'string' && typeof record.tag === 'string' && typeof record.data === 'string'
+  return (
+    record.v === 1 &&
+    record.alg === 'aes-256-gcm' &&
+    typeof record.iv === 'string' &&
+    typeof record.tag === 'string' &&
+    typeof record.data === 'string'
+  )
 }
 
 const aad = (recordId: string) => Buffer.from(`postscope-library:v1:${recordId.toLowerCase()}`, 'utf8')
@@ -114,7 +120,14 @@ export function encryptRecord(plaintext: string, recordId: string, key: Encrypti
   const cipher = crypto.createCipheriv('aes-256-gcm', key.key, iv)
   cipher.setAAD(aad(recordId))
   const data = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  return { v: 1, alg: 'aes-256-gcm', kid: key.id, iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: data.toString('base64') }
+  return {
+    v: 1,
+    alg: 'aes-256-gcm',
+    kid: key.id,
+    iv: iv.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'),
+    data: data.toString('base64'),
+  }
 }
 
 export class DecryptionError extends Error {

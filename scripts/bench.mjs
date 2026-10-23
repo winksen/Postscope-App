@@ -167,20 +167,28 @@ for (const [group, key, label] of BUDGETED) {
   const base = baseline?.[group]?.[key]
   const change = base ? (value - base) / base : null
   lines.push(`| ${label} | ${value} | ${base ?? '-'} | ${change === null ? '-' : `${change >= 0 ? '+' : ''}${round(change * 100)}%`} |`)
-  if (flag('--check') && base && change > TOLERANCE) failures.push(`${key} is ${round(change * 100)}% above the baseline (${value} vs ${base}, limit +${TOLERANCE * 100}%)`)
+  if (flag('--check') && base && change > TOLERANCE)
+    failures.push(`${key} is ${round(change * 100)}% above the baseline (${value} vs ${base}, limit +${TOLERANCE * 100}%)`)
 }
 
 const e = result.engine
-console.log(`Engine: ${e.requests} requests (${e.collectionKB} KB): parse ${e.parseMs} ms, audit ${e.auditMs} ms, compact ${e.compactMs} ms, calibration ${e.calibrationMs} ms (fastest of ${RUNS})`)
+console.log(
+  `Engine: ${e.requests} requests (${e.collectionKB} KB): parse ${e.parseMs} ms, audit ${e.auditMs} ms, compact ${e.compactMs} ms, calibration ${e.calibrationMs} ms (fastest of ${RUNS})`
+)
 console.log(lines.join('\n'))
 
 if (reportPath) fs.writeFileSync(reportPath, `${JSON.stringify(result, null, 2)}\n`)
-if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n### Performance budgets\n\n${lines.join('\n')}\n`)
+if (process.env.GITHUB_STEP_SUMMARY)
+  fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n### Performance budgets\n\n${lines.join('\n')}\n`)
 
 if (flag('--update')) {
   // The slowest of three passes, so the baseline is not a lucky run and the 20 percent margin sits above normal noise.
   const slowest = Math.max(e.parseAuditRatio, ...Array.from({ length: 2 }, () => measureEngine().parseAuditRatio))
-  const next = { note: 'Recorded by npm run bench -- --update. CI fails when a number is more than 20 percent above it.', engine: { parseAuditRatio: slowest }, bundle: result.bundle }
+  const next = {
+    note: 'Recorded by npm run bench -- --update. CI fails when a number is more than 20 percent above it.',
+    engine: { parseAuditRatio: slowest },
+    bundle: result.bundle,
+  }
   fs.writeFileSync(BASELINE_FILE, `${JSON.stringify(next, null, 2)}\n`)
   console.log(`Baseline written to ${path.relative(root, BASELINE_FILE)}`)
 }

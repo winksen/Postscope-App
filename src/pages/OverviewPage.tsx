@@ -1,24 +1,5 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import {
-  FileText,
-  FolderOpen,
-  GitBranch,
-  Hash,
-  Key,
-  ShieldWarning,
-  TreeStructure,
-} from '@phosphor-icons/react'
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { FileText, FolderOpen, GitBranch, Hash, Key, ShieldWarning, TreeStructure } from '@phosphor-icons/react'
 import { StatCard } from '../components/StatCard'
 import type { ParsedCollection } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
@@ -40,13 +21,7 @@ const AUTH_COLORS: Record<string, string> = {
   awsv4: 'hsl(24 90% 52%)',
 }
 
-const FALLBACK_AUTH_COLORS = [
-  'hsl(340 75% 52%)',
-  'hsl(187 72% 42%)',
-  'hsl(142 65% 40%)',
-  'hsl(285 70% 54%)',
-  'hsl(48 95% 48%)',
-] as const
+const FALLBACK_AUTH_COLORS = ['hsl(340 75% 52%)', 'hsl(187 72% 42%)', 'hsl(142 65% 40%)', 'hsl(285 70% 54%)', 'hsl(48 95% 48%)'] as const
 
 /** Distinct color per HTTP verb; DELETE uses destructive red. */
 const VERB_COLORS: Record<string, string> = {
@@ -145,15 +120,7 @@ function maxDepth(node: StructureNode): number {
   return 1 + Math.max(...node.children.map(maxDepth))
 }
 
-function StructureBranch({
-  node,
-  depth = 0,
-  isLast = true,
-}: {
-  node: StructureNode
-  depth?: number
-  isLast?: boolean
-}) {
+function StructureBranch({ node, depth = 0, isLast = true }: { node: StructureNode; depth?: number; isLast?: boolean }) {
   const requestCount = totalRequests(node)
   const directRequests = node.requests.length
   const hasChildren = node.children.length > 0
@@ -172,28 +139,17 @@ function StructureBranch({
             aria-hidden
           />
           <span className="absolute left-1 top-6 h-px w-5" style={{ backgroundColor: levelColor }} aria-hidden />
-          <span
-            className="absolute left-[0.0625rem] top-5 h-2 w-2 rounded-full"
-            style={{ backgroundColor: levelColor }}
-            aria-hidden
-          />
+          <span className="absolute left-[0.0625rem] top-5 h-2 w-2 rounded-full" style={{ backgroundColor: levelColor }} aria-hidden />
         </>
       )}
       <div className="relative flex min-w-0 items-center gap-3 rounded-lg px-2 py-2">
-        <span
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center',
-          )}
-          style={{ color: levelColor }}
-        >
+        <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center')} style={{ color: levelColor }}>
           <FolderOpen className="h-5 w-5" weight="fill" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <p className="truncate text-sm font-medium">{node.name}</p>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {requestCount} req
-            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{requestCount} req</span>
             {hasChildren && (
               <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground">
                 {node.children.length} folder{node.children.length === 1 ? '' : 's'}
@@ -217,9 +173,7 @@ function StructureBranch({
               isLast={index === shownChildren.length - 1 && hiddenChildren === 0}
             />
           ))}
-          {hiddenChildren > 0 && (
-            <div className="pl-7 text-xs text-muted-foreground">+ {hiddenChildren} more folder branches</div>
-          )}
+          {hiddenChildren > 0 && <div className="pl-7 text-xs text-muted-foreground">+ {hiddenChildren} more folder branches</div>}
         </div>
       )}
     </div>
@@ -250,20 +204,12 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
   }))
 
   const noauthCount = parsed.authTypes.noauth ?? 0
-  const typedAuthSharePct =
-    parsed.totalRequests > 0
-      ? Math.round(((parsed.totalRequests - noauthCount) / parsed.totalRequests) * 100)
-      : 0
+  const typedAuthSharePct = parsed.totalRequests > 0 ? Math.round(((parsed.totalRequests - noauthCount) / parsed.totalRequests) * 100) : 0
 
-  const maxFolderDepth =
-    parsed.folders.length > 0 ? Math.max(...parsed.folders.map((f) => f.path.length)) : 0
-  const avgRequestsPerFolder = parsed.totalFolders
-    ? (parsed.totalRequests / parsed.totalFolders).toFixed(1)
-    : '0'
+  const maxFolderDepth = parsed.folders.length > 0 ? Math.max(...parsed.folders.map((f) => f.path.length)) : 0
+  const avgRequestsPerFolder = parsed.totalFolders ? (parsed.totalRequests / parsed.totalFolders).toFixed(1) : '0'
   const busiestFolder =
-    parsed.folders.length > 0
-      ? parsed.folders.reduce((best, f) => (f.requestCount > best.requestCount ? f : best))
-      : undefined
+    parsed.folders.length > 0 ? parsed.folders.reduce((best, f) => (f.requestCount > best.requestCount ? f : best)) : undefined
   const topMethod = methodEntries[0]
   const structureDetailRows = [
     { label: 'Folders', value: parsed.totalFolders },
@@ -345,9 +291,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Collection overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Structure, auth coverage, and request inventory for this import.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Structure, auth coverage, and request inventory for this import.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -389,17 +333,8 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             </p>
             <div className="h-64 w-full" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={methodData}
-                  margin={{ top: 12, right: 8, left: 8, bottom: 4 }}
-                  barCategoryGap="40%"
-                >
-                  <CartesianGrid
-                    strokeDasharray="6 10"
-                    vertical={false}
-                    stroke="hsl(var(--border))"
-                    strokeLinecap="round"
-                  />
+                <BarChart data={methodData} margin={{ top: 12, right: 8, left: 8, bottom: 4 }} barCategoryGap="40%">
+                  <CartesianGrid strokeDasharray="6 10" vertical={false} stroke="hsl(var(--border))" strokeLinecap="round" />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
@@ -424,8 +359,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             </div>
             <p className="mt-4 text-center text-sm font-semibold text-foreground">Method mix</p>
             <p className="mx-auto mt-1 max-w-sm text-center text-xs leading-relaxed text-muted-foreground">
-              Each verb keeps its own color; DELETE uses a destructive red. Taller bars are more common
-              in this collection.
+              Each verb keeps its own color; DELETE uses a destructive red. Taller bars are more common in this collection.
             </p>
           </CardContent>
         </Card>
@@ -437,10 +371,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
           </CardHeader>
           <CardContent className="space-y-0 pt-2">
             <div className="mx-auto w-full max-w-md shrink-0 px-1 text-center">
-              <p
-                className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
-                style={{ fontFamily: CHART_FONT }}
-              >
+              <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground" style={{ fontFamily: CHART_FONT }}>
                 {typedAuthSharePct}
                 <span className="text-2xl font-semibold text-muted-foreground">%</span>
               </p>
@@ -470,11 +401,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
                     animationDuration={800}
                   >
                     {authColorData.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={entry.fill}
-                        className="transition-all duration-200 hover:opacity-80"
-                      />
+                      <Cell key={i} fill={entry.fill} className="transition-all duration-200 hover:opacity-80" />
                     ))}
                   </Pie>
                   <Tooltip
@@ -496,10 +423,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
               {authColorData.map((entry) => (
                 <div key={entry.name} className="flex items-center gap-2 text-xs">
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: entry.fill }}
-                  />
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.fill }} />
                   <span className="capitalize text-muted-foreground">{entry.name}</span>
                   <span className="tabular-nums font-semibold text-foreground">{entry.value}</span>
                 </div>
@@ -508,8 +432,8 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
 
             <p className="mt-5 text-center text-sm font-semibold text-foreground">Auth coverage</p>
             <p className="mx-auto mt-1 max-w-sm text-center text-xs leading-relaxed text-muted-foreground">
-              {typedAuthSharePct}% of requests use a non-empty auth type. The arc shows how requests split
-              across bearer, API keys, and other profiles.
+              {typedAuthSharePct}% of requests use a non-empty auth type. The arc shows how requests split across bearer, API keys, and
+              other profiles.
             </p>
           </CardContent>
         </Card>
@@ -572,20 +496,14 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Request collection tree</CardTitle>
-          <CardDescription>
-            Branch-level overview of the collection structure without expanding every request detail.
-          </CardDescription>
+          <CardDescription>Branch-level overview of the collection structure without expanding every request detail.</CardDescription>
         </CardHeader>
         <CardContent>
           {treeLevelLegend.length > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
               {treeLevelLegend.map((level) => (
                 <div key={level.label} className="flex items-center gap-2 text-xs">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: level.color }}
-                    aria-hidden
-                  />
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: level.color }} aria-hidden />
                   <span className="font-medium text-muted-foreground">{level.label}</span>
                 </div>
               ))}

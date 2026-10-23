@@ -104,16 +104,10 @@ export function ScoreGauge({ score, grade, summary }: ScoreGaugeProps) {
           />
         </svg>
         <div className="absolute left-1/2 top-[70px] w-[120px] -translate-x-1/2 text-center">
-          <span
-            className="block font-sans text-5xl font-semibold tabular-nums tracking-tight text-foreground"
-            style={{ lineHeight: 1 }}
-          >
+          <span className="block font-sans text-5xl font-semibold tabular-nums tracking-tight text-foreground" style={{ lineHeight: 1 }}>
             {animatedScore}
           </span>
-          <span
-            className="mt-2 block text-xl font-semibold transition-colors duration-300"
-            style={{ color: strokeColor }}
-          >
+          <span className="mt-2 block text-xl font-semibold transition-colors duration-300" style={{ color: strokeColor }}>
             {grade}
           </span>
         </div>

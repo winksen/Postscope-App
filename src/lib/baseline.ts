@@ -23,10 +23,20 @@ export function buildBaseline(findings: Finding[], createdAt: Date = new Date())
   const byFingerprint = new Map<string, BaselineEntry>()
   for (const finding of findings) {
     for (const item of findingOccurrences(finding)) {
-      byFingerprint.set(item.fingerprint, { fingerprint: item.fingerprint, ruleId: item.ruleId, requestId: item.requestId, location: item.location })
+      byFingerprint.set(item.fingerprint, {
+        fingerprint: item.fingerprint,
+        ruleId: item.ruleId,
+        requestId: item.requestId,
+        location: item.location,
+      })
     }
   }
-  const entries = [...byFingerprint.values()].sort((a, b) => a.ruleId.localeCompare(b.ruleId) || (a.requestId ?? '').localeCompare(b.requestId ?? '') || (a.location ?? '').localeCompare(b.location ?? ''))
+  const entries = [...byFingerprint.values()].sort(
+    (a, b) =>
+      a.ruleId.localeCompare(b.ruleId) ||
+      (a.requestId ?? '').localeCompare(b.requestId ?? '') ||
+      (a.location ?? '').localeCompare(b.location ?? '')
+  )
   return { version: 1, tool: 'PostScope', createdAt: createdAt.toISOString(), entries }
 }
 

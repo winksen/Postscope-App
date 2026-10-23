@@ -85,7 +85,12 @@ interface InlineParse {
 function parseInline(parsed: ParsedCollection, requests: Map<string, ParsedRequest>, now: Date): InlineParse {
   const result: InlineParse = { suppressions: [], expired: [], invalid: [] }
   for (const description of parsed.descriptions ?? []) {
-    const place = description.kind === 'collection' ? 'description (collection)' : description.kind === 'folder' ? `description (folder "${description.owner}")` : `description (request "${description.owner}")`
+    const place =
+      description.kind === 'collection'
+        ? 'description (collection)'
+        : description.kind === 'folder'
+          ? `description (folder "${description.owner}")`
+          : `description (request "${description.owner}")`
     for (const line of description.text.split(/\r?\n/)) {
       const marker = line.match(INLINE_LINE)
       if (!marker) continue
@@ -136,7 +141,10 @@ export function applySuppressions(
 
   for (const entry of options.suppressions ?? []) {
     if (isExpired(entry.expires, now)) {
-      notices.push({ ruleId: 'SUPPRESSION_EXPIRED', location: `config suppression ${entry.ruleId}${entry.request ? ` for ${entry.request}` : ''} (expired ${entry.expires})` })
+      notices.push({
+        ruleId: 'SUPPRESSION_EXPIRED',
+        location: `config suppression ${entry.ruleId}${entry.request ? ` for ${entry.request}` : ''} (expired ${entry.expires})`,
+      })
       continue
     }
     const requestPattern = entry.request ? globToRegExp(entry.request) : null
@@ -163,7 +171,9 @@ export function applySuppressions(
       active.push(finding)
       continue
     }
-    const { kept, matched } = splitFindingByOccurrence(finding, (occurrence) => candidates.find((suppression) => suppression.matches(occurrence)))
+    const { kept, matched } = splitFindingByOccurrence(finding, (occurrence) =>
+      candidates.find((suppression) => suppression.matches(occurrence))
+    )
     if (kept) active.push(kept)
     if (matched) {
       suppressed.push({
@@ -181,4 +191,3 @@ export function applySuppressions(
   }
   return { active, suppressed, notices }
 }
-

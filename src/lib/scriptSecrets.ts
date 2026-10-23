@@ -1,11 +1,4 @@
-import {
-  AUTH_HEADER_SCHEME,
-  SESSION_COOKIE,
-  TOKEN_HEADER,
-  findSecretPatterns,
-  isLikelySecretValue,
-  isSensitiveKey,
-} from './secretPatterns'
+import { AUTH_HEADER_SCHEME, SESSION_COOKIE, TOKEN_HEADER, findSecretPatterns, isLikelySecretValue, isSensitiveKey } from './secretPatterns'
 
 /**
  * Credential literals inside Postman scripts. One scanner feeds both the auditor (evidence) and the redaction
@@ -22,7 +15,8 @@ export interface ScriptSecret {
   end: number
 }
 
-const SET_CALL = /pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`\n]+)\1\s*,\s*(['"`])([^'"`\n]*)\3/g
+const SET_CALL =
+  /pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`\n]+)\1\s*,\s*(['"`])([^'"`\n]*)\3/g
 const ASSIGNMENT = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([^'"`\n]{6,})\2/g
 const PROPERTY = /['"]?([A-Za-z_$][\w$-]*)['"]?\s*:\s*(['"`])([^'"`\n]{6,})\2/g
 /** `{ key: 'Authorization', value: 'Bearer ...' }` as used by `pm.request.headers.add`, `pm.sendRequest` and auth helpers. */
@@ -32,7 +26,8 @@ const VALUE_THEN_KEY = /\bvalue\s*:\s*(['"`])([^'"`\n]*)\1\s*,[^{}]{0,120}?\bkey
 const HEADER_STRING = /pm\.request\.headers\.(?:add|upsert)\s*\(\s*(['"`])([A-Za-z0-9-]{1,60})\s*:\s*([^'"`\n]*)\1/g
 /** `btoa('user:password')` and `Buffer.from('user:password').toString('base64')` */
 const BTOA = /\bbtoa\s*\(\s*(['"`])([^'"`\n:$\s]{1,64}):([^'"`\n]{6,})\1\s*\)/g
-const BUFFER_BASE64 = /\bBuffer\.from\s*\(\s*(['"`])([^'"`\n:$\s]{1,64}):([^'"`\n]{6,})\1[^)\n]{0,40}\)\s*\.toString\(\s*['"`]base64['"`]\s*\)/g
+const BUFFER_BASE64 =
+  /\bBuffer\.from\s*\(\s*(['"`])([^'"`\n:$\s]{1,64}):([^'"`\n]{6,})\1[^)\n]{0,40}\)\s*\.toString\(\s*['"`]base64['"`]\s*\)/g
 
 const AUTHORIZATION_HEADER = /^(?:proxy-)?authorization$/i
 
@@ -95,7 +90,8 @@ export function findScriptSecrets(source: string | undefined | null, patternLimi
     const valueStart = (match.index ?? 0) + match[0].indexOf(match[1]) + 1
     addNamed(match[4], match[2], valueStart)
   }
-  for (const match of source.matchAll(HEADER_STRING)) addNamed(match[2], match[3].trim(), literalStart(match, match[3]) + (match[3].length - match[3].trimStart().length))
+  for (const match of source.matchAll(HEADER_STRING))
+    addNamed(match[2], match[3].trim(), literalStart(match, match[3]) + (match[3].length - match[3].trimStart().length))
   for (const pattern of [BTOA, BUFFER_BASE64]) {
     for (const match of source.matchAll(pattern)) {
       const password = match[3]

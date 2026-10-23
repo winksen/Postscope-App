@@ -2,10 +2,21 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseCollection, type ParsedRequest } from '../src/lib/parser'
 import { VIRTUALIZE_ABOVE, computeWindow, scrollTopForRow } from '../src/lib/virtualWindow'
-import { allFolderKeys, ancestorFolderKeys, buildRequestTree, filterRequestList, filterTreeNodes, flattenTree, folderKey } from '../src/lib/requestTree'
+import {
+  allFolderKeys,
+  ancestorFolderKeys,
+  buildRequestTree,
+  filterRequestList,
+  filterTreeNodes,
+  flattenTree,
+  folderKey,
+} from '../src/lib/requestTree'
 
 type Item = { name: string; item?: Item[]; request?: Record<string, unknown> }
-const leaf = (name: string, method = 'GET'): Item => ({ name, request: { method, url: `https://api.example.com/${name.replace(/\s/g, '-')}` } })
+const leaf = (name: string, method = 'GET'): Item => ({
+  name,
+  request: { method, url: `https://api.example.com/${name.replace(/\s/g, '-')}` },
+})
 
 function sample(): ParsedRequest[] {
   const item: Item[] = [
@@ -48,7 +59,10 @@ test('scrolling to a row moves the least amount', () => {
 test('flattening shows open folders only and numbers the rows for assistive technology', () => {
   const { root, nodes } = buildRequestTree(sample())
   const closed = flattenTree(root, nodes, new Set())
-  assert.deepEqual(closed.map((row) => row.key), ['label:root', 'r:Health', folderKey(['Users']), folderKey(['Orders'])])
+  assert.deepEqual(
+    closed.map((row) => row.key),
+    ['label:root', 'r:Health', folderKey(['Users']), folderKey(['Orders'])]
+  )
 
   const users = folderKey(['Users'])
   const open = flattenTree(root, nodes, new Set([users]))
@@ -76,7 +90,10 @@ test('folder keys, ancestors and searching', () => {
   assert.deepEqual(ancestorFolderKeys(deep), [folderKey(['Users']), folderKey(['Users', 'Admin'])])
   assert.deepEqual(allFolderKeys(nodes), [folderKey(['Users']), folderKey(['Users', 'Admin']), folderKey(['Orders'])])
 
-  assert.deepEqual(filterRequestList(root, 'health').map((request) => request.name), ['Health'])
+  assert.deepEqual(
+    filterRequestList(root, 'health').map((request) => request.name),
+    ['Health']
+  )
   const found = filterTreeNodes(nodes, 'delete')
   assert.equal(found.length, 1)
   assert.equal(found[0].children[0].requests[0].name, 'Delete user')

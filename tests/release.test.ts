@@ -21,7 +21,11 @@ test('CLI reports the package version from another working directory', () => {
     const cli = path.join(root, 'cli', 'postscope.ts')
     const env = { ...process.env }
     delete env.APP_VERSION
-    const result = spawnSync(process.execPath, ['--import', pathToFileURL(path.join(root, 'node_modules', 'tsx', 'dist', 'loader.mjs')).href, cli, '--version'], { encoding: 'utf8', cwd, env })
+    const result = spawnSync(
+      process.execPath,
+      ['--import', pathToFileURL(path.join(root, 'node_modules', 'tsx', 'dist', 'loader.mjs')).href, cli, '--version'],
+      { encoding: 'utf8', cwd, env }
+    )
     assert.equal(result.status, 0, result.stderr)
     assert.equal(result.stdout.trim(), pkg.version)
   } finally {
@@ -36,7 +40,10 @@ test('release check fails when a version drifts', () => {
     for (const file of ['scripts/release-check.mjs', 'package.json', 'package-lock.json', 'Dockerfile', 'compose.yaml', 'CHANGELOG.md']) {
       fs.copyFileSync(path.join(root, file), path.join(copy, file))
     }
-    fs.writeFileSync(path.join(copy, 'Dockerfile'), fs.readFileSync(path.join(copy, 'Dockerfile'), 'utf8').replace(/ARG APP_VERSION=\S+/, 'ARG APP_VERSION=9.9.9'))
+    fs.writeFileSync(
+      path.join(copy, 'Dockerfile'),
+      fs.readFileSync(path.join(copy, 'Dockerfile'), 'utf8').replace(/ARG APP_VERSION=\S+/, 'ARG APP_VERSION=9.9.9')
+    )
     const result = spawnSync(process.execPath, ['scripts/release-check.mjs'], { encoding: 'utf8', cwd: copy })
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Dockerfile ARG APP_VERSION: 9\.9\.9/)

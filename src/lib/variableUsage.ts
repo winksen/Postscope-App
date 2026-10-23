@@ -61,7 +61,13 @@ function requestParts(req: ParsedRequest): Array<{ place: string; text: string }
     ...req.headers.map((header) => ({ place: `header ${header.key.trim()}`, text: `${header.key} ${header.value}` })),
     ...(req.pathVariables ?? []).map((variable) => ({ place: 'path variable', text: variable.value })),
     { place: 'body', text: req.bodyRaw ?? '' },
-    { place: 'auth', text: [...(req.authFields ?? []).map((field) => field.value), req.basicAuth ? `${req.basicAuth.username} ${req.basicAuth.password}` : ''].join(' ') },
+    {
+      place: 'auth',
+      text: [
+        ...(req.authFields ?? []).map((field) => field.value),
+        req.basicAuth ? `${req.basicAuth.username} ${req.basicAuth.password}` : '',
+      ].join(' '),
+    },
   ]
 }
 
@@ -114,12 +120,17 @@ export function analyzeVariableUsage(parsed: ParsedCollection): VariableUsage {
       scan.sets.forEach((name) => setByScripts.add(name))
     }
     for (const response of req.savedResponses ?? []) {
-      const text = [response.requestUrl, response.requestBody, ...response.requestHeaders.map((header) => `${header.key} ${header.value}`)].join(' ')
+      const text = [
+        response.requestUrl,
+        response.requestBody,
+        ...response.requestHeaders.map((header) => `${header.key} ${header.value}`),
+      ].join(' ')
       extractVariableNames(text).forEach((name) => referencedAnywhere.add(name))
     }
   }
   for (const script of parsed.scripts ?? []) {
-    const place = script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
+    const place =
+      script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
     if (script.disabled) {
       const scan = scanScript(script.source)
       scan.gets.forEach(({ name }) => referencedAnywhere.add(name))
@@ -140,8 +151,12 @@ export function analyzeVariableUsage(parsed: ParsedCollection): VariableUsage {
 
   const active = activeEnvironmentOf(parsed)
   const globals = (parsed.environments ?? []).filter((environment) => environment.kind === 'globals')
-  const environmentVariables = [...(active?.variables ?? []), ...globals.flatMap((environment) => environment.variables)].filter((variable) => variable.enabled)
-  const collectionDefined = new Set((parsed.collectionVariables ?? []).filter((variable) => !variable.disabled).map((variable) => variable.key))
+  const environmentVariables = [...(active?.variables ?? []), ...globals.flatMap((environment) => environment.variables)].filter(
+    (variable) => variable.enabled
+  )
+  const collectionDefined = new Set(
+    (parsed.collectionVariables ?? []).filter((variable) => !variable.disabled).map((variable) => variable.key)
+  )
   const environmentDefined = new Set(environmentVariables.map((variable) => variable.key))
   const definedAnywhere = new Set([
     ...collectionDefined,
@@ -156,7 +171,8 @@ export function analyzeVariableUsage(parsed: ParsedCollection): VariableUsage {
     if (collectionDefined.has(name) || environmentDefined.has(name) || setByScripts.has(name) || iterationData.has(name)) continue
     const req = requestsById.get(reference.requestId)
     const scoped = (parsed.scopedVariables ?? []).some(
-      (variable) => !variable.disabled && variable.key === name && (req ? scopedVariableVisible(variable, req) : variable.scope === 'folder')
+      (variable) =>
+        !variable.disabled && variable.key === name && (req ? scopedVariableVisible(variable, req) : variable.scope === 'folder')
     )
     if (scoped) continue
     const list = undefinedNames.get(name) ?? []

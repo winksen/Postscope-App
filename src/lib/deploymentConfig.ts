@@ -116,11 +116,7 @@ export function requiresUploadConsent(loggingMode: LoggingMode, storageMode: Sto
   return loggingMode === 'hybrid' && storageMode === 'history'
 }
 
-export function canSaveToAppStorage(
-  loggingMode: LoggingMode,
-  storageMode: StorageMode,
-  hasConsent: boolean
-): boolean {
+export function canSaveToAppStorage(loggingMode: LoggingMode, storageMode: StorageMode, hasConsent: boolean): boolean {
   if (loggingMode === 'on') return true
   if (loggingMode === 'off') return false
   return storageMode === 'history' && hasConsent

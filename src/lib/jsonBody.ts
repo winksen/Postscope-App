@@ -80,7 +80,8 @@ export function parseTemplatedJson(raw: string): TemplatedJson | null {
   return {
     value,
     templated: originals.length > 0,
-    restore: (serialized) => (originals.length ? serialized.replace(sentinel, (match, index: string) => originals[Number(index)] ?? match) : serialized),
+    restore: (serialized) =>
+      originals.length ? serialized.replace(sentinel, (match, index: string) => originals[Number(index)] ?? match) : serialized,
   }
 }
 

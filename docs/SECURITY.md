@@ -87,7 +87,7 @@ For any deployment with `LOGGING_MODE=hybrid` or `on`:
 - [ ] Consider `LIBRARY_ALLOW_DELETE=false` when the library is an audit record.
 - [ ] Mount `/app/data` on a volume writable by uid 1000 and back it up. It contains whatever users uploaded.
 - [ ] Monitor `GET /api/health` (returns 503 when storage is not writable).
-- [ ] Run `npm run audit:deps` regularly and rebuild the image after dependency updates.
+- [ ] Run `npm run audit:deps` regularly and rebuild the image after dependency updates. The project's own CI fails on high severity advisories in runtime dependencies, runs CodeQL (security-extended queries) on every push and pull request and weekly, and Dependabot proposes npm, GitHub Actions and base image updates every week.
 
 ## 5. Reporting a vulnerability
 

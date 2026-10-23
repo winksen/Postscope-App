@@ -72,11 +72,7 @@ export async function findLibraryIdForContent(rawJson: string): Promise<string |
 }
 
 /** Save a collection to the app's filesystem storage (not the browser). */
-export async function saveToLibrary(
-  rawJson: string,
-  name: string,
-  requestCount: number
-): Promise<SavedCollectionMeta> {
+export async function saveToLibrary(rawJson: string, name: string, requestCount: number): Promise<SavedCollectionMeta> {
   if (rawJson.length > MAX_COLLECTION_BYTES) {
     throw new Error('Collection is too large to store.')
   }

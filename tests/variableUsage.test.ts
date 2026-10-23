@@ -13,9 +13,7 @@ function collection(overrides: Record<string, unknown> = {}, request: Record<str
   return {
     info: { name: 'Variables' },
     variable: [{ key: 'baseUrl', value: 'https://api.example.com' }],
-    item: [
-      { name: 'R', ...item, request: { method: 'GET', url: '{{baseUrl}}/users', description: 'd', ...request } },
-    ],
+    item: [{ name: 'R', ...item, request: { method: 'GET', url: '{{baseUrl}}/users', description: 'd', ...request } }],
     ...overrides,
   }
 }
@@ -31,7 +29,10 @@ test('references in URLs, headers, query, bodies and auth are checked against de
     {},
     {
       url: '{{baseUrl}}/users/{{userId}}?key={{apiKey}}',
-      header: [{ key: 'X-Tenant', value: '{{tenant}}' }, { key: 'X-Off', value: '{{disabledOnly}}', disabled: true }],
+      header: [
+        { key: 'X-Tenant', value: '{{tenant}}' },
+        { key: 'X-Off', value: '{{disabledOnly}}', disabled: true },
+      ],
       body: { mode: 'raw', raw: '{"id": {{bodyId}}, "when": "{{$isoTimestamp}}"}' },
       auth: { type: 'bearer', bearer: [{ key: 'token', value: '{{authToken}}' }] },
     }
@@ -61,7 +62,11 @@ test('definitions from collection, folder, request, script and iteration data va
             name: 'Inside',
             variable: [{ key: 'requestVar', value: '1' }],
             event: script("pm.environment.set('token', pm.response.json().token); const v = pm.iterationData.get('row')"),
-            request: { method: 'GET', url: '{{baseUrl}}/{{folderVar}}/{{requestVar}}/{{fromCollectionScript}}/{{token}}/{{row}}', description: 'd' },
+            request: {
+              method: 'GET',
+              url: '{{baseUrl}}/{{folderVar}}/{{requestVar}}/{{fromCollectionScript}}/{{token}}/{{row}}',
+              description: 'd',
+            },
           },
           { name: 'Outside request var', request: { method: 'GET', url: '{{baseUrl}}/{{requestVar}}', description: 'd' } },
         ],
@@ -75,12 +80,16 @@ test('definitions from collection, folder, request, script and iteration data va
 })
 
 test('pm.get references and replaceIn strings in scripts are checked', () => {
-  const json = collection({}, {}, {
-    event: [
-      ...script("const a = pm.environment.get('envOnly'); const b = pm.variables.get('computed'); pm.variables.replaceIn('{{inline}}')"),
-      ...script("pm.environment.get('fromTest')", 'test'),
-    ],
-  })
+  const json = collection(
+    {},
+    {},
+    {
+      event: [
+        ...script("const a = pm.environment.get('envOnly'); const b = pm.variables.get('computed'); pm.variables.replaceIn('{{inline}}')"),
+        ...script("pm.environment.get('fromTest')", 'test'),
+      ],
+    }
+  )
   const finding = find(runAudit(parseCollection(json)), 'UNDEFINED_VARIABLE')
   assert.deepEqual(locations(finding).sort(), [
     '{{computed}} in pre-request script',
@@ -98,8 +107,13 @@ test('without a loaded environment the finding is informational and says so', ()
 })
 
 test('with an environment loaded the finding is a warning and the environment satisfies references', () => {
-  const env = (name: string, keys: string[]) => JSON.stringify({ name, values: keys.map((key) => ({ key, value: 'v', enabled: true })), _postman_variable_scope: 'environment' })
-  const globals = JSON.stringify({ name: 'G', values: [{ key: 'fromGlobals', value: 'v', enabled: true }], _postman_variable_scope: 'globals' })
+  const env = (name: string, keys: string[]) =>
+    JSON.stringify({ name, values: keys.map((key) => ({ key, value: 'v', enabled: true })), _postman_variable_scope: 'environment' })
+  const globals = JSON.stringify({
+    name: 'G',
+    values: [{ key: 'fromGlobals', value: 'v', enabled: true }],
+    _postman_variable_scope: 'globals',
+  })
   const json = collection({}, { url: '{{baseUrl}}/{{inStaging}}/{{inProd}}/{{fromGlobals}}/{{missing}}' })
   const parsed = attachEnvironments(parseCollection(json), [env('Staging', ['inStaging']), env('Prod', ['inProd']), globals])
   let finding = find(runAudit(parsed), 'UNDEFINED_VARIABLE')
@@ -107,44 +121,55 @@ test('with an environment loaded the finding is a warning and the environment sa
   assert.deepEqual(locations(finding).sort(), ['{{inProd}} in url', '{{missing}} in url'])
   finding = find(runAudit(withActiveEnvironment(parsed, 1)), 'UNDEFINED_VARIABLE')
   assert.deepEqual(locations(finding).sort(), ['{{inStaging}} in url', '{{missing}} in url'])
-  const disabledEnvironment = attachEnvironments(parseCollection(json), [JSON.stringify({ name: 'E', values: [{ key: 'inStaging', value: 'v', enabled: false }], _postman_variable_scope: 'environment' })])
+  const disabledEnvironment = attachEnvironments(parseCollection(json), [
+    JSON.stringify({ name: 'E', values: [{ key: 'inStaging', value: 'v', enabled: false }], _postman_variable_scope: 'environment' }),
+  ])
   assert.ok(locations(find(runAudit(disabledEnvironment), 'UNDEFINED_VARIABLE')).includes('{{inStaging}} in url'))
 })
 
 test('scripts that set variables with computed names make the finding informational', () => {
   const json = collection({}, { url: '{{baseUrl}}/{{missing}}' }, { event: script('pm.environment.set(name, value)') })
-  const parsed = attachEnvironments(parseCollection(json), [JSON.stringify({ name: 'E', values: [], _postman_variable_scope: 'environment' })])
+  const parsed = attachEnvironments(parseCollection(json), [
+    JSON.stringify({ name: 'E', values: [], _postman_variable_scope: 'environment' }),
+  ])
   const finding = find(runAudit(parsed), 'UNDEFINED_VARIABLE')
   assert.equal(finding?.severity, 'info')
   assert.match(finding?.description ?? '', /computed names/)
 })
 
 test('a user severity override wins over the automatic downgrade', () => {
-  const findings = runAudit(parseCollection(collection({}, { url: '{{baseUrl}}/{{missing}}' })), sanitizeAuditOptions({ severityOverrides: { UNDEFINED_VARIABLE: 'critical' } }))
+  const findings = runAudit(
+    parseCollection(collection({}, { url: '{{baseUrl}}/{{missing}}' })),
+    sanitizeAuditOptions({ severityOverrides: { UNDEFINED_VARIABLE: 'critical' } })
+  )
   assert.equal(find(findings, 'UNDEFINED_VARIABLE')?.severity, 'critical')
 })
 
 test('unused collection variables are reported once nothing references them', () => {
-  const json = collection({
-    variable: [
-      { key: 'baseUrl', value: 'https://api.example.com' },
-      { key: 'usedInUrl', value: '1' },
-      { key: 'usedInScript', value: '1' },
-      { key: 'usedInOtherVariable', value: '1' },
-      { key: 'usedInDisabledHeader', value: '1' },
-      { key: 'dataFile', value: '1' },
-      { key: 'neverUsed', value: 'x' },
-      { key: 'alsoUnused', value: 'y' },
-      { key: 'apiKey', value: '' },
-      { key: 'token', value: '' },
-      { key: 'composed', value: '{{usedInOtherVariable}}/x' },
-    ],
-  }, {
-    url: '{{baseUrl}}/{{usedInUrl}}/{{composed}}',
-    header: [{ key: 'X', value: '{{usedInDisabledHeader}}', disabled: true }],
-  }, {
-    event: script("pm.collectionVariables.get('usedInScript'); pm.iterationData.get('dataFile')"),
-  })
+  const json = collection(
+    {
+      variable: [
+        { key: 'baseUrl', value: 'https://api.example.com' },
+        { key: 'usedInUrl', value: '1' },
+        { key: 'usedInScript', value: '1' },
+        { key: 'usedInOtherVariable', value: '1' },
+        { key: 'usedInDisabledHeader', value: '1' },
+        { key: 'dataFile', value: '1' },
+        { key: 'neverUsed', value: 'x' },
+        { key: 'alsoUnused', value: 'y' },
+        { key: 'apiKey', value: '' },
+        { key: 'token', value: '' },
+        { key: 'composed', value: '{{usedInOtherVariable}}/x' },
+      ],
+    },
+    {
+      url: '{{baseUrl}}/{{usedInUrl}}/{{composed}}',
+      header: [{ key: 'X', value: '{{usedInDisabledHeader}}', disabled: true }],
+    },
+    {
+      event: script("pm.collectionVariables.get('usedInScript'); pm.iterationData.get('dataFile')"),
+    }
+  )
   const finding = find(runAudit(parseCollection(json)), 'UNUSED_COLLECTION_VARIABLE')
   assert.equal(finding?.severity, 'info')
   assert.equal(finding?.category, 'hygiene')
@@ -178,6 +203,9 @@ test('repair adds empty placeholders for undefined variables, off by default', (
   const { fixedJson, applied } = applyRepairPlan(original, [fix.id], plan)
   assert.equal(applied.length, 1)
   const variables = (fixedJson as { variable: Array<{ key: string; value: string }> }).variable
-  assert.deepEqual(variables.map((variable) => variable.key), ['baseUrl', 'missing', 'otherMissing'])
+  assert.deepEqual(
+    variables.map((variable) => variable.key),
+    ['baseUrl', 'missing', 'otherMissing']
+  )
   assert.ok(!find(runAudit(parseCollection(fixedJson)), 'UNDEFINED_VARIABLE'))
 })

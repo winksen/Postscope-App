@@ -112,7 +112,9 @@ function headerSignature(request: ParsedRequest): string {
 
 function scriptSignature(request: ParsedRequest): string {
   const scripts = request.scripts
-  return scripts ? [scripts.prerequest, scripts.test, scripts.disabledPrerequest, scripts.disabledTest].map((source) => source ?? '').join('\u0000') : ''
+  return scripts
+    ? [scripts.prerequest, scripts.test, scripts.disabledPrerequest, scripts.disabledTest].map((source) => source ?? '').join('\u0000')
+    : ''
 }
 
 function changedFields(before: ParsedRequest, after: ParsedRequest): RequestChangeField[] {
@@ -122,7 +124,12 @@ function changedFields(before: ParsedRequest, after: ParsedRequest): RequestChan
   if (before.method !== after.method) fields.push('method')
   if (before.url !== after.url) fields.push('url')
   if (before.auth !== after.auth) fields.push('auth')
-  if ((before.bodyMode ?? '') !== (after.bodyMode ?? '') || (before.bodyRaw ?? '') !== (after.bodyRaw ?? '') || (before.bodySize ?? 0) !== (after.bodySize ?? 0)) fields.push('body')
+  if (
+    (before.bodyMode ?? '') !== (after.bodyMode ?? '') ||
+    (before.bodyRaw ?? '') !== (after.bodyRaw ?? '') ||
+    (before.bodySize ?? 0) !== (after.bodySize ?? 0)
+  )
+    fields.push('body')
   if (headerSignature(before) !== headerSignature(after)) fields.push('headers')
   if (scriptSignature(before) !== scriptSignature(after)) fields.push('scripts')
   return fields
@@ -135,7 +142,10 @@ interface RequestMatch {
 }
 
 /** Pairs requests by id first, then by method and normalized URL (in order of appearance when several share one). */
-function matchRequests(before: ParsedRequest[], after: ParsedRequest[]): { matches: RequestMatch[]; added: ParsedRequest[]; removed: ParsedRequest[] } {
+function matchRequests(
+  before: ParsedRequest[],
+  after: ParsedRequest[]
+): { matches: RequestMatch[]; added: ParsedRequest[]; removed: ParsedRequest[] } {
   const matches: RequestMatch[] = []
   const afterById = new Map(after.map((request) => [request.id, request]))
   const usedAfter = new Set<ParsedRequest>()
@@ -182,7 +192,7 @@ function keyFindings(findings: Finding[], parsed: ParsedCollection, idMap: Map<s
   const seen = new Set<string>()
   for (const finding of findings) {
     for (const occurrence of findingOccurrences(finding)) {
-      const stableId = occurrence.requestId === undefined ? undefined : idMap.get(occurrence.requestId) ?? occurrence.requestId
+      const stableId = occurrence.requestId === undefined ? undefined : (idMap.get(occurrence.requestId) ?? occurrence.requestId)
       const key = occurrenceFingerprint(finding.ruleId, stableId, occurrence.location)
       if (seen.has(key)) continue
       seen.add(key)
@@ -225,7 +235,11 @@ function hostsOf(parsed: ParsedCollection): Set<string> {
 }
 
 function authTypesOf(parsed: ParsedCollection): Set<string> {
-  return new Set(Object.entries(parsed.authTypes).filter(([, count]) => count > 0).map(([type]) => type))
+  return new Set(
+    Object.entries(parsed.authTypes)
+      .filter(([, count]) => count > 0)
+      .map(([type]) => type)
+  )
 }
 
 function difference(from: Set<string>, other: Set<string>): string[] {
@@ -264,7 +278,8 @@ export function compareCollections(before: CompareInput, after: CompareInput): C
     if (fields.length === 0) unchanged += 1
     else changed.push({ before: describeRequest(match.before), after: describeRequest(match.after), matchedBy: match.matchedBy, fields })
   }
-  const byName = (a: ComparedRequest, b: ComparedRequest) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+  const byName = (a: ComparedRequest, b: ComparedRequest) =>
+    a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
 
   const beforeFindings = keyFindings(before.findings, before.parsed, new Map())
   const afterFindings = keyFindings(after.findings, after.parsed, idMap)
@@ -291,8 +306,14 @@ export function compareCollections(before: CompareInput, after: CompareInput): C
       unchanged,
     },
     findings: {
-      added: afterFindings.filter((finding) => !beforeKeys.has(finding.key)).map(stripKey).sort(compareFindings),
-      resolved: beforeFindings.filter((finding) => !afterKeys.has(finding.key)).map(stripKey).sort(compareFindings),
+      added: afterFindings
+        .filter((finding) => !beforeKeys.has(finding.key))
+        .map(stripKey)
+        .sort(compareFindings),
+      resolved: beforeFindings
+        .filter((finding) => !afterKeys.has(finding.key))
+        .map(stripKey)
+        .sort(compareFindings),
       unchanged: afterFindings.filter((finding) => beforeKeys.has(finding.key)).length,
     },
     newHosts: difference(afterHosts, beforeHosts),

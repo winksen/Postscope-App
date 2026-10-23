@@ -16,13 +16,7 @@ interface RequestSearchModalProps {
   onSelect: (request: ParsedRequest) => void
 }
 
-export function RequestSearchModal({
-  open,
-  requests,
-  initialQuery = '',
-  onOpenChange,
-  onSelect,
-}: RequestSearchModalProps) {
+export function RequestSearchModal({ open, requests, initialQuery = '', onOpenChange, onSelect }: RequestSearchModalProps) {
   const [query, setQuery] = useState(initialQuery)
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -105,8 +99,16 @@ export function RequestSearchModal({
                 {query.trim() ? 'No requests match your search.' : 'Start typing to search requests.'}
               </p>
             ) : (
-              <ul id="request-search-results" aria-label="Matching requests" className="w-full max-w-full space-y-0.5 overflow-hidden" role="listbox">
+              <ul
+                id="request-search-results"
+                aria-label="Matching requests"
+                className="w-full max-w-full space-y-0.5 overflow-hidden"
+                role="listbox"
+              >
                 {results.map((request, index) => (
+                  // Focus stays in the search field (combobox pattern), which handles the arrow keys and Enter, so the option
+                  // itself needs no key listener or tab stop.
+                  // eslint-disable-next-line jsx-a11y/click-events-have-key-events
                   <li
                     key={request.id}
                     id={`request-search-option-${index}`}
@@ -144,7 +146,9 @@ export function RequestSearchModal({
         </ScrollArea>
 
         <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-2.5 text-[11px] text-muted-foreground">
-          <span>{results.length} result{results.length === 1 ? '' : 's'}</span>
+          <span>
+            {results.length} result{results.length === 1 ? '' : 's'}
+          </span>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1">
               <kbd className="rounded bg-background/60 px-1 py-0.5">↑</kbd>

@@ -191,7 +191,10 @@ async function readRecord(dir: string, id: string): Promise<StoredCollection | n
     if (isEnvelope(parsed)) {
       const state = getLibraryEncryption()
       if (!state.enabled || 'error' in state) {
-        warnOnce('library-encrypted-no-key', 'The library contains encrypted records but no usable LIBRARY_ENCRYPTION_KEY is configured; they are skipped.')
+        warnOnce(
+          'library-encrypted-no-key',
+          'The library contains encrypted records but no usable LIBRARY_ENCRYPTION_KEY is configured; they are skipped.'
+        )
         return null
       }
       try {
@@ -284,7 +287,12 @@ export interface SaveOptions {
   savedBy?: string | null
 }
 
-export async function saveCollection(rawJson: string, name: string, _requestCount?: number, options: SaveOptions = {}): Promise<StoredCollectionMeta> {
+export async function saveCollection(
+  rawJson: string,
+  name: string,
+  _requestCount?: number,
+  options: SaveOptions = {}
+): Promise<StoredCollectionMeta> {
   if (typeof rawJson !== 'string' || !rawJson.trim()) throw new LibraryError(400, 'rawJson is required.')
   const maxBytes = getMaxCollectionBytes()
   if (rawJson.length > maxBytes) throw new LibraryError(413, 'Collection is too large to store.')
@@ -322,7 +330,10 @@ export async function saveCollection(rawJson: string, name: string, _requestCoun
     if (maxTotalBytes > 0) {
       const used = [...state.items.values()].reduce((sum, item) => sum + item.sizeBytes, 0)
       if (used + stored.length > maxTotalBytes) {
-        throw new LibraryError(507, 'Library storage quota is full. Remove saved collections or ask an operator to raise LIBRARY_MAX_TOTAL_MB.')
+        throw new LibraryError(
+          507,
+          'Library storage quota is full. Remove saved collections or ask an operator to raise LIBRARY_MAX_TOTAL_MB.'
+        )
       }
     }
 
@@ -340,7 +351,10 @@ export async function saveCollection(rawJson: string, name: string, _requestCoun
 
     await ensureDir(state.dir)
     const serialized = JSON.stringify(record)
-    await writeAtomic(collectionPath(state.dir, record.id), keys ? JSON.stringify(encryptRecord(serialized, record.id, keys.current)) : serialized)
+    await writeAtomic(
+      collectionPath(state.dir, record.id),
+      keys ? JSON.stringify(encryptRecord(serialized, record.id, keys.current)) : serialized
+    )
     state.items.set(record.id, toMeta(record))
     await pruneUnlocked()
     return toMeta(record)

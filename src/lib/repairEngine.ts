@@ -150,14 +150,12 @@ function hostToString(host: PostmanUrl['host']): string {
 function pathToString(path: PostmanUrl['path']): string {
   if (typeof path === 'string') return path ? `/${path.replace(/^\/+/, '')}` : ''
   if (!Array.isArray(path) || path.length === 0) return ''
-  return `/${path.map((segment) => (typeof segment === 'string' ? segment : segment?.value ?? '')).join('/')}`
+  return `/${path.map((segment) => (typeof segment === 'string' ? segment : (segment?.value ?? ''))).join('/')}`
 }
 
 function queryToString(query: PostmanUrl['query']): string {
   if (!Array.isArray(query) || query.length === 0) return ''
-  const params = query
-    .filter((q) => q?.key && !q.disabled)
-    .map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value ?? '')}`)
+  const params = query.filter((q) => q?.key && !q.disabled).map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value ?? '')}`)
   return params.length ? `?${params.join('&')}` : ''
 }
 
@@ -195,7 +193,9 @@ function baseUrlVariableName(origin: string): string {
   const host = origin.replace(/^https?:\/\//, '').replace(/:\d+$/, '')
   const label = /^[\d.]+$/.test(host) || host.includes(':') ? 'host' : host.split('.')[0]
   const words = label.split(/[^A-Za-z0-9]+/).filter(Boolean)
-  const camel = words.map((word, index) => (index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())).join('')
+  const camel = words
+    .map((word, index) => (index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()))
+    .join('')
   const name = /^[A-Za-z]/.test(camel) ? camel : `host${camel}`
   return `${name || 'host'}BaseUrl`
 }
@@ -217,7 +217,11 @@ export function buildOriginVariableMap(parsed: ParsedCollection): OriginVariable
   const result: OriginVariable[] = []
 
   const existingBaseOrigin = existing.has('baseUrl') ? parseUrlParts(existing.get('baseUrl'))?.origin : undefined
-  const baseOrigin = existing.has('baseUrl') ? (existingBaseOrigin && counts.has(existingBaseOrigin) ? existingBaseOrigin : undefined) : ordered[0]?.[0]
+  const baseOrigin = existing.has('baseUrl')
+    ? existingBaseOrigin && counts.has(existingBaseOrigin)
+      ? existingBaseOrigin
+      : undefined
+    : ordered[0]?.[0]
   if (baseOrigin) {
     used.add('baseUrl')
     result.push({ origin: baseOrigin, variable: 'baseUrl', requestCount: counts.get(baseOrigin) ?? 0 })
@@ -290,13 +294,18 @@ function findEffectiveAuth(rawJson: unknown, itemPath: number[]): PostmanAuth | 
 }
 
 function sanitizeIdPart(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'collection'
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'collection'
+  )
 }
 
 function hashString(value: string): string {
   let hash = 0
   for (let i = 0; i < value.length; i += 1) {
-    hash = Math.imul(31, hash) + value.charCodeAt(i) | 0
+    hash = (Math.imul(31, hash) + value.charCodeAt(i)) | 0
   }
   return Math.abs(hash).toString(36)
 }
@@ -437,11 +446,17 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
   }
 
   if (kind === 'hardcodedAuthToken') {
-    const beforeSnippet = headerSnippet(affectedRequest, (header) => {
-      const lower = header.key.toLowerCase()
-      return lower === 'authorization' || lower === 'proxy-authorization' || lower === 'cookie' || TOKEN_HEADER.test(lower)
-    }, true)
-    const afterSnippet = beforeSnippet?.toLowerCase().includes('basic') ? 'Authorization: Basic {{basicAuthToken}}' : 'Authorization: Bearer {{token}}'
+    const beforeSnippet = headerSnippet(
+      affectedRequest,
+      (header) => {
+        const lower = header.key.toLowerCase()
+        return lower === 'authorization' || lower === 'proxy-authorization' || lower === 'cookie' || TOKEN_HEADER.test(lower)
+      },
+      true
+    )
+    const afterSnippet = beforeSnippet?.toLowerCase().includes('basic')
+      ? 'Authorization: Basic {{basicAuthToken}}'
+      : 'Authorization: Bearer {{token}}'
     return {
       ...base,
       status: 'auto',
@@ -474,7 +489,8 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       ...base,
       status: 'auto',
       title: 'Move Basic auth credentials to variables',
-      description: 'Replaces literal username and password fields in Postman Basic auth with {{username}} and {{password}}, including auth inherited from folders or the collection.',
+      description:
+        'Replaces literal username and password fields in Postman Basic auth with {{username}} and {{password}}, including auth inherited from folders or the collection.',
       risk: 'low',
       selectedByDefault: true,
       beforeSnippet: 'Basic auth username/password: ***',
@@ -570,7 +586,10 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
 
   if (kind === 'bodySecrets') {
     const bodyRule = finding.ruleId === 'HARDCODED_PASSWORD' ? 'HARDCODED_PASSWORD' : 'HARDCODED_SECRET'
-    const field = finding.evidence?.find((evidence) => evidence.location.startsWith('body'))?.location.split(/[ .]/).pop()
+    const field = finding.evidence
+      ?.find((evidence) => evidence.location.startsWith('body'))
+      ?.location.split(/[ .]/)
+      .pop()
     return {
       ...base,
       status: 'auto',
@@ -640,7 +659,8 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       ...base,
       status: 'auto',
       title: 'Re-enable TLS certificate verification',
-      description: 'Removes strictSSL: false from affected requests, their folders, and the collection. Requests to servers with self-signed certificates will fail until their CA is trusted.',
+      description:
+        'Removes strictSSL: false from affected requests, their folders, and the collection. Requests to servers with self-signed certificates will fail until their CA is trusted.',
       risk: 'medium',
       selectedByDefault: false,
       beforeSnippet: 'protocolProfileBehavior.strictSSL: false',
@@ -680,7 +700,10 @@ interface PatchResult {
   variables: RepairVariable[]
 }
 
-function applyUrlPatch(collection: unknown, fix: RepairFix): {
+function applyUrlPatch(
+  collection: unknown,
+  fix: RepairFix
+): {
   changed: number
   skipped: SkippedRepair[]
 } {
@@ -824,7 +847,10 @@ export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
   return { changed: 0, skipped: [], variables: [] }
 }
 
-export function patchBasicAuth(collection: unknown, fix: RepairFix): {
+export function patchBasicAuth(
+  collection: unknown,
+  fix: RepairFix
+): {
   changed: number
   skipped: SkippedRepair[]
 } {
@@ -858,7 +884,12 @@ export function patchBasicAuth(collection: unknown, fix: RepairFix): {
       }
     }
     if (!changedForOwner) {
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal Basic auth credentials were found.' })
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: 'No literal Basic auth credentials were found.',
+      })
     }
   }
 
@@ -924,7 +955,12 @@ function patchAuthHelperSecrets(collection: unknown): PatchResult {
   return { changed, skipped: [], variables: [...variables.values()] }
 }
 
-function replaceJsonSecrets(value: unknown, rule: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET', variables: Map<string, RepairVariable>, depth = 0): number {
+function replaceJsonSecrets(
+  value: unknown,
+  rule: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET',
+  variables: Map<string, RepairVariable>,
+  depth = 0
+): number {
   if (depth > 50 || value === null || typeof value !== 'object') return 0
   let changed = 0
   if (Array.isArray(value)) {
@@ -1039,7 +1075,12 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
     }
 
     if (changedForRequest === 0) {
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal value could be replaced automatically (body is not JSON or form data).' })
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: 'No literal value could be replaced automatically (body is not JSON or form data).',
+      })
     }
     changed += changedForRequest
   }
@@ -1095,7 +1136,12 @@ function patchQuerySecrets(collection: unknown, fix: RepairFix): PatchResult {
         const name = toVariableName(param.key)
         const replacement = `{{${name}}}`
         if (typeof url.raw === 'string') {
-          url.raw = replaceInRaw(replaceInRaw(url.raw, param.key, param.value, replacement), param.key, encodeURIComponent(param.value), replacement)
+          url.raw = replaceInRaw(
+            replaceInRaw(url.raw, param.key, param.value, replacement),
+            param.key,
+            encodeURIComponent(param.value),
+            replacement
+          )
         }
         param.value = replacement
         variables.set(name, { key: name, value: '' })
@@ -1167,7 +1213,12 @@ function patchInsecureHttp(collection: unknown, fix: RepairFix): PatchResult {
         }
         continue
       }
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: `{{${leadingVariable}}} is not defined as a collection variable.` })
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: `{{${leadingVariable}}} is not defined as a collection variable.`,
+      })
       continue
     }
 
@@ -1201,7 +1252,10 @@ function patchTlsVerification(collection: unknown, fix: RepairFix): PatchResult 
   return { changed, skipped: [], variables: [] }
 }
 
-function patchDescriptions(collection: unknown, fix: RepairFix): {
+function patchDescriptions(
+  collection: unknown,
+  fix: RepairFix
+): {
   changed: number
   skipped: SkippedRepair[]
 } {
@@ -1227,7 +1281,11 @@ function patchDescriptions(collection: unknown, fix: RepairFix): {
   return { changed, skipped }
 }
 
-export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan: RepairPlan): {
+export function applyRepairPlan(
+  rawJson: unknown,
+  selectedFixIds: string[],
+  plan: RepairPlan
+): {
   fixedJson: unknown
   applied: AppliedRepair[]
   skipped: SkippedRepair[]
@@ -1259,9 +1317,8 @@ export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan
       changed = result.changed
       localSkipped = result.skipped
       variables = result.variables.length ? result.variables : variables
-      action = fix.kind === 'emptyHeaders'
-        ? `Disabled ${changed} empty header(s).`
-        : `Replaced ${changed} literal header value(s) with variables.`
+      action =
+        fix.kind === 'emptyHeaders' ? `Disabled ${changed} empty header(s).` : `Replaced ${changed} literal header value(s) with variables.`
     } else if (fix.kind === 'basicAuthCredentials') {
       const result = patchBasicAuth(fixedJson, fix)
       changed = result.changed

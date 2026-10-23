@@ -184,10 +184,15 @@ export function buildSarifReport(ctx: ReportContext): string {
         truncated += 1
         continue
       }
-      const label = requestId ? labels.get(requestId) ?? requestId : null
+      const label = requestId ? (labels.get(requestId) ?? requestId) : null
       const evidence = finding.evidence?.find((entry) => (requestId ? entry.requestId === requestId : !entry.requestId))
-      const position = positions.get(evidence?.pointer ?? '') ?? (requestId ? positions.get(`${requestPointers.get(requestId)}/request`) : undefined)
-      const message = [label ? `${finding.title}: ${label}.` : `${finding.title}.`, evidence ? `Location: ${evidence.location}.` : '', finding.recommendation]
+      const position =
+        positions.get(evidence?.pointer ?? '') ?? (requestId ? positions.get(`${requestPointers.get(requestId)}/request`) : undefined)
+      const message = [
+        label ? `${finding.title}: ${label}.` : `${finding.title}.`,
+        evidence ? `Location: ${evidence.location}.` : '',
+        finding.recommendation,
+      ]
         .filter(Boolean)
         .join(' ')
       const reasons = suppressions?.filter((item) => (requestId ? item.requestId === requestId : !item.requestId))
@@ -231,7 +236,9 @@ export function buildSarifReport(ctx: ReportContext): string {
       version: '2.1.0',
       runs: [
         {
-          automationDetails: { id: `postscope/${safeFileStem(ctx.parsed.name)}/${(ctx.generatedAt ?? new Date()).toISOString().slice(0, 10)}` },
+          automationDetails: {
+            id: `postscope/${safeFileStem(ctx.parsed.name)}/${(ctx.generatedAt ?? new Date()).toISOString().slice(0, 10)}`,
+          },
           columnKind: 'utf16CodeUnits',
           invocations: [
             {
@@ -239,7 +246,10 @@ export function buildSarifReport(ctx: ReportContext): string {
               ...(truncated > 0
                 ? {
                     toolExecutionNotifications: [
-                      { level: 'warning', message: { text: `Results were truncated at ${MAX_SARIF_RESULTS}; ${truncated} more result(s) were not written.` } },
+                      {
+                        level: 'warning',
+                        message: { text: `Results were truncated at ${MAX_SARIF_RESULTS}; ${truncated} more result(s) were not written.` },
+                      },
                     ],
                   }
                 : {}),
@@ -341,10 +351,15 @@ export function buildMarkdownReport(ctx: ReportContext): string {
     for (const finding of ctx.suppressed) {
       lines.push(`### ${escapeMarkdown(finding.title)}`, '', `\`${finding.ruleId}\` · ${finding.category}`, '')
       for (const item of finding.suppressions.slice(0, MAX_MARKDOWN_AFFECTED)) {
-        const where = [item.requestId ? labels.get(item.requestId) ?? item.requestId : 'collection', item.location].filter(Boolean).join(': ')
-        lines.push(`- ${escapeMarkdown(where)}. Reason: ${escapeMarkdown(item.reason)} (${item.source}${item.expires ? `, expires ${item.expires}` : ''})`)
+        const where = [item.requestId ? (labels.get(item.requestId) ?? item.requestId) : 'collection', item.location]
+          .filter(Boolean)
+          .join(': ')
+        lines.push(
+          `- ${escapeMarkdown(where)}. Reason: ${escapeMarkdown(item.reason)} (${item.source}${item.expires ? `, expires ${item.expires}` : ''})`
+        )
       }
-      if (finding.suppressions.length > MAX_MARKDOWN_AFFECTED) lines.push(`- … and ${finding.suppressions.length - MAX_MARKDOWN_AFFECTED} more`)
+      if (finding.suppressions.length > MAX_MARKDOWN_AFFECTED)
+        lines.push(`- … and ${finding.suppressions.length - MAX_MARKDOWN_AFFECTED} more`)
       lines.push('')
     }
   }

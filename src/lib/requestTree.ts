@@ -71,8 +71,28 @@ export function countNodeRequests(node: TreeNode): number {
 /** One visible line of the tree. `key` is stable across renders: `f:<folder path>` or `r:<request id>`. */
 export type TreeRow =
   | { kind: 'label'; key: string; label: string; depth: 0; level: 1; posInSet: 1; setSize: 1; parentIndex: -1 }
-  | { kind: 'folder'; key: string; node: TreeNode; count: number; open: boolean; depth: number; level: number; posInSet: number; setSize: number; parentIndex: number }
-  | { kind: 'request'; key: string; request: ParsedRequest; depth: number; level: number; posInSet: number; setSize: number; parentIndex: number }
+  | {
+      kind: 'folder'
+      key: string
+      node: TreeNode
+      count: number
+      open: boolean
+      depth: number
+      level: number
+      posInSet: number
+      setSize: number
+      parentIndex: number
+    }
+  | {
+      kind: 'request'
+      key: string
+      request: ParsedRequest
+      depth: number
+      level: number
+      posInSet: number
+      setSize: number
+      parentIndex: number
+    }
 
 export const folderKey = (path: string[]): string => `f:${path.join('\u0000')}`
 export const requestKey = (id: string): string => `r:${id}`
@@ -99,7 +119,16 @@ export function flattenTree(root: ParsedRequest[], nodes: TreeNode[], openFolder
   if (root.length > 0) {
     rows.push({ kind: 'label', key: 'label:root', label: 'Root', depth: 0, level: 1, posInSet: 1, setSize: 1, parentIndex: -1 })
     root.forEach((request, index) => {
-      rows.push({ kind: 'request', key: requestKey(request.id), request, depth: 0, level: 1, posInSet: index + 1, setSize: root.length, parentIndex: -1 })
+      rows.push({
+        kind: 'request',
+        key: requestKey(request.id),
+        request,
+        depth: 0,
+        level: 1,
+        posInSet: index + 1,
+        setSize: root.length,
+        parentIndex: -1,
+      })
     })
   }
 
@@ -109,11 +138,31 @@ export function flattenTree(root: ParsedRequest[], nodes: TreeNode[], openFolder
       const key = folderKey(path)
       const open = openAll || openFolders.has(key)
       const rowIndex = rows.length
-      rows.push({ kind: 'folder', key, node, count: countNodeRequests(node), open, depth, level: depth + 1, posInSet: offset + index + 1, setSize: total, parentIndex })
+      rows.push({
+        kind: 'folder',
+        key,
+        node,
+        count: countNodeRequests(node),
+        open,
+        depth,
+        level: depth + 1,
+        posInSet: offset + index + 1,
+        setSize: total,
+        parentIndex,
+      })
       if (!open) return
       const childCount = node.requests.length + node.children.length
       node.requests.forEach((request, requestIndex) => {
-        rows.push({ kind: 'request', key: requestKey(request.id), request, depth: depth + 1, level: depth + 2, posInSet: requestIndex + 1, setSize: childCount, parentIndex: rowIndex })
+        rows.push({
+          kind: 'request',
+          key: requestKey(request.id),
+          request,
+          depth: depth + 1,
+          level: depth + 2,
+          posInSet: requestIndex + 1,
+          setSize: childCount,
+          parentIndex: rowIndex,
+        })
       })
       walk(node.children, path, depth + 1, rowIndex, node.requests.length, childCount)
     })

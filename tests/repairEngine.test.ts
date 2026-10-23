@@ -32,7 +32,13 @@ test('applying the default plan removes the targeted secrets and keeps the colle
 
   const after = runAudit(parseCollection(fixedJson))
   const remaining = new Set(after.map((finding) => finding.ruleId))
-  for (const ruleId of ['HARDCODED_AUTH_CREDENTIAL', 'SECRET_IN_QUERY', 'SECRET_IN_COLLECTION_VARIABLE', 'HARDCODED_API_KEY', 'BASIC_AUTH_PLAINTEXT']) {
+  for (const ruleId of [
+    'HARDCODED_AUTH_CREDENTIAL',
+    'SECRET_IN_QUERY',
+    'SECRET_IN_COLLECTION_VARIABLE',
+    'HARDCODED_API_KEY',
+    'BASIC_AUTH_PLAINTEXT',
+  ]) {
     assert.ok(!remaining.has(ruleId as never), `${ruleId} should be fixed`)
   }
 
@@ -113,7 +119,12 @@ test('repair patches secrets in disabled headers, query params and form fields',
           auth: { type: 'noauth' },
           description: 'd',
           header: [{ key: 'Authorization', value: `Bearer ${FAKE.bearer}`, disabled: true }],
-          url: { raw: '{{baseUrl}}/p', host: ['{{baseUrl}}'], path: ['p'], query: [{ key: 'api_key', value: FAKE.apiKey, disabled: true }] },
+          url: {
+            raw: '{{baseUrl}}/p',
+            host: ['{{baseUrl}}'],
+            path: ['p'],
+            query: [{ key: 'api_key', value: FAKE.apiKey, disabled: true }],
+          },
           body: { mode: 'urlencoded', urlencoded: [{ key: 'password', value: FAKE.password, disabled: true }] },
         },
       },
@@ -126,7 +137,10 @@ test('repair patches secrets in disabled headers, query params and form fields',
   const request = (fixedJson as { item: Array<{ request: { header: Array<{ disabled?: boolean; value: string }> } }> }).item[0].request
   assert.equal(request.header[0].disabled, true)
   assert.equal(request.header[0].value, 'Bearer {{token}}')
-  assert.deepEqual(runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'), [])
+  assert.deepEqual(
+    runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'),
+    []
+  )
 })
 
 test('repair keeps unquoted variables, indentation and XML in raw bodies', () => {
@@ -134,9 +148,36 @@ test('repair keeps unquoted variables, indentation and XML in raw bodies', () =>
     info: { name: 'Bodies' },
     variable: [{ key: 'baseUrl', value: 'https://x.test' }],
     item: [
-      { name: 'JSON', request: { method: 'POST', auth: { type: 'noauth' }, description: 'd', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{\n    "id": {{userId}},\n    "password": "${FAKE.password}"\n}` } } },
-      { name: 'SOAP', request: { method: 'POST', auth: { type: 'noauth' }, description: 'd', url: '{{baseUrl}}/s', body: { mode: 'raw', raw: `<Password>${FAKE.password}</Password>` } } },
-      { name: 'Pairs', request: { method: 'POST', auth: { type: 'noauth' }, description: 'd', url: '{{baseUrl}}/p', body: { mode: 'raw', raw: `a=1&client_secret=${FAKE.clientSecret}` } } },
+      {
+        name: 'JSON',
+        request: {
+          method: 'POST',
+          auth: { type: 'noauth' },
+          description: 'd',
+          url: '{{baseUrl}}/a',
+          body: { mode: 'raw', raw: `{\n    "id": {{userId}},\n    "password": "${FAKE.password}"\n}` },
+        },
+      },
+      {
+        name: 'SOAP',
+        request: {
+          method: 'POST',
+          auth: { type: 'noauth' },
+          description: 'd',
+          url: '{{baseUrl}}/s',
+          body: { mode: 'raw', raw: `<Password>${FAKE.password}</Password>` },
+        },
+      },
+      {
+        name: 'Pairs',
+        request: {
+          method: 'POST',
+          auth: { type: 'noauth' },
+          description: 'd',
+          url: '{{baseUrl}}/p',
+          body: { mode: 'raw', raw: `a=1&client_secret=${FAKE.clientSecret}` },
+        },
+      },
     ],
   }
   const { plan } = analyze(original)
@@ -145,7 +186,10 @@ test('repair keeps unquoted variables, indentation and XML in raw bodies', () =>
   assert.equal(bodies[0], '{\n    "id": {{userId}},\n    "password": "{{password}}"\n}')
   assert.equal(bodies[1], '<Password>{{Password}}</Password>')
   assert.equal(bodies[2], 'a=1&client_secret={{client_secret}}')
-  assert.deepEqual(runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'), [])
+  assert.deepEqual(
+    runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'),
+    []
+  )
 })
 
 function hostCollection(extra: Record<string, unknown> = {}) {
@@ -164,7 +208,15 @@ function hostCollection(extra: Record<string, unknown> = {}) {
         request: {
           method: 'GET',
           description: 'd',
-          url: { raw: 'http://legacy.example.com:8080/old/path?x=1', protocol: 'http', host: ['legacy', 'example', 'com'], port: '8080', path: ['old', 'path'], query: [{ key: 'x', value: '1' }], variable: [{ key: 'id', value: '1' }] },
+          url: {
+            raw: 'http://legacy.example.com:8080/old/path?x=1',
+            protocol: 'http',
+            host: ['legacy', 'example', 'com'],
+            port: '8080',
+            path: ['old', 'path'],
+            query: [{ key: 'x', value: '1' }],
+            variable: [{ key: 'id', value: '1' }],
+          },
         },
       },
     ],
@@ -202,7 +254,9 @@ test('base URL repair keeps each host on its own variable', () => {
     variable: [{ key: 'id', value: '1' }],
   })
 
-  const variables = Object.fromEntries((fixedJson as { variable: Array<{ key: string; value: string }> }).variable.map((variable) => [variable.key, variable.value]))
+  const variables = Object.fromEntries(
+    (fixedJson as { variable: Array<{ key: string; value: string }> }).variable.map((variable) => [variable.key, variable.value])
+  )
   assert.equal(variables.baseUrl, 'https://api.example.com')
   assert.equal(variables.authBaseUrl, 'https://auth.example.com')
   assert.equal(variables.legacyBaseUrl, 'http://legacy.example.com:8080')
@@ -221,9 +275,15 @@ test('an existing baseUrl variable keeps its meaning', () => {
 })
 
 test('base URL repair does not re-encode variables in the path', () => {
-  const original = { info: { name: 'Path' }, item: [{ name: 'A', request: { method: 'GET', description: 'd', url: 'https://api.example.com/{{tenant}}/users/{{id}}?q={{term}}' } }] }
+  const original = {
+    info: { name: 'Path' },
+    item: [{ name: 'A', request: { method: 'GET', description: 'd', url: 'https://api.example.com/{{tenant}}/users/{{id}}?q={{term}}' } }],
+  }
   const { plan } = analyze(original)
   const fix = plan.fixes.find((candidate) => candidate.kind === 'hardcodedBaseUrl')!
   const { fixedJson } = applyRepairPlan(original, [fix.id], plan)
-  assert.equal((fixedJson as { item: Array<{ request: { url: string } }> }).item[0].request.url, '{{baseUrl}}/{{tenant}}/users/{{id}}?q={{term}}')
+  assert.equal(
+    (fixedJson as { item: Array<{ request: { url: string } }> }).item[0].request.url,
+    '{{baseUrl}}/{{tenant}}/users/{{id}}?q={{term}}'
+  )
 })

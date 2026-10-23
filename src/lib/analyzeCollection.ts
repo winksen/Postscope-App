@@ -132,7 +132,14 @@ function getWorker(): Worker | null {
 }
 
 type WorkerJob =
-  | { type: 'analyze'; slot: AnalysisSlot; raw: string; options?: AuditOptions; environments?: readonly string[]; activeEnvironment?: number }
+  | {
+      type: 'analyze'
+      slot: AnalysisSlot
+      raw: string
+      options?: AuditOptions
+      environments?: readonly string[]
+      activeEnvironment?: number
+    }
   | { type: 'audit'; slot: AnalysisSlot; options?: AuditOptions; activeEnvironment?: number }
 
 function runInWorker(job: WorkerJob, timeoutMs: number): Promise<AnalysisResult> {
@@ -193,7 +200,11 @@ export async function analyzeCollectionText(
  */
 export async function auditAgain(
   options?: AuditOptions,
-  { timeoutMs = DEFAULT_TIMEOUT_MS, activeEnvironment, slot = 'main' }: Pick<AnalyzeTextOptions, 'timeoutMs' | 'activeEnvironment' | 'slot'> = {}
+  {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    activeEnvironment,
+    slot = 'main',
+  }: Pick<AnalyzeTextOptions, 'timeoutMs' | 'activeEnvironment' | 'slot'> = {}
 ): Promise<AnalysisResult | null> {
   try {
     return await runInWorker({ type: 'audit', slot, options, activeEnvironment }, timeoutMs)

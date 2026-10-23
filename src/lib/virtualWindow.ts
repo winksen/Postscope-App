@@ -22,7 +22,14 @@ export interface RowWindow {
 }
 
 /** Which rows to render for a fixed-height list at a scroll position. */
-export function computeWindow({ count, rowHeight, scrollTop, viewportHeight, overscan = 10, threshold = VIRTUALIZE_ABOVE }: WindowInput): RowWindow {
+export function computeWindow({
+  count,
+  rowHeight,
+  scrollTop,
+  viewportHeight,
+  overscan = 10,
+  threshold = VIRTUALIZE_ABOVE,
+}: WindowInput): RowWindow {
   const totalHeight = count * rowHeight
   if (count <= threshold) return { start: 0, end: count, totalHeight, virtual: false }
   // A stale scroll position (the list shrank, or the viewport was resized) is clamped to the end of the list.

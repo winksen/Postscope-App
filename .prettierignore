@@ -1,0 +1,15 @@
+dist
+dist-node
+node_modules
+coverage
+data
+public
+package-lock.json
+playwright-report
+test-results
+# Documentation and prose keep the authors' line breaks and table layout.
+*.md
+# Workflow and compose files are formatted by hand.
+.github
+compose.yaml
+action.yml

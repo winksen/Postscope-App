@@ -7,8 +7,7 @@ interface SeverityBadgeProps {
 }
 
 export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
-  const variant =
-    severity === 'critical' ? 'critical' : severity === 'warning' ? 'warning' : 'secondary'
+  const variant = severity === 'critical' ? 'critical' : severity === 'warning' ? 'warning' : 'secondary'
   return (
     <Badge
       variant={variant}

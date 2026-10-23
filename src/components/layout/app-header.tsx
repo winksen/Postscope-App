@@ -83,11 +83,12 @@ export function AppHeader({
           className="flex h-9 w-full items-center rounded-xl bg-card pl-9 pr-9 text-left text-sm shadow-[0_8px_22px_hsl(var(--background)/0.28)] transition-colors duration-200 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 dark:bg-muted/70 dark:hover:bg-muted"
         >
           <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <span className={search ? 'truncate text-foreground' : 'truncate text-muted-foreground'}>
-            {search || 'Search requests…'}
-          </span>
+          <span className={search ? 'truncate text-foreground' : 'truncate text-muted-foreground'}>{search || 'Search requests…'}</span>
         </button>
-        <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[10px] text-muted-foreground sm:flex" aria-hidden>
+        <div
+          className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[10px] text-muted-foreground sm:flex"
+          aria-hidden
+        >
           <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">/</kbd>
           <span>or</span>
           <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">Ctrl</kbd>
@@ -97,7 +98,10 @@ export function AppHeader({
 
       <div className="flex items-center gap-1">
         {environments.length === 1 && (
-          <span className="hidden max-w-[10rem] truncate rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground lg:inline" title={`Environment: ${environments[0].name}`}>
+          <span
+            className="hidden max-w-[10rem] truncate rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground lg:inline"
+            title={`Environment: ${environments[0].name}`}
+          >
             Environment: {environments[0].name}
           </span>
         )}

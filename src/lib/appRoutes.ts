@@ -77,7 +77,8 @@ export function parseAppLocation(pathname: string, search: string, basePath = ''
     const severity = params.get('severity')
     if (severity && (FILTER_SEVERITIES as readonly string[]).includes(severity)) location.severity = severity as Severity
     const category = params.get('category')
-    if (page === 'security' && category && (FILTER_CATEGORIES as readonly string[]).includes(category)) location.category = category as AppLocation['category']
+    if (page === 'security' && category && (FILTER_CATEGORIES as readonly string[]).includes(category))
+      location.category = category as AppLocation['category']
     const rule = params.get('rule')
     if (rule && RULE_ID.test(rule)) location.rule = rule
     const finding = params.get('finding')

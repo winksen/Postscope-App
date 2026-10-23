@@ -28,20 +28,26 @@ function collection(description = '', folderDescription = '', requestDescription
         name: 'Public',
         description: folderDescription,
         item: [
-          { name: 'Health', request: { method: 'POST', url: '{{baseUrl}}/health', auth: { type: 'noauth' }, description: requestDescription } },
+          {
+            name: 'Health',
+            request: { method: 'POST', url: '{{baseUrl}}/health', auth: { type: 'noauth' }, description: requestDescription },
+          },
           { name: 'Ping', request: { method: 'POST', url: '{{baseUrl}}/ping', auth: { type: 'noauth' }, description: 'Ping.' } },
         ],
       },
       {
         name: 'Private',
-        item: [{ name: 'Create', request: { method: 'POST', url: '{{baseUrl}}/things', auth: { type: 'noauth' }, description: 'Creates.' } }],
+        item: [
+          { name: 'Create', request: { method: 'POST', url: '{{baseUrl}}/things', auth: { type: 'noauth' }, description: 'Creates.' } },
+        ],
       },
       { name: 'Root', request: { method: 'POST', url: '{{baseUrl}}/root', auth: { type: 'noauth' }, description: 'Root.' } },
     ],
   }
 }
 
-const detailed = (json: unknown, suppressions?: ConfigSuppression[], now = NOW) => runAuditDetailed(parseCollection(json), { suppressions, now })
+const detailed = (json: unknown, suppressions?: ConfigSuppression[], now = NOW) =>
+  runAuditDetailed(parseCollection(json), { suppressions, now })
 
 test('sha256 matches the reference implementation', () => {
   for (const text of ['', 'abc', 'PostScope', 'x'.repeat(55), 'x'.repeat(56), 'x'.repeat(64), 'x'.repeat(1000), 'Zoë 日本語 🙂']) {
@@ -54,8 +60,21 @@ test('occurrence fingerprints ignore the masked preview and distinguish rule, re
   assert.equal(a, sha256Hex('HARDCODED_TOKEN|Users/List|header Authorization'))
   assert.notEqual(a, occurrenceFingerprint('HARDCODED_TOKEN', 'Users/List', 'header X-Api-Key'))
   assert.notEqual(a, occurrenceFingerprint('HARDCODED_TOKEN', 'Users/Other', 'header Authorization'))
-  const finding = { ruleId: 'HARDCODED_TOKEN', affected: ['A', 'B'], evidence: [{ requestId: 'A', location: 'header Authorization', preview: 'one' }, { requestId: 'A', location: 'header Authorization', preview: 'two' }] } as Finding
-  assert.deepEqual(findingOccurrences(finding).map((item) => [item.requestId, item.location]), [['A', 'header Authorization'], ['B', undefined]])
+  const finding = {
+    ruleId: 'HARDCODED_TOKEN',
+    affected: ['A', 'B'],
+    evidence: [
+      { requestId: 'A', location: 'header Authorization', preview: 'one' },
+      { requestId: 'A', location: 'header Authorization', preview: 'two' },
+    ],
+  } as Finding
+  assert.deepEqual(
+    findingOccurrences(finding).map((item) => [item.requestId, item.location]),
+    [
+      ['A', 'header Authorization'],
+      ['B', undefined],
+    ]
+  )
   assert.equal(findingOccurrences({ ruleId: 'X', affected: [], evidence: undefined } as unknown as Finding).length, 1)
 })
 
@@ -75,14 +94,20 @@ test('a config suppression hides matching occurrences, keeps them visible and ke
   const result = detailed(json, [{ ruleId: 'MISSING_AUTH', request: 'Public/*', reason: 'Public endpoints', expires: '2027-01-01' }])
   assert.deepEqual(find(before.findings, 'MISSING_AUTH')?.affected, ['Public/Health', 'Public/Ping', 'Private/Create', 'Root'])
   assert.deepEqual(find(result.findings, 'MISSING_AUTH')?.affected, ['Private/Create', 'Root'])
-  assert.deepEqual(find(result.findings, 'MISSING_AUTH')?.evidence?.map((item) => item.location), ['POST /things', 'POST /root'])
+  assert.deepEqual(
+    find(result.findings, 'MISSING_AUTH')?.evidence?.map((item) => item.location),
+    ['POST /things', 'POST /root']
+  )
   const suppressed = result.suppressed.find((finding) => finding.ruleId === 'MISSING_AUTH')
   assert.equal(suppressed?.suppressed, true)
   assert.deepEqual(suppressed?.affected, ['Public/Health', 'Public/Ping'])
-  assert.deepEqual(suppressed?.suppressions.map((item) => [item.requestId, item.location, item.reason, item.source, item.expires]), [
-    ['Public/Health', 'POST /health', 'Public endpoints', 'config', '2027-01-01'],
-    ['Public/Ping', 'POST /ping', 'Public endpoints', 'config', '2027-01-01'],
-  ])
+  assert.deepEqual(
+    suppressed?.suppressions.map((item) => [item.requestId, item.location, item.reason, item.source, item.expires]),
+    [
+      ['Public/Health', 'POST /health', 'Public endpoints', 'config', '2027-01-01'],
+      ['Public/Ping', 'POST /ping', 'Public endpoints', 'config', '2027-01-01'],
+    ]
+  )
   const parsed = parseCollection(json)
   assert.ok(calculateScore(parsed, result.findings).total >= calculateScore(parsed, before.findings).total)
 })
@@ -103,8 +128,14 @@ test('descriptions that count requests follow the number that remains', () => {
   const result = detailed(json, [{ ruleId: 'MISSING_DESCRIPTION', request: 'Private/*', reason: 'Internal' }])
   const missing = find(result.findings, 'MISSING_DESCRIPTION')
   assert.ok(missing === undefined || /^\d+ request/.test(missing.description))
-  const noDescriptions = { ...collection(), item: [1, 2, 3].map((n) => ({ name: `R${n}`, request: { method: 'GET', url: '{{baseUrl}}/x' } })) }
-  const partial = find(detailed(noDescriptions, [{ ruleId: 'MISSING_DESCRIPTION', request: 'R1', reason: 'x' }]).findings, 'MISSING_DESCRIPTION')
+  const noDescriptions = {
+    ...collection(),
+    item: [1, 2, 3].map((n) => ({ name: `R${n}`, request: { method: 'GET', url: '{{baseUrl}}/x' } })),
+  }
+  const partial = find(
+    detailed(noDescriptions, [{ ruleId: 'MISSING_DESCRIPTION', request: 'R1', reason: 'x' }]).findings,
+    'MISSING_DESCRIPTION'
+  )
   assert.equal(partial?.description, '2 request(s) have no description.')
 })
 
@@ -122,7 +153,11 @@ test('inline suppressions in request, folder and collection descriptions', () =>
 })
 
 test('a suppression without a reason, with an unknown rule or a bad date is not applied and is reported', () => {
-  const bad = detailed(collection('postscope-ignore MISSING_AUTH\npostscope-ignore MISSING_AUTH:\npostscope-ignore NOT_A_RULE: because\npostscope-ignore MISSING_AUTH expires=soon: later'))
+  const bad = detailed(
+    collection(
+      'postscope-ignore MISSING_AUTH\npostscope-ignore MISSING_AUTH:\npostscope-ignore NOT_A_RULE: because\npostscope-ignore MISSING_AUTH expires=soon: later'
+    )
+  )
   assert.equal(bad.suppressed.length, 0)
   assert.equal(find(bad.findings, 'MISSING_AUTH')?.affected.length, 4)
   const notice = find(bad.findings, 'SUPPRESSION_INVALID')
@@ -136,7 +171,10 @@ test('expired suppressions stop applying and raise an informational finding', ()
   const expired = detailed(collection(), config)
   assert.equal(find(expired.findings, 'MISSING_AUTH')?.affected.length, 4)
   assert.equal(expired.suppressed.length, 0)
-  assert.match(find(expired.findings, 'SUPPRESSION_EXPIRED')?.evidence?.[0].location ?? '', /config suppression MISSING_AUTH \(expired 2026-10-14\)/)
+  assert.match(
+    find(expired.findings, 'SUPPRESSION_EXPIRED')?.evidence?.[0].location ?? '',
+    /config suppression MISSING_AUTH \(expired 2026-10-14\)/
+  )
   const onTheDay = detailed(collection(), [{ ...config[0], expires: '2026-10-15' }])
   assert.equal(find(onTheDay.findings, 'MISSING_AUTH'), undefined)
   assert.equal(find(onTheDay.findings, 'SUPPRESSION_EXPIRED'), undefined)
@@ -146,7 +184,15 @@ test('expired suppressions stop applying and raise an informational finding', ()
 })
 
 test('suppressions cover secret findings without exposing values', () => {
-  const json = { info: { name: 'Secrets' }, item: [{ name: 'Legacy', request: { method: 'GET', url: 'https://x.test', description: 'd', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] } }] }
+  const json = {
+    info: { name: 'Secrets' },
+    item: [
+      {
+        name: 'Legacy',
+        request: { method: 'GET', url: 'https://x.test', description: 'd', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] },
+      },
+    ],
+  }
   const result = detailed(json, [{ ruleId: 'HARDCODED_API_KEY', request: 'Legacy', reason: 'Sandbox key, rotated monthly' }])
   assert.equal(find(result.findings, 'HARDCODED_API_KEY'), undefined)
   assert.ok(!JSON.stringify(result.suppressed).includes(FAKE.apiKey))
@@ -155,19 +201,41 @@ test('suppressions cover secret findings without exposing values', () => {
 test('reports keep suppressed occurrences with their reasons', () => {
   const json = collection()
   const parsed = parseCollection(json)
-  const result = runAuditDetailed(parsed, { now: NOW, suppressions: [{ ruleId: 'MISSING_AUTH', request: 'Public/*', reason: 'Public endpoints' }] })
-  const ctx = { parsed, findings: result.findings, suppressed: result.suppressed, score: calculateScore(parsed, result.findings), appVersion: '0.0.0' }
+  const result = runAuditDetailed(parsed, {
+    now: NOW,
+    suppressions: [{ ruleId: 'MISSING_AUTH', request: 'Public/*', reason: 'Public endpoints' }],
+  })
+  const ctx = {
+    parsed,
+    findings: result.findings,
+    suppressed: result.suppressed,
+    score: calculateScore(parsed, result.findings),
+    appVersion: '0.0.0',
+  }
 
-  const report = JSON.parse(buildJsonReport(ctx)) as { suppressed: Array<{ ruleId: string; suppressed: boolean; suppressions: Array<{ fingerprint: string; reason: string }> }>; findings: Array<{ ruleId: string; occurrences: Array<{ fingerprint: string }> }> }
+  const report = JSON.parse(buildJsonReport(ctx)) as {
+    suppressed: Array<{ ruleId: string; suppressed: boolean; suppressions: Array<{ fingerprint: string; reason: string }> }>
+    findings: Array<{ ruleId: string; occurrences: Array<{ fingerprint: string }> }>
+  }
   assert.equal(report.suppressed[0].suppressed, true)
   assert.equal(report.suppressed[0].suppressions[0].reason, 'Public endpoints')
   assert.match(report.suppressed[0].suppressions[0].fingerprint, /^[0-9a-f]{64}$/)
   assert.ok(report.findings.every((finding) => finding.occurrences.length > 0))
 
-  const sarif = JSON.parse(buildSarifReport(ctx)) as { runs: Array<{ results: Array<{ ruleId: string; suppressions?: Array<{ kind: string; status: string; justification: string }>; partialFingerprints: Record<string, string> }> }> }
+  const sarif = JSON.parse(buildSarifReport(ctx)) as {
+    runs: Array<{
+      results: Array<{
+        ruleId: string
+        suppressions?: Array<{ kind: string; status: string; justification: string }>
+        partialFingerprints: Record<string, string>
+      }>
+    }>
+  }
   const results = sarif.runs[0].results.filter((result) => result.ruleId === 'MISSING_AUTH')
   assert.equal(results.filter((result) => result.suppressions).length, 2)
-  assert.deepEqual(results.find((result) => result.suppressions)?.suppressions, [{ kind: 'external', status: 'accepted', justification: 'Public endpoints' }])
+  assert.deepEqual(results.find((result) => result.suppressions)?.suppressions, [
+    { kind: 'external', status: 'accepted', justification: 'Public endpoints' },
+  ])
   assert.ok(results.every((result) => /^[0-9a-f]{64}$/.test(result.partialFingerprints['postscope/v2'])))
   assert.ok(results.every((result) => result.partialFingerprints['postscope/v1']))
 
@@ -187,14 +255,34 @@ test('a baseline hides known occurrences and lets new ones through', () => {
   assert.equal(applyBaseline(original, baseline).hidden, baseline.entries.length)
 
   const grown = collection()
-  grown.item.push({ name: 'Brand new', request: { method: 'DELETE', url: '{{baseUrl}}/new', auth: { type: 'noauth' }, description: 'New.' } } as never)
+  grown.item.push({
+    name: 'Brand new',
+    request: { method: 'DELETE', url: '{{baseUrl}}/new', auth: { type: 'noauth' }, description: 'New.' },
+  } as never)
   const next = applyBaseline(runAudit(parseCollection(grown), { now: NOW }), baseline)
-  assert.deepEqual(next.findings.map((finding) => [finding.ruleId, finding.affected]), [['MISSING_AUTH', ['Brand new']], ['ROOT_LEVEL_REQUESTS', ['Brand new']]])
-  assert.deepEqual(next.findings[0].evidence?.map((item) => item.location), ['DELETE /new'])
+  assert.deepEqual(
+    next.findings.map((finding) => [finding.ruleId, finding.affected]),
+    [
+      ['MISSING_AUTH', ['Brand new']],
+      ['ROOT_LEVEL_REQUESTS', ['Brand new']],
+    ]
+  )
+  assert.deepEqual(
+    next.findings[0].evidence?.map((item) => item.location),
+    ['DELETE /new']
+  )
 })
 
 test('baselines are deterministic, contain no values and reject malformed files', () => {
-  const json = { info: { name: 'Secrets' }, item: [{ name: 'Legacy', request: { method: 'GET', url: 'https://x.test', description: 'd', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] } }] }
+  const json = {
+    info: { name: 'Secrets' },
+    item: [
+      {
+        name: 'Legacy',
+        request: { method: 'GET', url: 'https://x.test', description: 'd', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] },
+      },
+    ],
+  }
   const findings = runAudit(parseCollection(json))
   const first = JSON.stringify(buildBaseline(findings, NOW))
   assert.equal(first, JSON.stringify(buildBaseline([...findings].reverse(), NOW)))
@@ -216,14 +304,23 @@ test('the project config is validated strictly', () => {
   assert.deepEqual(good.errors, [])
   assert.deepEqual(good.config.disabledRules, ['GET_WITH_BODY'])
   assert.deepEqual(good.config.weights, { critical: 30, warning: 8, info: 2 })
-  assert.deepEqual(good.config.suppressions, [{ ruleId: 'MISSING_AUTH', request: 'Public/**', location: 'POST', reason: 'Public', expires: '2027-02-28' }])
+  assert.deepEqual(good.config.suppressions, [
+    { ruleId: 'MISSING_AUTH', request: 'Public/**', location: 'POST', reason: 'Public', expires: '2027-02-28' },
+  ])
 
   const bad = parseProjectConfig({
     disabledRule: [],
     disabledRules: ['NOPE'],
     severityOverrides: { MISSING_AUTH: 'urgent' },
     weights: { critical: 'high', fatal: 1 },
-    suppressions: [{ ruleId: 'MISSING_AUTH' }, { ruleId: 'MISSING_AUTH', reason: '   ' }, { ruleId: 'NOPE', reason: 'x' }, { ruleId: 'MISSING_AUTH', reason: 'x', expires: '2027-02-30' }, { ruleId: 'MISSING_AUTH', reason: 'x', color: 'red' }, 'text'],
+    suppressions: [
+      { ruleId: 'MISSING_AUTH' },
+      { ruleId: 'MISSING_AUTH', reason: '   ' },
+      { ruleId: 'NOPE', reason: 'x' },
+      { ruleId: 'MISSING_AUTH', reason: 'x', expires: '2027-02-30' },
+      { ruleId: 'MISSING_AUTH', reason: 'x', color: 'red' },
+      'text',
+    ],
   })
   assert.ok(bad.errors.includes('unknown key "disabledRule"'))
   assert.ok(bad.errors.some((error) => error.includes('unknown rule "NOPE"')))

@@ -3,7 +3,16 @@ import { Check, Copy, CornersIn, CornersOut, Lock, LockOpen } from '@phosphor-ic
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { RequestTreeView } from '@/components/RequestTreeView'
-import { allFolderKeys, ancestorFolderKeys, buildRequestTree, filterRequestList, filterTreeNodes, flattenTree, requestKey, requestMatchesQuery } from '@/lib/requestTree'
+import {
+  allFolderKeys,
+  ancestorFolderKeys,
+  buildRequestTree,
+  filterRequestList,
+  filterTreeNodes,
+  flattenTree,
+  requestKey,
+  requestMatchesQuery,
+} from '@/lib/requestTree'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { RequestBadges } from '@/components/RequestBadges'
@@ -28,9 +37,7 @@ function parseQueryParams(rawUrl: string): Array<{ key: string; value: string }>
   if (!manual) return []
 
   try {
-    const normalized = /^https?:\/\//i.test(rawUrl)
-      ? rawUrl
-      : `https://postscope.local/${rawUrl.replace(/^\//, '')}`
+    const normalized = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://postscope.local/${rawUrl.replace(/^\//, '')}`
     const parsed = new URL(normalized)
     return Array.from(parsed.searchParams.entries()).map(([key, value]) => ({ key, value }))
   } catch {
@@ -74,36 +81,27 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export function RequestsPage({
-  parsed,
-  findings,
-  search,
-  selectedId: selectedRequestId = null,
-  onSelectId,
-}: RequestsPageProps) {
+export function RequestsPage({ parsed, findings, search, selectedId: selectedRequestId = null, onSelectId }: RequestsPageProps) {
   const { root, nodes } = useMemo(() => buildRequestTree(parsed.requests), [parsed.requests])
   const filteredRoot = useMemo(() => filterRequestList(root, search), [root, search])
   const filteredNodes = useMemo(() => filterTreeNodes(nodes, search), [nodes, search])
   const searching = search.trim() !== ''
   const [openFolders, setOpenFolders] = useState<ReadonlySet<string>>(() => new Set())
-  const rows = useMemo(() => flattenTree(filteredRoot, filteredNodes, openFolders, searching), [filteredRoot, filteredNodes, openFolders, searching])
+  const rows = useMemo(
+    () => flattenTree(filteredRoot, filteredNodes, openFolders, searching),
+    [filteredRoot, filteredNodes, openFolders, searching]
+  )
   const allKeys = useMemo(() => allFolderKeys(nodes), [nodes])
   const expandedByControl = allKeys.length > 0 && allKeys.every((key) => openFolders.has(key))
   /** Request to scroll into view once its folders are open (set when the address or the search selects it). */
   const [revealKey, setRevealKey] = useState<string | null>(null)
-  const selected = useMemo(() => parsed.requests.find((request) => request.id === selectedRequestId) ?? null, [parsed.requests, selectedRequestId])
-  const selectedFindings = useMemo(
-    () => (selected ? findingsForRequest(selected, findings) : []),
-    [selected, findings]
+  const selected = useMemo(
+    () => parsed.requests.find((request) => request.id === selectedRequestId) ?? null,
+    [parsed.requests, selectedRequestId]
   )
-  const selectedSecurityFindings = useMemo(
-    () => selectedFindings.filter((finding) => finding.category !== 'hygiene'),
-    [selectedFindings]
-  )
-  const selectedHygieneFindings = useMemo(
-    () => selectedFindings.filter((finding) => finding.category === 'hygiene'),
-    [selectedFindings]
-  )
+  const selectedFindings = useMemo(() => (selected ? findingsForRequest(selected, findings) : []), [selected, findings])
+  const selectedSecurityFindings = useMemo(() => selectedFindings.filter((finding) => finding.category !== 'hygiene'), [selectedFindings])
+  const selectedHygieneFindings = useMemo(() => selectedFindings.filter((finding) => finding.category === 'hygiene'), [selectedFindings])
   const selectedScore = selected ? requestHealthScore(selectedFindings) : 0
   const selectedQueryParams = useMemo(() => (selected ? parseQueryParams(selected.url) : []), [selected])
 
@@ -127,9 +125,7 @@ export function RequestsPage({
     <div className="flex h-full min-h-0 flex-col gap-5 overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight">Requests explorer</h1>
-        <p className="text-sm text-muted-foreground">
-          Browse the imported collection and inspect each request in a Postman-like layout.
-        </p>
+        <p className="text-sm text-muted-foreground">Browse the imported collection and inspect each request in a Postman-like layout.</p>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
@@ -248,23 +244,17 @@ export function RequestsPage({
 
                       <div className="rounded-lg bg-muted/35 px-3 py-2.5">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Params</p>
-                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">
-                          {selectedQueryParams.length}
-                        </p>
+                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">{selectedQueryParams.length}</p>
                       </div>
 
                       <div className="rounded-lg bg-muted/35 px-3 py-2.5">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Headers</p>
-                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">
-                          {selected.headers.length}
-                        </p>
+                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">{selected.headers.length}</p>
                       </div>
 
                       <div className="rounded-lg bg-muted/35 px-3 py-2.5">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Body</p>
-                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">
-                          {selected.bodyRaw ? 1 : 0}
-                        </p>
+                        <p className="mt-2 text-lg font-semibold tabular-nums text-foreground">{selected.bodyRaw ? 1 : 0}</p>
                       </div>
                     </div>
 
@@ -275,16 +265,23 @@ export function RequestsPage({
                           {selectedQueryParams.map((param) => (
                             <li key={`${param.key}-${param.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs">
                               <span className="min-w-0 truncate text-foreground">{param.key}</span>
-                              <span className="min-w-0 truncate text-muted-foreground">{param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}</span>
+                              <span className="min-w-0 truncate text-muted-foreground">
+                                {param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}
+                              </span>
                             </li>
                           ))}
                           {(selected.disabledQueryParams ?? []).map((param) => (
-                            <li key={`disabled-${param.key}-${param.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-70">
+                            <li
+                              key={`disabled-${param.key}-${param.value}`}
+                              className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-70"
+                            >
                               <span className="flex min-w-0 items-center gap-2">
                                 <span className="min-w-0 truncate text-foreground">{param.key}</span>
                                 <DisabledBadge />
                               </span>
-                              <span className="min-w-0 truncate text-muted-foreground">{param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}</span>
+                              <span className="min-w-0 truncate text-muted-foreground">
+                                {param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -298,19 +295,27 @@ export function RequestsPage({
                       {selected.headers.length > 0 || (selected.disabledHeaders?.length ?? 0) > 0 ? (
                         <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 lg:grid-cols-2">
                           {selected.headers.map((header) => (
-                            <li key={`${header.key}-${header.value}`} className="group flex min-w-0 items-center justify-between gap-2 text-xs">
+                            <li
+                              key={`${header.key}-${header.value}`}
+                              className="group flex min-w-0 items-center justify-between gap-2 text-xs"
+                            >
                               <span className="min-w-0 truncate text-muted-foreground">
-                                <span className="text-foreground">{header.key}</span>: <SecretValue name={header.key} value={header.value} />
+                                <span className="text-foreground">{header.key}</span>:{' '}
+                                <SecretValue name={header.key} value={header.value} />
                               </span>
                               <CopyButton text={`${header.key}: ${header.value}`} />
                             </li>
                           ))}
                           {(selected.disabledHeaders ?? []).map((header) => (
-                            <li key={`disabled-${header.key}-${header.value}`} className="group flex min-w-0 items-center justify-between gap-2 text-xs opacity-70">
+                            <li
+                              key={`disabled-${header.key}-${header.value}`}
+                              className="group flex min-w-0 items-center justify-between gap-2 text-xs opacity-70"
+                            >
                               <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
                                 <DisabledBadge />
                                 <span className="min-w-0 truncate">
-                                  <span className="text-foreground">{header.key}</span>: <SecretValue name={header.key} value={header.value} />
+                                  <span className="text-foreground">{header.key}</span>:{' '}
+                                  <SecretValue name={header.key} value={header.value} />
                                 </span>
                               </span>
                               <CopyButton text={`${header.key}: ${header.value}`} />
@@ -327,12 +332,17 @@ export function RequestsPage({
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">Disabled body fields</p>
                         <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 sm:grid-cols-2">
                           {(selected.disabledBodyFields ?? []).map((field) => (
-                            <li key={`disabled-${field.key}-${field.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-70">
+                            <li
+                              key={`disabled-${field.key}-${field.value}`}
+                              className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-70"
+                            >
                               <span className="flex min-w-0 items-center gap-2">
                                 <span className="min-w-0 truncate text-foreground">{field.key}</span>
                                 <DisabledBadge />
                               </span>
-                              <span className="min-w-0 truncate text-muted-foreground">{field.value ? <SecretValue name={field.key} value={field.value} /> : '-'}</span>
+                              <span className="min-w-0 truncate text-muted-foreground">
+                                {field.value ? <SecretValue name={field.key} value={field.value} /> : '-'}
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -346,7 +356,8 @@ export function RequestsPage({
                       </div>
                       {selected.bodyTruncated && (
                         <p className="text-xs text-muted-foreground">
-                          Large body: the first {Math.round(selected.bodyRaw!.length / 1024)} KB of {Math.round((selected.bodySize ?? 0) / 1024)} KB are shown. Findings use the whole body.
+                          Large body: the first {Math.round(selected.bodyRaw!.length / 1024)} KB of{' '}
+                          {Math.round((selected.bodySize ?? 0) / 1024)} KB are shown. Findings use the whole body.
                         </p>
                       )}
                       {selected.bodyRaw ? (

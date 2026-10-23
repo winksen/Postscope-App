@@ -65,10 +65,7 @@ export function ensureAppEnv(): void {
     if (eq === -1) continue
     const key = trimmed.slice(0, eq).trim()
     let value = trimmed.slice(eq + 1).trim()
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1)
     }
     if (key === 'LOGGING_MODE') {

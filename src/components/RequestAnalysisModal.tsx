@@ -138,9 +138,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
               <Separator />
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Security findings ({findings.length})
-                </p>
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Security findings ({findings.length})</p>
                 {findings.length === 0 ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4">
                     <Check className="h-5 w-5 text-[hsl(var(--success-text))]" />
@@ -156,8 +154,8 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                           f.severity === 'critical'
                             ? 'border-destructive/20 bg-destructive/5'
                             : f.severity === 'warning'
-                            ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
-                            : 'border-border bg-card'
+                              ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
+                              : 'border-border bg-card'
                         )}
                       >
                         <div className="flex flex-wrap items-center gap-2">

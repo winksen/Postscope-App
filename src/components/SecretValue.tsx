@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { Eye, EyeSlash } from '@phosphor-icons/react'
-import { containsSecretPattern, isLikelySecretValue, isSensitiveHeader, isSensitiveKey, maskSecret, redactSecretsInText } from '@/lib/secretPatterns'
+import {
+  containsSecretPattern,
+  isLikelySecretValue,
+  isSensitiveHeader,
+  isSensitiveKey,
+  maskSecret,
+  redactSecretsInText,
+} from '@/lib/secretPatterns'
 import { cn } from '@/lib/utils'
 
 function RevealToggle({ revealed, onToggle }: { revealed: boolean; onToggle: () => void }) {

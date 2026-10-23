@@ -47,7 +47,8 @@ export function parseScoreWeights(text: string | undefined): { weights: ScoreWei
     const [name, raw] = pair.split('=').map((part) => part.trim())
     const value = Number(raw)
     if (!isSeverity(name?.toLowerCase())) errors.push(`unknown severity "${name}"`)
-    else if (raw === undefined || raw === '' || !Number.isFinite(value) || value < 0 || value > MAX_WEIGHT) errors.push(`"${pair.trim()}" needs a number from 0 to ${MAX_WEIGHT}`)
+    else if (raw === undefined || raw === '' || !Number.isFinite(value) || value < 0 || value > MAX_WEIGHT)
+      errors.push(`"${pair.trim()}" needs a number from 0 to ${MAX_WEIGHT}`)
     else entries[name.toLowerCase()] = value
   }
   return { weights: sanitizeScoreWeights(entries), errors }
@@ -67,7 +68,10 @@ export function findingAffectedCount(finding: { affected: readonly unknown[]; ev
  * Scoring model v2: `weight * (1 + log2(affectedCount))`, capped per rule. More affected requests never lower
  * the penalty, and one rule can never cost more than its cap.
  */
-export function findingPenalty(finding: { severity: Severity; affected: readonly unknown[]; evidence?: readonly unknown[] }, weights: ScoreWeights = DEFAULT_SCORE_WEIGHTS): number {
+export function findingPenalty(
+  finding: { severity: Severity; affected: readonly unknown[]; evidence?: readonly unknown[] },
+  weights: ScoreWeights = DEFAULT_SCORE_WEIGHTS
+): number {
   const weight = weights[finding.severity] ?? 0
   const scaled = weight * (1 + Math.log2(findingAffectedCount(finding)))
   const cap = weight * CAP_FACTOR[finding.severity]

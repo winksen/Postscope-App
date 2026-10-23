@@ -19,6 +19,9 @@ export function compactParsed(parsed: ParsedCollection): ParsedCollection {
     return compact
   })
   // Folders hold the same request objects; they must point at the compact ones or the large bodies are sent twice.
-  const folders = parsed.folders.map((folder) => ({ ...folder, requests: folder.requests.map((request) => replaced.get(request) ?? request) }))
+  const folders = parsed.folders.map((folder) => ({
+    ...folder,
+    requests: folder.requests.map((request) => replaced.get(request) ?? request),
+  }))
   return { ...parsed, requests, folders }
 }

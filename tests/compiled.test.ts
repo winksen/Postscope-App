@@ -23,7 +23,11 @@ before(() => {
 after(() => fs.rmSync(work, { recursive: true, force: true }))
 
 function cli(...args: string[]) {
-  const result = spawnSync(process.execPath, [path.join(outdir, 'cli.js'), ...args], { cwd: work, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', APP_VERSION: '1.2.3' } })
+  const result = spawnSync(process.execPath, [path.join(outdir, 'cli.js'), ...args], {
+    cwd: work,
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH ?? '', APP_VERSION: '1.2.3' },
+  })
   return { code: result.status, stdout: result.stdout, stderr: result.stderr }
 }
 
@@ -34,7 +38,10 @@ test('the build produces self-contained files with no imports from node_modules 
   assert.ok((fs.statSync(path.join(outdir, 'cli.js')).mode & 0o111) !== 0, 'cli.js is executable')
   for (const source of [cliSource, serverSource]) {
     const imports = [...source.matchAll(/^import .* from ["']([^"']+)["']/gm)].map((match) => match[1])
-    assert.ok(imports.every((name) => name.startsWith('node:')), `non-builtin imports: ${imports.filter((name) => !name.startsWith('node:'))}`)
+    assert.ok(
+      imports.every((name) => name.startsWith('node:')),
+      `non-builtin imports: ${imports.filter((name) => !name.startsWith('node:'))}`
+    )
   }
   assert.ok(!fs.existsSync(path.join(work, 'node_modules')))
 })
@@ -64,7 +71,14 @@ test('the compiled CLI expands folders and globs and produces JUnit, HTML and SA
 })
 
 test('the compiled CLI pairs environment files with --auto-env', () => {
-  fs.writeFileSync(path.join(work, 'collections', 'team', 'clean.postman_environment.json'), JSON.stringify({ name: 'Staging', values: [{ key: 'clientSecret', value: 'cs-0a1b2c3d4e5f6a7b8c9d', enabled: true }], _postman_variable_scope: 'environment' }))
+  fs.writeFileSync(
+    path.join(work, 'collections', 'team', 'clean.postman_environment.json'),
+    JSON.stringify({
+      name: 'Staging',
+      values: [{ key: 'clientSecret', value: 'cs-0a1b2c3d4e5f6a7b8c9d', enabled: true }],
+      _postman_variable_scope: 'environment',
+    })
+  )
   const without = JSON.parse(cli('scan', clean, '--format', 'json', '--fail-on', 'none').stdout)
   const withEnvironment = JSON.parse(cli('scan', clean, '--auto-env', '--format', 'json', '--fail-on', 'none').stdout)
   assert.ok(!without.findings.some((finding: { ruleId: string }) => finding.ruleId === 'SECRET_IN_ENVIRONMENT'))
@@ -92,7 +106,14 @@ test('the compiled server starts without node_modules and serves the app, config
   const port = await freePort()
   const child: ChildProcess = spawn(process.execPath, [path.join(outdir, 'server.js')], {
     cwd: work,
-    env: { PATH: process.env.PATH ?? '', PORT: String(port), HOST: '127.0.0.1', LOGGING_MODE: 'off', LOG_LEVEL: 'error', DATA_DIR: path.join(work, 'data') },
+    env: {
+      PATH: process.env.PATH ?? '',
+      PORT: String(port),
+      HOST: '127.0.0.1',
+      LOGGING_MODE: 'off',
+      LOG_LEVEL: 'error',
+      DATA_DIR: path.join(work, 'data'),
+    },
     stdio: 'ignore',
   })
   try {
@@ -123,7 +144,15 @@ test('the compiled library tool reports status and encrypts records', async () =
   const library = path.join(data, 'library')
   fs.mkdirSync(library, { recursive: true })
   const id = '0f0f0f0f-1111-4222-8333-444444444444'
-  const record = { id, name: 'Legacy', rawJson: '{"info":{"name":"Legacy"},"item":[]}', requestCount: 0, savedAt: 1, sizeBytes: 36, contentHash: 'x' }
+  const record = {
+    id,
+    name: 'Legacy',
+    rawJson: '{"info":{"name":"Legacy"},"item":[]}',
+    requestCount: 0,
+    savedAt: 1,
+    sizeBytes: 36,
+    contentHash: 'x',
+  }
   fs.writeFileSync(path.join(library, `${id}.json`), JSON.stringify(record))
   const run = (...args: string[]) => {
     const result = spawnSync(process.execPath, [path.join(outdir, 'library.js'), ...args], {
@@ -142,7 +171,11 @@ test('the compiled library tool reports status and encrypts records', async () =
   assert.ok(!fs.readFileSync(path.join(library, `${id}.json`), 'utf8').includes('Legacy'))
   assert.match(run('status').stdout, /1 encrypted/)
   assert.equal(run('bogus').code, 2)
-  const noKey = spawnSync(process.execPath, [path.join(outdir, 'library.js'), 'encrypt'], { cwd: work, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', DATA_DIR: data } })
+  const noKey = spawnSync(process.execPath, [path.join(outdir, 'library.js'), 'encrypt'], {
+    cwd: work,
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH ?? '', DATA_DIR: data },
+  })
   assert.equal(noKey.status, 2)
   assert.match(noKey.stderr, /LIBRARY_ENCRYPTION_KEY/)
 })

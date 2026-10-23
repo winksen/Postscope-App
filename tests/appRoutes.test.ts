@@ -21,17 +21,29 @@ test('rejects addresses outside the analyzer', () => {
 })
 
 test('reads filters and ignores unknown values', () => {
-  assert.deepEqual(parseAppLocation('/analyze/security', '?severity=critical&rule=HARDCODED_TOKEN&category=auth&view=suppressed&finding=MISSING_AUTH', '/analyze'), {
+  assert.deepEqual(
+    parseAppLocation(
+      '/analyze/security',
+      '?severity=critical&rule=HARDCODED_TOKEN&category=auth&view=suppressed&finding=MISSING_AUTH',
+      '/analyze'
+    ),
+    {
+      page: 'security',
+      severity: 'critical',
+      category: 'auth',
+      rule: 'HARDCODED_TOKEN',
+      finding: 'MISSING_AUTH',
+      view: 'suppressed',
+    }
+  )
+  assert.deepEqual(parseAppLocation('/analyze/security', '?severity=urgent&rule=not%20a%20rule&category=hygiene&view=other', '/analyze'), {
     page: 'security',
-    severity: 'critical',
-    category: 'auth',
-    rule: 'HARDCODED_TOKEN',
-    finding: 'MISSING_AUTH',
-    view: 'suppressed',
   })
-  assert.deepEqual(parseAppLocation('/analyze/security', '?severity=urgent&rule=not%20a%20rule&category=hygiene&view=other', '/analyze'), { page: 'security' })
   // The hygiene page has no category or view filter.
-  assert.deepEqual(parseAppLocation('/analyze/hygiene', '?category=auth&view=suppressed&severity=info', '/analyze'), { page: 'hygiene', severity: 'info' })
+  assert.deepEqual(parseAppLocation('/analyze/hygiene', '?category=auth&view=suppressed&severity=info', '/analyze'), {
+    page: 'hygiene',
+    severity: 'info',
+  })
   // Filters on other pages are ignored.
   assert.deepEqual(parseAppLocation('/analyze/score', '?severity=critical', '/analyze'), { page: 'score' })
 })
@@ -64,7 +76,10 @@ test('building and parsing are inverse operations', () => {
   }
   assert.equal(buildAppPath('', { page: 'overview' }), '/')
   assert.equal(buildAppPath('/analyze', { page: 'overview' }), '/analyze')
-  assert.equal(buildAppPath('/analyze', { page: 'security', severity: 'critical', rule: 'HARDCODED_TOKEN' }), '/analyze/security?severity=critical&rule=HARDCODED_TOKEN')
+  assert.equal(
+    buildAppPath('/analyze', { page: 'security', severity: 'critical', rule: 'HARDCODED_TOKEN' }),
+    '/analyze/security?severity=critical&rule=HARDCODED_TOKEN'
+  )
 })
 
 test('links carry no values: only ids, rule names and filter words', () => {
@@ -74,8 +89,14 @@ test('links carry no values: only ids, rule names and filter words', () => {
 
 test('search shortcuts: Ctrl+K anywhere, slash only outside text fields and dialogs', async () => {
   const { isSearchShortcut, isTypingTarget } = await import('../src/lib/keyboard')
-  const press = (key: string, extra: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean; target: unknown }> = {}) =>
-    ({ key, ctrlKey: false, metaKey: false, altKey: false, target: { tagName: 'BODY' }, ...extra })
+  const press = (key: string, extra: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean; target: unknown }> = {}) => ({
+    key,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    target: { tagName: 'BODY' },
+    ...extra,
+  })
 
   assert.equal(isSearchShortcut(press('/')), true)
   assert.equal(isSearchShortcut(press('k', { ctrlKey: true })), true)

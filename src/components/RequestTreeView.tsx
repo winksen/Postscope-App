@@ -22,7 +22,15 @@ interface RequestTreeViewProps {
  * The request tree as an ARIA tree over a flat list of rows. Only one row is in the tab order (roving tabindex), arrow
  * keys move between visible rows, and the list renders just the rows near the viewport when it is long.
  */
-export function RequestTreeView({ rows, selectedKey, onSelectRequest, onToggleFolder, revealKey, onRevealed, className }: RequestTreeViewProps) {
+export function RequestTreeView({
+  rows,
+  selectedKey,
+  onSelectRequest,
+  onToggleFolder,
+  revealKey,
+  onRevealed,
+  className,
+}: RequestTreeViewProps) {
   const list = useRef<VirtualListHandle>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
   /** Row index to move DOM focus to after the next render. */
@@ -121,7 +129,10 @@ export function RequestTreeView({ rows, selectedKey, onSelectRequest, onToggleFo
         const row = rows[index]
         if (row.kind === 'label') {
           return (
-            <div role="none" className="flex h-full items-center gap-1.5 pl-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <div
+              role="none"
+              className="flex h-full items-center gap-1.5 pl-3 text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            >
               <FolderOpen className="h-3.5 w-3.5" weight="fill" aria-hidden />
               {row.label}
             </div>
@@ -137,7 +148,11 @@ export function RequestTreeView({ rows, selectedKey, onSelectRequest, onToggleFo
         }
         if (row.kind === 'folder') {
           return (
+            // Keys are handled by the tree (`handleKeyDown`) and `common` carries the roving tabindex; the lint rules cannot
+            // see through the spread, and a folder has no selected state (ARIA 1.2 does not require aria-selected).
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus
             <div
+              // eslint-disable-next-line jsx-a11y/role-has-required-aria-props
               role="treeitem"
               aria-expanded={row.open}
               {...common}
@@ -145,7 +160,11 @@ export function RequestTreeView({ rows, selectedKey, onSelectRequest, onToggleFo
               className="group mx-2 flex h-9 cursor-pointer items-center gap-2 rounded-xl pr-2 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', row.open && 'rotate-90')} aria-hidden />
-              {row.open ? <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" aria-hidden /> : <Folder className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" aria-hidden />}
+              {row.open ? (
+                <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" aria-hidden />
+              ) : (
+                <Folder className="h-4 w-4 shrink-0 text-muted-foreground" weight="fill" aria-hidden />
+              )}
               <span className="block w-0 min-w-0 flex-1 truncate font-medium">{row.node.name}</span>
               <span className="shrink-0 text-xs text-muted-foreground">({row.count})</span>
             </div>
@@ -153,6 +172,7 @@ export function RequestTreeView({ rows, selectedKey, onSelectRequest, onToggleFo
         }
         const active = row.key === selectedKey
         return (
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus -- see the folder row
           <div
             role="treeitem"
             aria-selected={active}

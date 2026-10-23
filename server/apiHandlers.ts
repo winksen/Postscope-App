@@ -16,7 +16,14 @@ import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConf
 import { HttpError, readJsonBody, sendJson } from './http'
 import { checkRateLimit, getClientIp, getProxyUser, isSameOriginRequest } from './security'
 import { recordAudit } from './auditLog'
-import { getAuditPolicy, getMaxCollectionBytes, getScoreWeights, isHealthVersionExposed, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
+import {
+  getAuditPolicy,
+  getMaxCollectionBytes,
+  getScoreWeights,
+  isHealthVersionExposed,
+  isLibraryDeleteAllowed,
+  isLibraryRedactionEnabled,
+} from './runtimeConfig'
 import { errorFields, log } from './logger'
 import { redactCollection } from '../src/lib/redaction'
 
@@ -135,7 +142,14 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
         sendJson(res, 404, { error: 'Collection not found' })
         return true
       }
-      void recordAudit({ action: 'open', id: collection.id, name: collection.name, user: getProxyUser(req), ip: getClientIp(req), requestId: requestIdOf(res) })
+      void recordAudit({
+        action: 'open',
+        id: collection.id,
+        name: collection.name,
+        user: getProxyUser(req),
+        ip: getClientIp(req),
+        requestId: requestIdOf(res),
+      })
       sendJson(res, 200, collection)
       return true
     }
@@ -183,7 +197,15 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
       }
       const name = (await listCollections()).find((item) => item.id.toLowerCase() === id!.toLowerCase())?.name
       const removed = await deleteCollection(id)
-      if (removed) void recordAudit({ action: 'delete', id: id.toLowerCase(), name, user: getProxyUser(req), ip: getClientIp(req), requestId: requestIdOf(res) })
+      if (removed)
+        void recordAudit({
+          action: 'delete',
+          id: id.toLowerCase(),
+          name,
+          user: getProxyUser(req),
+          ip: getClientIp(req),
+          requestId: requestIdOf(res),
+        })
       sendJson(res, removed ? 200 : 404, { ok: removed })
       return true
     }

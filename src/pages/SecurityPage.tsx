@@ -1,12 +1,4 @@
-import {
-  CheckCircle,
-  ArrowSquareOut,
-  FunnelSimple,
-  Info,
-  ShieldWarning,
-  Warning,
-  X,
-} from '@phosphor-icons/react'
+import { CheckCircle, ArrowSquareOut, FunnelSimple, Info, ShieldWarning, Warning, X } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import { FindingEvidence } from '../components/FindingEvidence'
 import { StatCard } from '../components/StatCard'
@@ -21,13 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
 interface SecurityPageProps {
@@ -98,9 +84,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security findings</h1>
-        <p className="text-sm text-muted-foreground">
-          Audit results with filters and full recommendation detail.
-        </p>
+        <p className="text-sm text-muted-foreground">Audit results with filters and full recommendation detail.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -146,11 +130,15 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
             <FunnelSimple className="h-4 w-4 text-muted-foreground" weight="fill" />
             <CardTitle className="text-base">Filters</CardTitle>
           </div>
-          <CardDescription>Narrow the table by severity and category{suppressed.length > 0 ? ', or switch to the suppressed findings' : ''}</CardDescription>
+          <CardDescription>
+            Narrow the table by severity and category{suppressed.length > 0 ? ', or switch to the suppressed findings' : ''}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
           <div className="grid w-full gap-2 sm:w-48">
-            <Label htmlFor="sev" className="text-xs">Severity</Label>
+            <Label htmlFor="sev" className="text-xs">
+              Severity
+            </Label>
             <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as (typeof SEVERITIES)[number])}>
               <SelectTrigger id="sev" className="transition-colors duration-200 h-9">
                 <SelectValue placeholder="Severity" />
@@ -165,7 +153,9 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
             </Select>
           </div>
           <div className="grid w-full gap-2 sm:w-48">
-            <Label htmlFor="cat" className="text-xs">Category</Label>
+            <Label htmlFor="cat" className="text-xs">
+              Category
+            </Label>
             <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as (typeof CATEGORIES)[number])}>
               <SelectTrigger id="cat" className="transition-colors duration-200 h-9">
                 <SelectValue placeholder="Category" />
@@ -181,7 +171,9 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
           </div>
           {suppressed.length > 0 && (
             <div className="grid w-full gap-2 sm:w-48">
-              <Label htmlFor="view" className="text-xs">Show</Label>
+              <Label htmlFor="view" className="text-xs">
+                Show
+              </Label>
               <Select value={view} onValueChange={(v) => setView(v as 'active' | 'suppressed')}>
                 <SelectTrigger id="view" className="transition-colors duration-200 h-9">
                   <SelectValue />
@@ -217,10 +209,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
                   <X className="h-3 w-3" weight="fill" />
                 </button>
               ))}
-              <button
-                onClick={clearAllFilters}
-                className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-              >
+              <button onClick={clearAllFilters} className="text-xs text-muted-foreground underline-offset-2 hover:underline">
                 Clear all
               </button>
             </div>
@@ -232,7 +221,8 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Findings</CardTitle>
           <CardDescription>
-            {filtered.length} of {showingSuppressed ? suppressed.length : findings.length} rows{showingSuppressed ? ' (suppressed, not scored)' : ''}
+            {filtered.length} of {showingSuppressed ? suppressed.length : findings.length} rows
+            {showingSuppressed ? ' (suppressed, not scored)' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -327,7 +317,11 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
                   <ul className="mt-2 space-y-1 text-sm">
                     {(detail as SuppressedFinding).suppressions.slice(0, 10).map((item, index) => (
                       <li key={index}>
-                        {item.reason} <span className="text-xs text-muted-foreground">({item.source}{item.expires ? `, expires ${item.expires}` : ''})</span>
+                        {item.reason}{' '}
+                        <span className="text-xs text-muted-foreground">
+                          ({item.source}
+                          {item.expires ? `, expires ${item.expires}` : ''})
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -337,9 +331,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search,
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Affected</p>
                   <p className="mt-1 text-sm text-foreground">
-                    {affectedLabels(detail, parsed.requests)
-                      .slice(0, 8)
-                      .join(', ')}
+                    {affectedLabels(detail, parsed.requests).slice(0, 8).join(', ')}
                     {detail.affected.length > 8 ? ` +${detail.affected.length - 8}` : ''}
                   </p>
                 </div>
