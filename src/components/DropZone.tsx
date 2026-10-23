@@ -34,7 +34,8 @@ import type { StorageMode } from '@/lib/storagePreferences'
 const fadeTransition = { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
 
 interface DropZoneProps {
-  onFile: (file: File) => void
+  /** One collection (or two, older first, to compare them) plus any number of Postman environment or globals files. */
+  onFiles: (files: File[]) => void
   onJsonText: (rawJson: string) => void
   loading?: boolean
   loggingMode: LoggingMode
@@ -49,7 +50,7 @@ interface DropZoneProps {
 }
 
 export function DropZone({
-  onFile,
+  onFiles,
   onJsonText,
   loading = false,
   loggingMode,
@@ -84,22 +85,28 @@ export function DropZone({
     }
   }, [])
 
-  const isAcceptedFile = (file: File) => file.name.endsWith('.postman_collection.json') || file.name.endsWith('.json')
+  const isAcceptedFile = (file: File) => file.name.toLowerCase().endsWith('.json')
+
+  const acceptFiles = useCallback(
+    (files: File[]) => {
+      if (!files.length) return
+      if (files.every(isAcceptedFile)) {
+        setEntryError(null)
+        onFiles(files)
+      } else {
+        setEntryError('Choose .json files: a Postman collection and, optionally, environment or globals exports.')
+      }
+    },
+    [onFiles]
+  )
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
       setDrag(false)
-      const file = e.dataTransfer.files[0]
-      if (!file) return
-      if (isAcceptedFile(file)) {
-        setEntryError(null)
-        onFile(file)
-      } else {
-        setEntryError('Choose a .json or .postman_collection.json file.')
-      }
+      acceptFiles(Array.from(e.dataTransfer.files))
     },
-    [onFile]
+    [acceptFiles]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -114,18 +121,10 @@ export function DropZone({
 
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (file) {
-        if (isAcceptedFile(file)) {
-          setEntryError(null)
-          onFile(file)
-        } else {
-          setEntryError('Choose a .json or .postman_collection.json file.')
-        }
-      }
+      acceptFiles(Array.from(e.target.files ?? []))
       e.target.value = ''
     },
-    [onFile]
+    [acceptFiles]
   )
 
   const handlePasteImport = useCallback(() => {
@@ -138,10 +137,7 @@ export function DropZone({
     onJsonText(pasteText.trim())
   }, [onJsonText, pasteText, validatePastedCollection])
 
-  const importBlocked =
-    canChoosePrivacyMode(loggingMode) &&
-    requiresUploadConsent(loggingMode, storageMode) &&
-    !uploadConsent
+  const importBlocked = canChoosePrivacyMode(loggingMode) && requiresUploadConsent(loggingMode, storageMode) && !uploadConsent
 
   const privacyDescription = getPrivacyModeDescription(loggingMode, storageMode)
   const remainingSavedCount = Math.max(savedCollections.length - 5, 0)
@@ -152,7 +148,10 @@ export function DropZone({
 
       <MarketingHeader />
 
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
+      <main className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
+        <p role="status" aria-live="polite" className="sr-only">
+          {loading ? 'Analyzing the collection...' : ''}
+        </p>
         <div className="mb-6 w-full max-w-3xl animate-fade-in">
           <p className="mb-3 text-center text-sm font-medium text-foreground">
             {canChoosePrivacyMode(loggingMode) ? 'Privacy mode' : 'Deployment mode'}
@@ -166,7 +165,7 @@ export function DropZone({
                 className={cn(
                   'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
                   storageMode === 'incognito'
-                    ? 'bg-secondary text-secondary-foreground shadow-sm dark:shadow-none'
+                    ? 'bg-secondary text-secondary-foreground shadow-xs dark:shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -179,7 +178,7 @@ export function DropZone({
                 className={cn(
                   'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
                   storageMode === 'history'
-                    ? 'bg-secondary text-secondary-foreground shadow-sm dark:shadow-none'
+                    ? 'bg-secondary text-secondary-foreground shadow-xs dark:shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -203,7 +202,7 @@ export function DropZone({
             </div>
           )}
 
-          <div className="relative mt-2.5 min-h-[2.5rem]">
+          <div className="relative mt-2.5 min-h-10">
             <AnimatePresence mode="wait">
               <motion.p
                 key={`${loggingMode}-${storageMode}`}
@@ -233,8 +232,8 @@ export function DropZone({
                     <CloudArrowUp className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
-                    <span className="font-medium">Mandatory logging.</span> Imported collections are
-                    automatically saved to the app storage for your team.
+                    <span className="font-medium">Mandatory logging.</span> Imported collections are automatically saved to the app storage
+                    for your team.
                   </p>
                 </div>
               </motion.div>
@@ -255,8 +254,8 @@ export function DropZone({
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-xs leading-snug text-foreground">
-                      <span className="font-medium">Upload warning.</span> Files are saved to this
-                      app&apos;s storage. Visible to your team, including URLs, headers, and tokens.
+                      <span className="font-medium">Upload warning.</span> Files are saved to this app&apos;s storage. Visible to your team,
+                      including URLs, headers, and tokens.
                     </p>
                     <div className="flex items-center gap-2.5">
                       <Checkbox
@@ -264,10 +263,7 @@ export function DropZone({
                         checked={uploadConsent}
                         onCheckedChange={(checked) => onUploadConsentChange(checked === true)}
                       />
-                      <Label
-                        htmlFor="upload-consent"
-                        className="cursor-pointer text-xs font-normal leading-snug text-muted-foreground"
-                      >
+                      <Label htmlFor="upload-consent" className="cursor-pointer text-xs font-normal leading-snug text-muted-foreground">
                         I accept: my collection will be stored on the app and may be viewed by my team.
                       </Label>
                     </div>
@@ -290,8 +286,8 @@ export function DropZone({
                     <ShieldCheck className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
-                    <span className="font-medium">Nothing stored.</span> Incognito mode: your data is
-                    never written to the app&apos;s storage.
+                    <span className="font-medium">Nothing stored.</span> Incognito mode: your data is never written to the app&apos;s
+                    storage.
                   </p>
                 </div>
               </motion.div>
@@ -302,31 +298,27 @@ export function DropZone({
         {/* Main drop card */}
         <Card
           className={cn(
-            'w-full max-w-3xl bg-card shadow-sm transition-all duration-300',
+            'w-full max-w-3xl bg-card shadow-xs transition-all duration-300',
             'animate-fade-in-scale',
-            drag
-              ? 'bg-primary/[0.03] shadow-lg'
-              : 'hover:bg-card/95'
+            drag ? 'bg-primary/3 shadow-lg' : 'hover:bg-card/95'
           )}
-
         >
           <CardHeader className="text-center">
-            <div
-              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted transition-transform duration-300"
-            >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted transition-transform duration-300">
               <FileCode className="h-7 w-7 text-primary" weight="fill" />
             </div>
-            <CardTitle className="text-2xl font-semibold">
+            <CardTitle as="h1" className="text-2xl font-semibold">
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
-              Drop a Postman export. Parsed in your browser, never uploaded.
+              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them
+              for secrets, or drop two collections (older first) to compare them.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="relative mx-auto grid w-full max-w-md grid-cols-2 gap-1 rounded-full bg-muted/50 p-1">
               <motion.span
-                className="absolute bottom-1 top-1 rounded-full bg-secondary shadow-sm"
+                className="absolute bottom-1 top-1 rounded-full bg-secondary shadow-xs"
                 animate={{ left: mode === 'file' ? '0.25rem' : 'calc(50% + 0.125rem)' }}
                 transition={fadeTransition}
                 style={{ width: 'calc(50% - 0.375rem)' }}
@@ -375,7 +367,7 @@ export function DropZone({
                   onDragLeave={importBlocked ? undefined : handleDragLeave}
                   className={cn(
                     'flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-muted/30 px-8 py-12 transition-all duration-300',
-                    drag && !importBlocked && 'border-primary/20 bg-primary/[0.06]',
+                    drag && !importBlocked && 'border-primary/20 bg-primary/6',
                     importBlocked && 'opacity-60'
                   )}
                 >
@@ -393,30 +385,29 @@ export function DropZone({
                           drag && 'animate-pulse-glow'
                         )}
                       >
-                          <UploadSimple
-                            className={cn(
-                              'h-8 w-8 text-muted-foreground transition-all duration-300',
-                              drag && 'text-primary'
-                            )}
-                            weight="fill"
-                          />
+                        <UploadSimple
+                          className={cn('h-8 w-8 text-muted-foreground transition-all duration-300', drag && 'text-primary')}
+                          weight="fill"
+                        />
                       </div>
                       <p className="text-center text-sm text-muted-foreground">
                         {importBlocked ? (
                           <>Accept the upload warning above to import a collection.</>
                         ) : (
                           <>
-                            <span className="font-medium text-foreground">Drag & drop</span> your JSON here
+                            <span className="font-medium text-foreground">Drag & drop</span> your collection and optional environment files
+                            here
                           </>
                         )}
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button asChild variant="default" className="shadow-sm" disabled={importBlocked}>
+                        <Button asChild variant="default" className="shadow-xs" disabled={importBlocked}>
                           <label className={cn('cursor-pointer', importBlocked && 'pointer-events-none opacity-50')}>
                             Browse files
                             <input
                               type="file"
-                              accept=".json,.postman_collection.json"
+                              accept=".json,.postman_collection.json,.postman_environment.json,.postman_globals.json"
+                              multiple
                               onChange={handleFileInput}
                               className="hidden"
                               disabled={importBlocked}
@@ -453,12 +444,10 @@ export function DropZone({
                     }}
                     disabled={importBlocked || loading}
                     placeholder='{"info":{"name":"My collection"},"item":[...]}'
-                    className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-none transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
+                    className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-hidden transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">
-                      Requires a valid Postman collection with `info` and `item`.
-                    </p>
+                    <p className="text-xs text-muted-foreground">Requires a valid Postman collection with `info` and `item`.</p>
                     <Button
                       type="button"
                       className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
@@ -473,16 +462,12 @@ export function DropZone({
             </AnimatePresence>
 
             {entryError && (
-              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
-                {entryError}
-              </div>
+              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive-text">{entryError}</div>
             )}
             <p className="text-center text-xs text-muted-foreground">
-              Accepts{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                .postman_collection.json
-              </code>{' '}
-              and standard exports.
+              Accepts <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">.postman_collection.json</code> plus optional{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">.postman_environment.json</code> and{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">.postman_globals.json</code>.
             </p>
           </CardContent>
         </Card>
@@ -490,7 +475,7 @@ export function DropZone({
         <div className="mt-6 animate-fade-in">
           <Button
             variant="secondary"
-            className="bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background"
+            className="bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background"
             asChild
           >
             <Link to={samplesPath}>
@@ -543,7 +528,7 @@ export function DropZone({
             )}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

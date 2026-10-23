@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Books,
-  Clock,
-  DownloadSimple,
-  FileCode,
-  FolderOpen,
-  Trash,
-} from '@phosphor-icons/react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { ArrowsLeftRight, Books, Clock, DownloadSimple, FileCode, FolderOpen, Trash } from '@phosphor-icons/react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,6 +24,10 @@ interface CollectionLibraryModalProps {
   onLibraryChange?: () => void
   /** Operators can disable removal (LIBRARY_ALLOW_DELETE=false) to keep an audit trail. */
   allowDelete?: boolean
+  /** The server stores collections encrypted at rest (LIBRARY_ENCRYPTION_KEY). */
+  encrypted?: boolean
+  /** Compare a saved collection with the one that is open. Only offered while a collection is open. */
+  onCompare?: (id: string) => void
 }
 
 export function CollectionLibraryModal({
@@ -46,6 +37,8 @@ export function CollectionLibraryModal({
   onLoad,
   onLibraryChange,
   allowDelete = true,
+  encrypted = false,
+  onCompare,
 }: CollectionLibraryModalProps) {
   const { notify } = useToast()
   const [collections, setCollections] = useState<SavedCollectionMeta[]>([])
@@ -78,6 +71,11 @@ export function CollectionLibraryModal({
     } finally {
       setBusyId(null)
     }
+  }
+
+  const handleCompare = (id: string) => {
+    onCompare?.(id)
+    onOpenChange(false)
   }
 
   const handleExport = async (meta: SavedCollectionMeta) => {
@@ -113,28 +111,24 @@ export function CollectionLibraryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] w-[min(60rem,calc(100vw-3rem))] max-w-none gap-0 overflow-hidden p-0">
         <DialogHeader className="space-y-3 bg-card p-6 pb-4 text-left">
-          <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            App storage
-          </DialogDescription>
+          <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">App storage</DialogDescription>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Books className="h-5 w-5 text-muted-foreground" weight="fill" />
             Team library
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Collections saved on this app. Visible to everyone on your team. Export a JSON file for an
-            offline copy.
+            Collections saved on this app. Visible to everyone on your team{encrypted ? ', stored encrypted on the server' : ''}. Export a
+            JSON file for an offline copy.
           </p>
         </DialogHeader>
 
         <ScrollArea className="max-h-[min(58vh,520px)]">
           <div className="space-y-2 px-6 py-4">
             {loading ? (
-              [...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-[72px] rounded-xl" />
-              ))
+              [...Array(3)].map((_, i) => <Skeleton key={i} className="h-[72px] rounded-xl" />)
             ) : loadError ? (
               <div className="flex flex-col items-center gap-3 rounded-xl bg-destructive/10 px-6 py-8 text-center">
-                <p className="text-sm font-medium text-destructive">{loadError}</p>
+                <p className="text-sm font-medium text-destructive-text">{loadError}</p>
                 <Button size="sm" variant="secondary" onClick={() => void refresh()}>
                   Try again
                 </Button>
@@ -180,6 +174,14 @@ export function CollectionLibraryModal({
                               <Clock className="h-3 w-3" />
                               {formatSavedAt(item.savedAt)}
                             </span>
+                            {item.savedBy && (
+                              <>
+                                <span aria-hidden>·</span>
+                                <span className="truncate" title={`Saved by ${item.savedBy}`}>
+                                  by {item.savedBy}
+                                </span>
+                              </>
+                            )}
                           </p>
                         </div>
                         {isActive && (
@@ -198,6 +200,18 @@ export function CollectionLibraryModal({
                         >
                           Open
                         </Button>
+                        {onCompare && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 gap-1 px-2.5 text-xs"
+                            disabled={isBusy || isActive}
+                            onClick={() => handleCompare(item.id)}
+                          >
+                            <ArrowsLeftRight className="h-3.5 w-3.5" weight="fill" />
+                            Compare
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"
@@ -212,7 +226,7 @@ export function CollectionLibraryModal({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-destructive"
+                            className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-destructive-text"
                             disabled={isBusy}
                             onClick={() => void handleDelete(item)}
                           >

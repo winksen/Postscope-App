@@ -74,20 +74,12 @@ function countBySeverity(findings: Finding[]): Record<Finding['severity'], numbe
 }
 
 function scoreTone(score: number): string {
-  if (score >= 90) return 'text-[hsl(var(--success))]'
-  if (score >= 55) return 'text-[hsl(var(--warning))]'
-  return 'text-destructive'
+  if (score >= 90) return 'text-[hsl(var(--success-text))]'
+  if (score >= 55) return 'text-[hsl(var(--warning-text))]'
+  return 'text-destructive-text'
 }
 
-function FixRow({
-  fix,
-  selected,
-  onToggle,
-}: {
-  fix: RepairFix
-  selected: boolean
-  onToggle: (checked: boolean) => void
-}) {
+function FixRow({ fix, selected, onToggle }: { fix: RepairFix; selected: boolean; onToggle: (checked: boolean) => void }) {
   const isManual = fix.status === 'manual'
 
   return (
@@ -125,11 +117,11 @@ function FixRow({
           <div className="grid gap-2 lg:grid-cols-2">
             <div className="min-w-0 rounded-lg bg-muted/45 px-3 py-2">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Before</p>
-              <p className="break-words text-xs text-muted-foreground">{fix.beforeSnippet || 'Not available'}</p>
+              <p className="wrap-break-word text-xs text-muted-foreground">{fix.beforeSnippet || 'Not available'}</p>
             </div>
             <div className="min-w-0 rounded-lg bg-card px-3 py-2 shadow-[0_8px_22px_hsl(var(--background)/0.2)] dark:shadow-none">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">After</p>
-              <p className="break-words text-xs text-foreground">{fix.afterSnippet || 'Manual guidance only'}</p>
+              <p className="wrap-break-word text-xs text-foreground">{fix.afterSnippet || 'Manual guidance only'}</p>
             </div>
           </div>
         )}
@@ -330,23 +322,29 @@ export function RepairPage({
                 Clear selection
               </Button>
               <div className="ml-0 grid w-full gap-2 sm:w-40 lg:ml-auto">
-                <Label className="text-xs">Category</Label>
+                <Label htmlFor="repair-category" className="text-xs">
+                  Category
+                </Label>
                 <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger id="repair-category" className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All categories</SelectItem>
                     {CATEGORY_ORDER.map((category) => (
-                      <SelectItem key={category} value={category}>{CATEGORY_LABELS[category]}</SelectItem>
+                      <SelectItem key={category} value={category}>
+                        {CATEGORY_LABELS[category]}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid w-full gap-2 sm:w-36">
-                <Label className="text-xs">Risk</Label>
+                <Label htmlFor="repair-risk" className="text-xs">
+                  Risk
+                </Label>
                 <Select value={riskFilter} onValueChange={(value) => setRiskFilter(value as RiskFilter)}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger id="repair-risk" className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -364,31 +362,34 @@ export function RepairPage({
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitle className="text-base">Fix list</CardTitle>
-              <CardDescription>{filteredFixes.length} repair item{filteredFixes.length === 1 ? '' : 's'} shown</CardDescription>
+              <CardDescription>
+                {filteredFixes.length} repair item{filteredFixes.length === 1 ? '' : 's'} shown
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {grouped.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/10 text-[hsl(var(--success-text))]">
                     <Wrench className="h-6 w-6" weight="fill" />
                   </div>
                   <p className="text-sm font-medium">No repairs match this view</p>
-                  <p className="max-w-sm text-sm text-muted-foreground">Adjust filters or review the Security page for remaining guidance.</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Adjust filters or review the Security page for remaining guidance.
+                  </p>
                 </div>
               ) : (
                 grouped.map((group) => (
                   <section key={group.category}>
                     <div className="flex items-center justify-between bg-muted/35 px-5 py-3">
-                      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{CATEGORY_LABELS[group.category]}</h2>
-                      <Badge variant="secondary" className="tabular-nums">{group.fixes.length}</Badge>
+                      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {CATEGORY_LABELS[group.category]}
+                      </h2>
+                      <Badge variant="secondary" className="tabular-nums">
+                        {group.fixes.length}
+                      </Badge>
                     </div>
                     {group.fixes.map((fix) => (
-                      <FixRow
-                        key={fix.id}
-                        fix={fix}
-                        selected={selected.has(fix.id)}
-                        onToggle={(checked) => toggleFix(fix.id, checked)}
-                      />
+                      <FixRow key={fix.id} fix={fix} selected={selected.has(fix.id)} onToggle={(checked) => toggleFix(fix.id, checked)} />
                     ))}
                   </section>
                 ))
@@ -408,16 +409,14 @@ export function RepairPage({
                 <span className="text-muted-foreground">Before score</span>
                 <span className="font-semibold tabular-nums">{score.total}/100</span>
               </div>
-              <Progress value={score.total} className="h-2" />
+              <Progress value={score.total} className="h-2" aria-label="Score before repairs" />
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Estimated after</span>
-                <span className={cn('font-semibold tabular-nums', scoreTone(estimatedScore.total))}>
-                  {estimatedScore.total}/100
-                </span>
+                <span className={cn('font-semibold tabular-nums', scoreTone(estimatedScore.total))}>{estimatedScore.total}/100</span>
               </div>
-              <Progress value={estimatedScore.total} className="h-2" />
+              <Progress value={estimatedScore.total} className="h-2" aria-label="Estimated score after repairs" />
             </div>
 
             <Separator />
@@ -438,16 +437,23 @@ export function RepairPage({
                 <Separator />
                 <div className="space-y-3">
                   <div className="rounded-lg bg-[hsl(var(--success)/0.08)] px-3 py-2">
-                    <p className="text-xs font-medium text-[hsl(var(--success))]">Applied {lastRun.applied.length} fix group{lastRun.applied.length === 1 ? '' : 's'}</p>
+                    <p className="text-xs font-medium text-[hsl(var(--success-text))]">
+                      Applied {lastRun.applied.length} fix group{lastRun.applied.length === 1 ? '' : 's'}
+                    </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Actual score moved from {lastRun.beforeScore}/100 to {lastRun.afterScore}/100 after re-analysis.
                     </p>
                   </div>
                   {lastRun.applied.slice(0, 3).map((item) => (
-                    <p key={item.fixId} className="text-xs text-muted-foreground">{item.summary}</p>
+                    <p key={item.fixId} className="text-xs text-muted-foreground">
+                      {item.summary}
+                    </p>
                   ))}
                   {lastRun.skipped.length > 0 && (
-                    <p className="text-xs text-muted-foreground">{lastRun.skipped.length} selected target{lastRun.skipped.length === 1 ? '' : 's'} skipped because no safe patch was available.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {lastRun.skipped.length} selected target{lastRun.skipped.length === 1 ? '' : 's'} skipped because no safe patch was
+                      available.
+                    </p>
                   )}
                 </div>
               </>

@@ -1,0 +1,15 @@
+{
+  "note": "Recorded by npm run bench -- --update. CI fails when a number is more than 20 percent above it.",
+  "engine": {
+    "parseAuditRatio": 3.41
+  },
+  "bundle": {
+    "landingJsGzip": 127017,
+    "analyzerJsGzip": 260073,
+    "dashboardJsGzip": 380757,
+    "workerJsGzip": 23526,
+    "cssGzip": 14224,
+    "totalJsGzip": 453056,
+    "chunks": 21
+  }
+}

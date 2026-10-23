@@ -1,0 +1,96 @@
+name: PostScope scan
+description: Audit Postman collections for hardcoded secrets, auth gaps and hygiene problems, and optionally fail the build.
+author: winksen
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  path:
+    description: Collection file, folder or glob to scan. Folders are searched for *.postman_collection.json.
+    required: false
+    default: '.'
+  fail-on:
+    description: Fail when a finding at or above this severity exists (critical, warning, info or none).
+    required: false
+    default: critical
+  min-score:
+    description: Fail when a collection scores below this value (0 to 100). Empty disables the check.
+    required: false
+    default: ''
+  baseline:
+    description: Baseline file. Only findings that are not in it are reported and can fail the build.
+    required: false
+    default: ''
+  sarif-output:
+    description: Where to write the SARIF report. Upload it with github/codeql-action/upload-sarif.
+    required: false
+    default: postscope.sarif
+  config:
+    description: Project config file. Defaults to the nearest .postscope.json above each collection.
+    required: false
+    default: ''
+  auto-env:
+    description: Also analyze environment and globals files stored next to each collection (true or false).
+    required: false
+    default: 'false'
+  node-version:
+    description: Node.js version used to run the scan (20.6 or newer).
+    required: false
+    default: '20'
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report that was written.
+    value: ${{ steps.scan.outputs.sarif-file }}
+  exit-code:
+    description: 0 when the policy passed, 1 when it failed.
+    value: ${{ steps.scan.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Build the PostScope CLI
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        # Same options as scripts/build-node.mjs: one self-contained JavaScript file, no dependencies at run time.
+        npx --yes esbuild@0.25.12 "$ACTION_PATH/cli/postscope.ts" \
+          --bundle --platform=node --format=esm --target=node20 --legal-comments=none --log-level=warning \
+          --banner:js='#!/usr/bin/env node' --outfile="$ACTION_PATH/dist-node/cli.js"
+
+    - name: Scan collections
+      id: scan
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_MIN_SCORE: ${{ inputs.min-score }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_SARIF: ${{ inputs.sarif-output }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_AUTO_ENV: ${{ inputs.auto-env }}
+      run: |
+        set -u
+        args=(scan "$INPUT_PATH" --fail-on "$INPUT_FAIL_ON")
+        [ -n "$INPUT_MIN_SCORE" ] && args+=(--min-score "$INPUT_MIN_SCORE")
+        [ -n "$INPUT_BASELINE" ] && args+=(--baseline "$INPUT_BASELINE")
+        [ -n "$INPUT_CONFIG" ] && args+=(--config "$INPUT_CONFIG")
+        [ "$INPUT_AUTO_ENV" = "true" ] && args+=(--auto-env)
+
+        # The SARIF file carries the full result; the Markdown report goes to the job summary. The exit code
+        # of the SARIF run (0 pass, 1 policy failed, 2 usage error) is kept for the last line.
+        code=0
+        node "$ACTION_PATH/dist-node/cli.js" "${args[@]}" --format sarif --output "$INPUT_SARIF" || code=$?
+        if [ "$code" -le 1 ]; then
+          node "$ACTION_PATH/dist-node/cli.js" "${args[@]}" --format markdown --quiet >> "$GITHUB_STEP_SUMMARY" || true
+        fi
+        echo "sarif-file=$INPUT_SARIF" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit "$code"

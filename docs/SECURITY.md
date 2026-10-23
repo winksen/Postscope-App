@@ -24,20 +24,30 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 | Slowloris / header floods | HTTP server | `headersTimeout` 20s, `requestTimeout` 120s, `keepAliveTimeout` 5s, `maxHeadersCount` 100 |
 | API abuse / scraping | API | Per-IP fixed-window rate limits for reads and writes (429 + `Retry-After`) |
 | Unauthorized access to a shared library | Whole app | Optional HTTP Basic auth (`BASIC_AUTH_USER`/`BASIC_AUTH_PASSWORD`), constant-time comparison, lockout after repeated failures |
-| XSS / clickjacking / MIME sniffing | Browser | CSP (`script-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, COOP/CORP |
+| Spoofed client IP to dodge rate limits or the sign-in lockout | Whole app | With `TRUST_PROXY=true` the client IP is taken `TRUST_PROXY_HOPS` entries from the right of `X-Forwarded-For`, validated as an IP, and falls back to the socket address; client-supplied left-hand entries are ignored |
+| Flooding the failure table to erase lockouts, or distributed password guessing | Whole app | Expired entries are swept first, then the oldest unlocked entries are evicted; locked addresses are never evicted. More than 10x the per-IP limit of failures in 15 minutes triggers a 60 second global back-off during which credentials are not evaluated (429, plain requests still get the 401 challenge) and a warning is logged |
+| Version fingerprinting on the public health endpoint | API | `HEALTH_EXPOSE_VERSION=false` removes `version` from `/api/health` |
+| XSS / clickjacking / MIME sniffing | Browser | CSP (`script-src 'self'`, `worker-src 'self'`, `img-src 'self' data:`, `frame-ancestors 'none'`, `object-src 'none'`; no `blob:` sources), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, COOP/CORP |
 | Misconfigured outbound links (`FEEDBACK_URL=javascript:…`) | Config | Server and client accept only `http(s)` URLs |
 | Spoofed collection names (bidi overrides, control characters) | Library | Names are stripped of control, zero-width, and bidi characters and capped at 200 chars |
 | Internal details in error responses | API | 500 responses return a generic message plus a request ID; details go to server logs only |
 | Torn writes / corruption on crash | Library storage | Atomic write (temp file + rename), serialized mutations, orphaned temp-file cleanup, corrupt files skipped |
 | Credentials visible on shared screens | UI | Header, query, and body values that look like credentials are masked until explicitly revealed |
 | Leaking secrets when sharing a collection or report | UI / CLI | "Sanitized copy" export and `--sanitize` replace credentials with `{{variables}}`; reports contain masked evidence only |
+| Stolen data volume, backup or disk image exposes stored collections | Library | Optional AES-256-GCM encryption at rest (`LIBRARY_ENCRYPTION_KEY[_FILE]`) with a random IV per record and the record id as authenticated data; tampered or swapped records are rejected; saving is refused (never plaintext) when the key is invalid; key rotation with `LIBRARY_ENCRYPTION_KEY_PREVIOUS` and `library.js encrypt` |
+| No record of who read or changed the shared library | Library | Append-only audit log (`DATA_DIR/audit/library-YYYY-MM.jsonl`) of saves, opens and removals with timestamp, collection id and name, user, IP and request id, never collection content; user identity comes from the SSO proxy through `TRUSTED_USER_HEADER`, only when `TRUST_PROXY=true` |
 | Long-lived secrets in a team library | Library | Optional server-side redaction (`LIBRARY_REDACT_SECRETS=true`), retention (`LIBRARY_RETENTION_DAYS`), and caps (`LIBRARY_MAX_ITEMS`, `LIBRARY_MAX_TOTAL_MB`) |
 | Running as root in containers | Docker | Image runs as the unprivileged `node` user; compose drops all capabilities and sets `no-new-privileges` |
+| Large dependency surface in the runtime image | Docker | The server is compiled to one JavaScript file with no third-party code at run time; the image ships no `node_modules`, no build tools and no TypeScript sources |
 
 ### Out of scope
 
+- Suppressions are a governance tool, not a detector: they hide findings only for the occurrences they name, need a written reason, can expire, and stay visible in every report. Review `.postscope.json` and baseline changes in code review like any other security policy change. Baseline files contain rule ids, request ids and evidence locations but never credential values.
+- Environment and globals files are analyzed in the browser or CLI only. They are never sent to the team library, so a library record cannot leak them.
 - PostScope does not verify whether a detected secret is still valid. Treat every finding as exposed and rotate it.
-- Basic auth is a gate, not identity management. Use an SSO-aware reverse proxy if you need per-user audit trails.
+- Page addresses contain the page, filters, rule ids and, for a selected request, the request id (`folder/name`). They never contain values, evidence or bodies, but request names can appear in browser history, proxy logs and shared links: treat a link as you would the collection's table of contents.
+- Basic auth is a gate, not identity management. Use an SSO-aware reverse proxy (see the deployment guide) if you need per-user audit trails.
+- Encryption at rest protects the volume and backups, not a running server: anyone who can call the API or read the process environment can still read collections. The key lives where the server can read it, so keep it in a secret store and out of images, compose files committed to git and shell history.
 - Rule-based detection has false positives and negatives. Use the rule settings to tune it, not as proof of absence.
 
 ## 3. Detection coverage
@@ -48,12 +58,18 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 |---|---|
 | Headers | `Authorization` / `Proxy-Authorization` (any scheme), `X-API-Key`, `X-Auth-Token`, session cookies, password headers |
 | Auth helpers (request, folder, collection; inheritance-aware) | Bearer token, API key value, OAuth1/OAuth2 secrets and tokens, AWS secret key, Digest/NTLM passwords, Hawk, Akamai, JWT, ASAP |
-| Bodies | JSON (nested objects and arrays), urlencoded, form-data, GraphQL variables |
+| Bodies | JSON (nested objects and arrays, including unquoted `{{variables}}`), XML/SOAP elements, `key=value` text, urlencoded, form-data, GraphQL variables |
 | URLs | Credential query parameters (`api_key`, `token`, `sig`, …), `user:password@host` |
-| Scripts | `pm.*.set("token", "literal")`, literal assignments, provider tokens, `console.log` of credentials |
-| Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable |
-| Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization` in the original request |
-| Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords |
+| Scripts | `pm.*.set("token", "literal")`, literal assignments and properties, `Authorization` literals added with `pm.request.headers` or `pm.sendRequest`, bearer literals in `pm.request.auth`, `btoa('user:password')`, provider tokens, `console.log` of credentials |
+| Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable; the same for folder and request variables |
+| Descriptions | Provider tokens and `key: value` credential fragments in collection, folder and request descriptions (replaced with `{{REDACTED}}` in sanitized copies) |
+| Environment and globals files | Credential-like names, `secret` typed variables (Postman exports them in clear text) and provider tokens with literal values (`SECRET_IN_ENVIRONMENT`). The sanitized export and the CLI `--sanitize` option write copies with those values emptied |
+| Path variables | Credential-like `url.variable` entries such as `:token` |
+| Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization`, query credentials and body secrets in the original request |
+| Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords, Microsoft Entra ID client secrets, Okta API tokens, HashiCorp Vault tokens, Postman API keys, Atlassian, Shopify, DigitalOcean, Docker Hub, Grafana, Hugging Face, Databricks, PyPI and Square tokens |
+| Basic Authorization | The base64 value is decoded; only a literal password is reported, so `Basic` tokens that encode `{{variables}}` are not false positives |
+| Credential-named fields | Long random-looking literals (20+ characters, high entropy) in sensitive header, query, form and JSON field names that no other rule recognized (`HIGH_ENTROPY_LITERAL`) |
+| Disabled entries | Headers, query params, form fields and scripts switched off in Postman are still in the export, so they go through the same secret rules (evidence is labelled `(disabled)`) |
 | Transport | `http://` / `ws://` to non-local hosts (including a `{{baseUrl}}` that resolves to one), `strictSSL: false` |
 
 Placeholders (`<string>`, `changeme`, `your-api-key`, `demo-…`) and variable references (`{{token}}`, `{{auth-token}}`) are not reported.
@@ -64,13 +80,14 @@ For any deployment with `LOGGING_MODE=hybrid` or `on`:
 
 - [ ] Put PostScope behind HTTPS (reverse proxy) and set `ENABLE_HSTS=true` once HTTPS-only.
 - [ ] Set `BASIC_AUTH_USER` and a long random `BASIC_AUTH_PASSWORD`, or restrict network access to trusted users. The server logs a warning at startup when the library is enabled without authentication.
-- [ ] If behind a proxy, set `TRUST_PROXY=true` so rate limits use the real client IP, and add the public origin to `ALLOWED_ORIGINS` if the proxy rewrites `Host`.
+- [ ] If behind a proxy, set `TRUST_PROXY=true` so rate limits use the real client IP, set `TRUST_PROXY_HOPS` to the number of proxies you control, make sure PostScope is not reachable around the proxy, and add the public origin to `ALLOWED_ORIGINS` if the proxy rewrites `Host`.
+- [ ] Set `HEALTH_EXPOSE_VERSION=false` if the health endpoint is reachable from untrusted networks.
 - [ ] Choose a retention policy: `LIBRARY_RETENTION_DAYS`, `LIBRARY_MAX_ITEMS`, `LIBRARY_MAX_TOTAL_MB`.
 - [ ] Consider `LIBRARY_REDACT_SECRETS=true` so stored copies never contain usable credentials.
 - [ ] Consider `LIBRARY_ALLOW_DELETE=false` when the library is an audit record.
 - [ ] Mount `/app/data` on a volume writable by uid 1000 and back it up. It contains whatever users uploaded.
 - [ ] Monitor `GET /api/health` (returns 503 when storage is not writable).
-- [ ] Run `npm run audit:deps` regularly and rebuild the image after dependency updates.
+- [ ] Run `npm run audit:deps` regularly and rebuild the image after dependency updates. The project's own CI fails on high severity advisories in runtime dependencies, runs CodeQL (security-extended queries) on every push and pull request and weekly, and Dependabot proposes npm, GitHub Actions and base image updates every week.
 
 ## 5. Reporting a vulnerability
 

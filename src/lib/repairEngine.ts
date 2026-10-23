@@ -4,6 +4,7 @@ import {
   TOKEN_HEADER,
   classifyBodySecret,
   findLeakedCollectionVariables,
+  findLeakedScopedVariables,
   isQuerySecret,
   type Finding,
 } from './auditor'
@@ -12,6 +13,10 @@ import type { PostmanAuth, PostmanCollection, PostmanHeader, PostmanItem, Postma
 import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsFor } from './authSchemes'
 import { isLikelySecretValue } from './secretPatterns'
 import { toVariableName } from './variables'
+import { analyzeVariableUsage } from './variableUsage'
+import { detectIndent, parseTemplatedJson } from './jsonBody'
+import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
+import { scrubDescription } from './descriptions'
 
 export type RepairFixKind =
   | 'hardcodedBaseUrl'
@@ -21,6 +26,7 @@ export type RepairFixKind =
   | 'basicAuthCredentials'
   | 'emptyHeaders'
   | 'collectionVariables'
+  | 'undefinedVariables'
   | 'missingDescription'
   | 'authHelperSecrets'
   | 'bodySecrets'
@@ -62,10 +68,22 @@ export interface RepairFix {
   variablesToEnsure?: RepairVariable[]
   generatedDescriptions?: Record<string, string>
   manualReason?: string
+  /** For base URL fixes: which collection variable replaces the host of each origin. */
+  originVariables?: OriginVariable[]
+  /** For `secretVariables`: folder and request variables whose values are cleared. */
+  scopedVariables?: Array<{ ownerPath: number[]; key: string }>
   /** For `secretVariables`: collection variable keys whose values are cleared. */
   variableKeys?: string[]
   /** For `bodySecrets`: which body classifier the fix targets. */
   bodyRule?: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET'
+}
+
+/** One literal origin (`https://auth.example.com`) and the collection variable that replaces it. */
+export interface OriginVariable {
+  origin: string
+  variable: string
+  /** Requests in the collection that use this origin. */
+  requestCount: number
 }
 
 export interface RepairPlan {
@@ -132,14 +150,12 @@ function hostToString(host: PostmanUrl['host']): string {
 function pathToString(path: PostmanUrl['path']): string {
   if (typeof path === 'string') return path ? `/${path.replace(/^\/+/, '')}` : ''
   if (!Array.isArray(path) || path.length === 0) return ''
-  return `/${path.map((segment) => (typeof segment === 'string' ? segment : segment?.value ?? '')).join('/')}`
+  return `/${path.map((segment) => (typeof segment === 'string' ? segment : (segment?.value ?? ''))).join('/')}`
 }
 
 function queryToString(query: PostmanUrl['query']): string {
   if (!Array.isArray(query) || query.length === 0) return ''
-  const params = query
-    .filter((q) => q?.key && !q.disabled)
-    .map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value ?? '')}`)
+  const params = query.filter((q) => q?.key && !q.disabled).map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value ?? '')}`)
   return params.length ? `?${params.join('&')}` : ''
 }
 
@@ -153,35 +169,93 @@ function currentUrlString(url: string | PostmanUrl | undefined): string {
   return typeof url === 'string' ? url : url.raw || postmanUrlToString(url)
 }
 
+/**
+ * Splits an absolute http(s) URL into its origin and the rest (path, query, hash), exactly as written.
+ * The rest is never re-encoded, so `{{variables}}` in the path survive. Hosts that contain a variable are not
+ * literal origins and return null.
+ */
 export function parseUrlParts(value: string | PostmanUrl | undefined): UrlParts | null {
   if (!value) return null
-  const source = currentUrlString(value)
-  if (!/^https?:\/\//i.test(source)) return null
-
-  try {
-    const parsed = new URL(source)
-    const pathQuery = parsed.pathname === '/' && !parsed.search ? '' : `${parsed.pathname}${parsed.search}`
-    return {
-      origin: parsed.origin,
-      pathQuery,
-    }
-  } catch {
-    return null
-  }
+  const source = currentUrlString(value).trim()
+  const match = source.match(/^(https?):\/\/([^/?#]*)([\s\S]*)$/i)
+  if (!match) return null
+  const authority = match[2].replace(/^[^@]*@/, '').toLowerCase()
+  if (!authority || authority.includes('{{')) return null
+  const scheme = match[1].toLowerCase()
+  const defaultPort = scheme === 'https' ? ':443' : ':80'
+  const host = authority.endsWith(defaultPort) ? authority.slice(0, -defaultPort.length) : authority
+  const rest = match[3]
+  return { origin: `${scheme}://${host}`, pathQuery: rest === '/' ? '' : rest }
 }
 
-export function replaceUrlHostWithBaseUrl(url: string | PostmanUrl | undefined): {
+/** `auth.example.com` becomes `authBaseUrl`; IP addresses and unusual hosts become `hostBaseUrl`. */
+function baseUrlVariableName(origin: string): string {
+  const host = origin.replace(/^https?:\/\//, '').replace(/:\d+$/, '')
+  const label = /^[\d.]+$/.test(host) || host.includes(':') ? 'host' : host.split('.')[0]
+  const words = label.split(/[^A-Za-z0-9]+/).filter(Boolean)
+  const camel = words
+    .map((word, index) => (index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()))
+    .join('')
+  const name = /^[A-Za-z]/.test(camel) ? camel : `host${camel}`
+  return `${name || 'host'}BaseUrl`
+}
+
+/**
+ * Maps every literal origin used by the collection to a collection variable. The most frequent origin keeps
+ * `baseUrl`; the others get a readable name from the first host label (`authBaseUrl`), with a numeric suffix on
+ * collisions. An existing `baseUrl` variable keeps its meaning: it is only reused for the origin it points at.
+ */
+export function buildOriginVariableMap(parsed: ParsedCollection): OriginVariable[] {
+  const counts = new Map<string, number>()
+  for (const request of parsed.requests) {
+    const origin = parseUrlParts(request.url)?.origin
+    if (origin) counts.set(origin, (counts.get(origin) ?? 0) + 1)
+  }
+  const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  const existing = new Map((parsed.collectionVariables ?? []).map((variable) => [variable.key, variable.value]))
+  const used = new Set(existing.keys())
+  const result: OriginVariable[] = []
+
+  const existingBaseOrigin = existing.has('baseUrl') ? parseUrlParts(existing.get('baseUrl'))?.origin : undefined
+  const baseOrigin = existing.has('baseUrl')
+    ? existingBaseOrigin && counts.has(existingBaseOrigin)
+      ? existingBaseOrigin
+      : undefined
+    : ordered[0]?.[0]
+  if (baseOrigin) {
+    used.add('baseUrl')
+    result.push({ origin: baseOrigin, variable: 'baseUrl', requestCount: counts.get(baseOrigin) ?? 0 })
+  }
+  for (const [origin, requestCount] of ordered) {
+    if (origin === baseOrigin) continue
+    const stem = baseUrlVariableName(origin)
+    let variable = stem
+    for (let suffix = 2; used.has(variable); suffix += 1) variable = `${stem}${suffix}`
+    used.add(variable)
+    result.push({ origin, variable, requestCount })
+  }
+  return result.sort((a, b) => b.requestCount - a.requestCount || a.origin.localeCompare(b.origin))
+}
+
+export function replaceUrlHostWithBaseUrl(
+  url: string | PostmanUrl | undefined,
+  variableFor: (origin: string) => string | undefined = () => 'baseUrl'
+): {
   before: string
   after: string
   origin: string
+  variable: string
 } | null {
   if (!url) return null
   const parts = parseUrlParts(url)
   if (!parts) return null
+  const variable = variableFor(parts.origin)
+  if (!variable) return null
   return {
     before: currentUrlString(url),
-    after: `{{baseUrl}}${parts.pathQuery}`,
+    after: `{{${variable}}}${parts.pathQuery}`,
     origin: parts.origin,
+    variable,
   }
 }
 
@@ -220,13 +294,18 @@ function findEffectiveAuth(rawJson: unknown, itemPath: number[]): PostmanAuth | 
 }
 
 function sanitizeIdPart(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'collection'
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'collection'
+  )
 }
 
 function hashString(value: string): string {
   let hash = 0
   for (let i = 0; i < value.length; i += 1) {
-    hash = Math.imul(31, hash) + value.charCodeAt(i) | 0
+    hash = (Math.imul(31, hash) + value.charCodeAt(i)) | 0
   }
   return Math.abs(hash).toString(36)
 }
@@ -256,6 +335,7 @@ const KIND_BY_RULE: Partial<Record<string, RepairFixKind>> = {
   BASIC_AUTH_PLAINTEXT: 'basicAuthCredentials',
   EMPTY_HEADERS: 'emptyHeaders',
   NO_COLLECTION_VARIABLES: 'collectionVariables',
+  UNDEFINED_VARIABLE: 'undefinedVariables',
   MISSING_DESCRIPTION: 'missingDescription',
   HARDCODED_AUTH_CREDENTIAL: 'authHelperSecrets',
   HARDCODED_PASSWORD: 'bodySecrets',
@@ -289,8 +369,12 @@ function firstAffectedRequest(finding: Finding, parsed: ParsedCollection): Parse
   return parsed.requests.find((request) => finding.affected.includes(request.id))
 }
 
-function headerSnippet(request: ParsedRequest | undefined, matcher: (header: { key: string; value: string }) => boolean): string | undefined {
-  const header = request?.headers.find(matcher)
+function headerSnippet(
+  request: ParsedRequest | undefined,
+  matcher: (header: { key: string; value: string }) => boolean,
+  includeDisabled = false
+): string | undefined {
+  const header = request?.headers.find(matcher) ?? (includeDisabled ? request?.disabledHeaders?.find(matcher) : undefined)
   if (!header) return undefined
   return `${header.key}: ${header.value ? '***' : '""'}`
 }
@@ -300,7 +384,7 @@ function authVariablesForTargets(targets: RepairTarget[], parsed: ParsedCollecti
   const keys = new Set<string>()
   for (const request of parsed.requests) {
     if (!targetIds.has(request.id)) continue
-    for (const header of request.headers) {
+    for (const header of [...request.headers, ...(request.disabledHeaders ?? [])]) {
       if (isVariableValue(header.value)) continue
       const lower = header.key.toLowerCase()
       if (lower === 'cookie') keys.add('sessionCookie')
@@ -316,7 +400,7 @@ function authVariablesForTargets(targets: RepairTarget[], parsed: ParsedCollecti
 
 export function buildGeneratedDescription(request: ParsedRequest): string {
   const parts = parseUrlParts(request.url)
-  let target = parts?.pathQuery.split('?')[0] || request.url || request.name
+  let target = parts?.pathQuery.split(/[?#]/)[0] || request.url || request.name
   if (target.startsWith('{{baseUrl}}')) target = target.replace('{{baseUrl}}', '') || '/'
   if (!target.startsWith('/') && !/^https?:\/\//i.test(target)) target = `/${target}`
   return `Sends a ${request.method} request to ${target}.`
@@ -339,30 +423,40 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
 
   if (kind === 'hardcodedBaseUrl' || kind === 'environmentUrl') {
     const targetRequests = parsed.requests.filter((request) => finding.affected.includes(request.id))
-    const origins = originSetForRequests(targetRequests)
-    const example = affectedRequest ? replaceUrlHostWithBaseUrl(affectedRequest.url) : null
-    const multipleHosts = origins.length > 1
+    const targetOrigins = new Set(originSetForRequests(targetRequests))
+    const originVariables = buildOriginVariableMap(parsed).filter((entry) => targetOrigins.has(entry.origin))
+    const variableFor = (origin: string) => originVariables.find((entry) => entry.origin === origin)?.variable
+    const example = affectedRequest ? replaceUrlHostWithBaseUrl(affectedRequest.url, variableFor) : null
+    const mappings = originVariables.map((entry) => `${entry.origin} becomes {{${entry.variable}}}`).join('; ')
     return {
       ...base,
       status: 'auto',
       title: kind === 'hardcodedBaseUrl' ? 'Replace hardcoded base URL' : 'Parameterize environment URL',
-      description: multipleHosts
-        ? `Replaces literal hosts with {{baseUrl}} while preserving paths and query strings. Multiple hosts were detected; ${origins[0]} will be used as the default baseUrl value.`
-        : 'Replaces the literal scheme and host with {{baseUrl}} while preserving paths and query strings.',
+      description:
+        originVariables.length > 1
+          ? `Replaces literal hosts with collection variables while preserving paths and query strings. Each host gets its own variable so requests keep calling the same server: ${mappings}.`
+          : `Replaces the literal scheme and host with ${originVariables[0] ? `{{${originVariables[0].variable}}}` : '{{baseUrl}}'} while preserving paths and query strings.`,
       risk: 'medium',
       selectedByDefault: true,
       beforeSnippet: example?.before,
       afterSnippet: example?.after,
-      variablesToEnsure: [{ key: 'baseUrl', value: origins[0] || '' }],
+      originVariables,
+      variablesToEnsure: originVariables.map((entry) => ({ key: entry.variable, value: entry.origin })),
     }
   }
 
   if (kind === 'hardcodedAuthToken') {
-    const beforeSnippet = headerSnippet(affectedRequest, (header) => {
-      const lower = header.key.toLowerCase()
-      return lower === 'authorization' || lower === 'proxy-authorization' || lower === 'cookie' || TOKEN_HEADER.test(lower)
-    })
-    const afterSnippet = beforeSnippet?.toLowerCase().includes('basic') ? 'Authorization: Basic {{basicAuthToken}}' : 'Authorization: Bearer {{token}}'
+    const beforeSnippet = headerSnippet(
+      affectedRequest,
+      (header) => {
+        const lower = header.key.toLowerCase()
+        return lower === 'authorization' || lower === 'proxy-authorization' || lower === 'cookie' || TOKEN_HEADER.test(lower)
+      },
+      true
+    )
+    const afterSnippet = beforeSnippet?.toLowerCase().includes('basic')
+      ? 'Authorization: Basic {{basicAuthToken}}'
+      : 'Authorization: Bearer {{token}}'
     return {
       ...base,
       status: 'auto',
@@ -384,7 +478,7 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       description: 'Replaces literal API key header values with {{apiKey}} and defines the variable if needed.',
       risk: 'low',
       selectedByDefault: true,
-      beforeSnippet: headerSnippet(affectedRequest, (header) => API_KEY_REGEX.test(header.key)),
+      beforeSnippet: headerSnippet(affectedRequest, (header) => API_KEY_REGEX.test(header.key), true),
       afterSnippet: 'x-api-key: {{apiKey}}',
       variablesToEnsure: [{ key: 'apiKey', value: '' }],
     }
@@ -395,7 +489,8 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       ...base,
       status: 'auto',
       title: 'Move Basic auth credentials to variables',
-      description: 'Replaces literal username and password fields in Postman Basic auth with {{username}} and {{password}}, including auth inherited from folders or the collection.',
+      description:
+        'Replaces literal username and password fields in Postman Basic auth with {{username}} and {{password}}, including auth inherited from folders or the collection.',
       risk: 'low',
       selectedByDefault: true,
       beforeSnippet: 'Basic auth username/password: ***',
@@ -417,6 +512,21 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       selectedByDefault: true,
       beforeSnippet: headerSnippet(affectedRequest, (header) => !header.value?.trim()),
       afterSnippet: 'Header disabled',
+    }
+  }
+
+  if (kind === 'undefinedVariables') {
+    const names = [...analyzeVariableUsage(parsed).undefinedNames.keys()]
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Add placeholders for undefined variables',
+      description: `Adds empty collection variables for ${names.length} referenced name(s) so every {{variable}} resolves. Fill them in, or define them in an environment instead, and remove any that are typos.`,
+      risk: 'low',
+      selectedByDefault: false,
+      variablesToEnsure: names.map((key) => ({ key, value: '' })),
+      beforeSnippet: names[0] ? `{{${names[0]}}} is not defined` : undefined,
+      afterSnippet: names[0] ? `${names[0]} = ""` : undefined,
     }
   }
 
@@ -476,7 +586,10 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
 
   if (kind === 'bodySecrets') {
     const bodyRule = finding.ruleId === 'HARDCODED_PASSWORD' ? 'HARDCODED_PASSWORD' : 'HARDCODED_SECRET'
-    const field = finding.evidence?.find((evidence) => evidence.location.startsWith('body'))?.location.split(/[ .]/).pop()
+    const field = finding.evidence
+      ?.find((evidence) => evidence.location.startsWith('body'))
+      ?.location.split(/[ .]/)
+      .pop()
     return {
       ...base,
       status: 'auto',
@@ -509,17 +622,20 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
 
   if (kind === 'secretVariables') {
     const leaked = findLeakedCollectionVariables(parsed)
+    const leakedScoped = findLeakedScopedVariables(parsed)
+    const first = leaked[0] ?? leakedScoped[0]
     return {
       ...base,
       status: 'auto',
       title: 'Clear secret collection variable values',
       description:
-        'Empties the values of credential-like collection variables so the export no longer carries them. Set the real values in a private environment or vault afterwards.',
+        'Empties the values of credential-like collection, folder and request variables so the export no longer carries them. Set the real values in a private environment or vault afterwards.',
       risk: 'medium',
       selectedByDefault: true,
       variableKeys: leaked.map((variable) => variable.key),
-      beforeSnippet: leaked[0] ? `${leaked[0].key} = ***` : undefined,
-      afterSnippet: leaked[0] ? `${leaked[0].key} = ""` : undefined,
+      scopedVariables: leakedScoped.map((variable) => ({ ownerPath: variable.ownerPath, key: variable.key })),
+      beforeSnippet: first ? `${first.key} = ***` : undefined,
+      afterSnippet: first ? `${first.key} = ""` : undefined,
     }
   }
 
@@ -543,7 +659,8 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       ...base,
       status: 'auto',
       title: 'Re-enable TLS certificate verification',
-      description: 'Removes strictSSL: false from affected requests, their folders, and the collection. Requests to servers with self-signed certificates will fail until their CA is trusted.',
+      description:
+        'Removes strictSSL: false from affected requests, their folders, and the collection. Requests to servers with self-signed certificates will fail until their CA is trusted.',
       risk: 'medium',
       selectedByDefault: false,
       beforeSnippet: 'protocolProfileBehavior.strictSSL: false',
@@ -558,7 +675,12 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
     description: finding.recommendation,
     risk: 'manual',
     selectedByDefault: false,
-    manualReason: 'This finding needs human context before changing the collection.',
+    manualReason:
+      finding.ruleId === 'SECRET_IN_ENVIRONMENT'
+        ? 'The secret lives in an environment or globals file, not in the collection. Use Export, Sanitized environments (or the CLI --sanitize option) to get copies with the values emptied.'
+        : finding.ruleId === 'HIGH_ENTROPY_LITERAL'
+          ? 'Confirm whether the value is a credential before moving it to a variable.'
+          : 'This finding needs human context before changing the collection.',
   }
 }
 
@@ -578,12 +700,16 @@ interface PatchResult {
   variables: RepairVariable[]
 }
 
-function applyUrlPatch(collection: unknown, fix: RepairFix): {
+function applyUrlPatch(
+  collection: unknown,
+  fix: RepairFix
+): {
   changed: number
   skipped: SkippedRepair[]
 } {
   let changed = 0
   const skipped: SkippedRepair[] = []
+  const variableByOrigin = new Map((fix.originVariables ?? []).map((entry) => [entry.origin, entry.variable]))
 
   for (const target of fix.affectedRequests) {
     const item = getItemAtPath(collection, target.itemPath)
@@ -593,10 +719,16 @@ function applyUrlPatch(collection: unknown, fix: RepairFix): {
     }
 
     const url = item.request.url
-    const replacement = replaceUrlHostWithBaseUrl(url)
+    const replacement = replaceUrlHostWithBaseUrl(url, (origin) => variableByOrigin.get(origin))
     if (!replacement) {
       if (VARIABLE_PATTERN.test(currentUrlString(url))) continue
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'URL was not an absolute HTTP URL.' })
+      const known = parseUrlParts(url)
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: known ? `No variable was planned for ${known.origin}.` : 'URL was not an absolute HTTP URL.',
+      })
       continue
     }
 
@@ -604,8 +736,9 @@ function applyUrlPatch(collection: unknown, fix: RepairFix): {
       item.request.url = replacement.after
     } else if (isRecord(url)) {
       url.raw = replacement.after
-      url.host = ['{{baseUrl}}']
+      url.host = [`{{${replacement.variable}}}`]
       delete url.protocol
+      delete url.port
     } else {
       item.request.url = replacement.after
     }
@@ -675,7 +808,7 @@ function patchAuthorizationHeader(header: PostmanHeader): { changed: boolean; va
 export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
   if (fix.kind === 'hardcodedAuthToken') {
     return applyHeaderPatch(collection, fix, (header) => {
-      if (header.disabled || isVariableValue(header.value)) return { changed: false, variables: [] }
+      if (isVariableValue(header.value)) return { changed: false, variables: [] }
       const lower = header.key.toLowerCase()
       if (lower === 'authorization' || lower === 'proxy-authorization') return patchAuthorizationHeader(header)
       if (TOKEN_HEADER.test(lower) && isLikelySecretValue(header.value)) {
@@ -695,7 +828,7 @@ export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
 
   if (fix.kind === 'hardcodedApiKey') {
     return applyHeaderPatch(collection, fix, (header) => {
-      if (header.disabled || !API_KEY_REGEX.test(header.key) || isVariableValue(header.value)) {
+      if (!API_KEY_REGEX.test(header.key) || isVariableValue(header.value)) {
         return { changed: false, variables: [] }
       }
       header.value = '{{apiKey}}'
@@ -714,7 +847,10 @@ export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
   return { changed: 0, skipped: [], variables: [] }
 }
 
-export function patchBasicAuth(collection: unknown, fix: RepairFix): {
+export function patchBasicAuth(
+  collection: unknown,
+  fix: RepairFix
+): {
   changed: number
   skipped: SkippedRepair[]
 } {
@@ -748,7 +884,12 @@ export function patchBasicAuth(collection: unknown, fix: RepairFix): {
       }
     }
     if (!changedForOwner) {
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal Basic auth credentials were found.' })
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: 'No literal Basic auth credentials were found.',
+      })
     }
   }
 
@@ -814,13 +955,12 @@ function patchAuthHelperSecrets(collection: unknown): PatchResult {
   return { changed, skipped: [], variables: [...variables.values()] }
 }
 
-function detectIndent(raw: string): number | string {
-  const match = raw.match(/\n([ \t]+)\S/)
-  if (!match) return raw.includes('\n') ? 2 : 0
-  return match[1].includes('\t') ? '\t' : match[1].length
-}
-
-function replaceJsonSecrets(value: unknown, rule: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET', variables: Map<string, RepairVariable>, depth = 0): number {
+function replaceJsonSecrets(
+  value: unknown,
+  rule: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET',
+  variables: Map<string, RepairVariable>,
+  depth = 0
+): number {
   if (depth > 50 || value === null || typeof value !== 'object') return 0
   let changed = 0
   if (Array.isArray(value)) {
@@ -845,6 +985,23 @@ function replaceJsonSecrets(value: unknown, rule: 'HARDCODED_PASSWORD' | 'HARDCO
   return changed
 }
 
+/** Replaces credentials in a `description` that is a string or `{ content, type }`. Returns how many were replaced. */
+function scrubDescriptionOf(owner: unknown): number {
+  if (!isRecord(owner)) return 0
+  const description = owner.description
+  if (typeof description === 'string') {
+    const result = scrubDescription(description, '{{REDACTED}}')
+    if (result.count) owner.description = result.text
+    return result.count
+  }
+  if (isRecord(description) && typeof description.content === 'string') {
+    const result = scrubDescription(description.content, '{{REDACTED}}')
+    if (result.count) description.content = result.text
+    return result.count
+  }
+  return 0
+}
+
 function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
   const rule = fix.bodyRule ?? 'HARDCODED_SECRET'
   const variables = new Map<string, RepairVariable>()
@@ -862,7 +1019,7 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
 
     if (rule === 'HARDCODED_PASSWORD' && Array.isArray(request.header)) {
       for (const header of request.header) {
-        if (!isRecord(header) || header.disabled || typeof header.key !== 'string' || typeof header.value !== 'string') continue
+        if (!isRecord(header) || typeof header.key !== 'string' || typeof header.value !== 'string') continue
         if (HEADER_PASSWORD_KEY.test(header.key) && !isVariableValue(header.value)) {
           const name = toVariableName(header.key, 'password')
           header.value = `{{${name}}}`
@@ -878,7 +1035,7 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
         const fields = body[mode]
         if (!Array.isArray(fields)) continue
         for (const field of fields) {
-          if (!isRecord(field) || field.disabled || field.type === 'file' || typeof field.key !== 'string' || typeof field.value !== 'string') continue
+          if (!isRecord(field) || field.type === 'file' || typeof field.key !== 'string' || typeof field.value !== 'string') continue
           if (classifyBodySecret(field.key, field.value) === rule) {
             const name = toVariableName(field.key)
             field.value = `{{${name}}}`
@@ -888,21 +1045,42 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
         }
       }
       if (typeof body.raw === 'string' && (!body.mode || body.mode === 'raw')) {
-        try {
-          const json = JSON.parse(body.raw) as unknown
-          const replaced = replaceJsonSecrets(json, rule, variables)
+        const templated = parseTemplatedJson(body.raw)
+        if (templated) {
+          const replaced = replaceJsonSecrets(templated.value, rule, variables)
           if (replaced > 0) {
-            body.raw = JSON.stringify(json, null, detectIndent(body.raw))
+            body.raw = templated.restore(JSON.stringify(templated.value, null, detectIndent(body.raw)))
             changedForRequest += replaced
           }
-        } catch {
-          // Raw bodies that are not strict JSON (or contain unquoted {{vars}}) are left untouched.
+        } else {
+          // Not JSON (XML/SOAP, form-like text): replace the matching field values in place.
+          const replacements = scanRawBodyFields(body.raw)
+            .filter((field) => classifyBodySecret(field.key, field.value) === rule)
+            .map((field) => {
+              const name = toVariableName(field.key)
+              variables.set(name, { key: name, value: '' })
+              return { field, value: `{{${name}}}` }
+            })
+          if (replacements.length > 0) {
+            body.raw = replaceRawBodyFields(body.raw, replacements)
+            changedForRequest += replacements.length
+          }
         }
       }
     }
 
+    if (rule === 'HARDCODED_SECRET') {
+      // Credentials pasted into the request documentation are reported under the same rule.
+      changedForRequest += scrubDescriptionOf(item) + scrubDescriptionOf(request)
+    }
+
     if (changedForRequest === 0) {
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: 'No literal value could be replaced automatically (body is not JSON or form data).' })
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: 'No literal value could be replaced automatically (body is not JSON or form data).',
+      })
     }
     changed += changedForRequest
   }
@@ -953,12 +1131,17 @@ function patchQuerySecrets(collection: unknown, fix: RepairFix): PatchResult {
     } else if (isRecord(request.url)) {
       const url = request.url as PostmanUrl
       for (const param of Array.isArray(url.query) ? url.query : []) {
-        if (!isRecord(param) || param.disabled || typeof param.key !== 'string' || typeof param.value !== 'string') continue
+        if (!isRecord(param) || typeof param.key !== 'string' || typeof param.value !== 'string') continue
         if (!isQuerySecret(param.key, param.value)) continue
         const name = toVariableName(param.key)
         const replacement = `{{${name}}}`
         if (typeof url.raw === 'string') {
-          url.raw = replaceInRaw(replaceInRaw(url.raw, param.key, param.value, replacement), param.key, encodeURIComponent(param.value), replacement)
+          url.raw = replaceInRaw(
+            replaceInRaw(url.raw, param.key, param.value, replacement),
+            param.key,
+            encodeURIComponent(param.value),
+            replacement
+          )
         }
         param.value = replacement
         variables.set(name, { key: name, value: '' })
@@ -987,6 +1170,15 @@ function patchSecretVariables(collection: unknown, fix: RepairFix): PatchResult 
     if (isRecord(variable) && keys.has(variable.key) && typeof variable.value === 'string' && variable.value) {
       variable.value = ''
       changed += 1
+    }
+  }
+  for (const target of fix.scopedVariables ?? []) {
+    const item = getItemAtPath(collection, target.ownerPath) as { variable?: unknown } | undefined
+    for (const variable of Array.isArray(item?.variable) ? item.variable : []) {
+      if (isRecord(variable) && variable.key === target.key && typeof variable.value === 'string' && variable.value) {
+        variable.value = ''
+        changed += 1
+      }
     }
   }
   return { changed, skipped: [], variables: [] }
@@ -1021,7 +1213,12 @@ function patchInsecureHttp(collection: unknown, fix: RepairFix): PatchResult {
         }
         continue
       }
-      skipped.push({ fixId: fix.id, title: fix.title, requestId: target.requestId, reason: `{{${leadingVariable}}} is not defined as a collection variable.` })
+      skipped.push({
+        fixId: fix.id,
+        title: fix.title,
+        requestId: target.requestId,
+        reason: `{{${leadingVariable}}} is not defined as a collection variable.`,
+      })
       continue
     }
 
@@ -1055,7 +1252,10 @@ function patchTlsVerification(collection: unknown, fix: RepairFix): PatchResult 
   return { changed, skipped: [], variables: [] }
 }
 
-function patchDescriptions(collection: unknown, fix: RepairFix): {
+function patchDescriptions(
+  collection: unknown,
+  fix: RepairFix
+): {
   changed: number
   skipped: SkippedRepair[]
 } {
@@ -1081,7 +1281,11 @@ function patchDescriptions(collection: unknown, fix: RepairFix): {
   return { changed, skipped }
 }
 
-export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan: RepairPlan): {
+export function applyRepairPlan(
+  rawJson: unknown,
+  selectedFixIds: string[],
+  plan: RepairPlan
+): {
   fixedJson: unknown
   applied: AppliedRepair[]
   skipped: SkippedRepair[]
@@ -1107,15 +1311,14 @@ export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan
       const result = applyUrlPatch(fixedJson, fix)
       changed = result.changed
       localSkipped = result.skipped
-      action = `Replaced URL hosts with {{baseUrl}} in ${changed} request(s).`
+      action = `Replaced URL hosts with collection variables in ${changed} request(s).`
     } else if (fix.kind === 'hardcodedAuthToken' || fix.kind === 'hardcodedApiKey' || fix.kind === 'emptyHeaders') {
       const result = patchHeaders(fixedJson, fix)
       changed = result.changed
       localSkipped = result.skipped
       variables = result.variables.length ? result.variables : variables
-      action = fix.kind === 'emptyHeaders'
-        ? `Disabled ${changed} empty header(s).`
-        : `Replaced ${changed} literal header value(s) with variables.`
+      action =
+        fix.kind === 'emptyHeaders' ? `Disabled ${changed} empty header(s).` : `Replaced ${changed} literal header value(s) with variables.`
     } else if (fix.kind === 'basicAuthCredentials') {
       const result = patchBasicAuth(fixedJson, fix)
       changed = result.changed
@@ -1123,6 +1326,8 @@ export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan
       action = `Replaced ${changed} Basic auth credential field(s) with variables.`
     } else if (fix.kind === 'collectionVariables') {
       action = 'Added missing starter collection variables.'
+    } else if (fix.kind === 'undefinedVariables') {
+      action = 'Added placeholders for undefined variables.'
     } else if (fix.kind === 'missingDescription') {
       const result = patchDescriptions(fixedJson, fix)
       changed = result.changed

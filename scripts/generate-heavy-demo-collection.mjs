@@ -17,10 +17,6 @@ function rng() {
   return seed / 0x7fffffff
 }
 
-function pick(arr) {
-  return arr[Math.floor(rng() * arr.length)]
-}
-
 function pickWeighted(entries) {
   const total = entries.reduce((s, e) => s + e.weight, 0)
   let r = rng() * total
@@ -36,16 +32,7 @@ function folder(name, ...children) {
 }
 
 function req(name, opts) {
-  const {
-    method = 'GET',
-    auth = 'noauth',
-    url,
-    body,
-    graphql,
-    description,
-    basicCreds,
-    extraHeaders = [],
-  } = opts
+  const { method = 'GET', auth = 'noauth', url, body, graphql, description, basicCreds, extraHeaders = [] } = opts
 
   const request = { method, auth: { type: auth }, url }
 
@@ -216,7 +203,10 @@ function buildAcmeV3() {
     'Acme Core API v3 [PRODUCTION]',
     folder(
       'Auth',
-      makeFromProfile('Login', p, `${b}/auth/login`, { body: { email: '{{userEmail}}', password: '{{userPassword}}' }, description: 'Primary login' }),
+      makeFromProfile('Login', p, `${b}/auth/login`, {
+        body: { email: '{{userEmail}}', password: '{{userPassword}}' },
+        description: 'Primary login',
+      }),
       makeFromProfile('Refresh session', p, `${b}/auth/refresh`, { body: { refreshToken: '{{token}}' } }),
       makeFromProfile('Logout', p, `${b}/auth/logout`)
     ),
@@ -356,7 +346,10 @@ function buildInternalAdmin() {
     ),
     folder(
       'Support Tools',
-      makeFromProfile('Impersonate user', p, `${b}/support/impersonate`, { body: { userId: '{{userId}}' }, basicCreds: { username: 'support_lead', password: 'break-glass' } }),
+      makeFromProfile('Impersonate user', p, `${b}/support/impersonate`, {
+        body: { userId: '{{userId}}' },
+        basicCreds: { username: 'support_lead', password: 'break-glass' },
+      }),
       makeFromProfile('Force password reset', p, `${b}/support/users/{{userId}}/reset-password`, { body: { notify: false } }),
       makeFromProfile('Purge user cache', p, `${b}/support/cache/purge`, { body: { userId: '{{userId}}' } })
     ),
@@ -390,7 +383,9 @@ function buildPartnerIntegrations() {
           'KYC',
           folder(
             'Documents',
-            makeFromProfile('Upload KYC document', p, `${b}/merchants/{{merchantId}}/kyc/documents`, { body: { type: 'passport', url: 'https://...' } }),
+            makeFromProfile('Upload KYC document', p, `${b}/merchants/{{merchantId}}/kyc/documents`, {
+              body: { type: 'passport', url: 'https://...' },
+            }),
             makeFromProfile('Verify KYC status', p, `${b}/merchants/{{merchantId}}/kyc/status`)
           ),
           makeFromProfile('Submit onboarding', p, `${b}/merchants/{{merchantId}}/onboarding/submit`)
@@ -418,7 +413,13 @@ function buildLegacyMonolith() {
   // Completely flat - 18 siblings, no subfolders
   const items = [
     req('GET /ping', { method: 'GET', auth: 'noauth', url: 'http://legacy-internal.example.net/ping' }),
-    req('POST /sync/accounts', { method: 'POST', auth: 'basic', url: 'http://legacy-internal.example.net/sync/accounts', basicCreds: { username: 'batch', password: 'batch123' }, body: { full: true } }),
+    req('POST /sync/accounts', {
+      method: 'POST',
+      auth: 'basic',
+      url: 'http://legacy-internal.example.net/sync/accounts',
+      basicCreds: { username: 'batch', password: 'batch123' },
+      body: { full: true },
+    }),
     req('GET /accounts/list', { method: 'GET', auth: 'noauth', url: 'http://legacy-internal.example.net/accounts/list' }),
     req('GET /accounts/list (copy)', { method: 'GET', auth: 'noauth', url: 'http://legacy-internal.example.net/accounts/list' }),
   ]
@@ -439,10 +440,7 @@ function buildWebhooksMess() {
       'incoming',
       makeFromProfile('Stripe payment succeeded', p, `${b}/stripe/payment-succeeded`, { body: { id: 'evt_1' } }),
       makeFromProfile('stripe payment succeeded', p, `${b}/stripe/payment-succeeded`, { body: { id: 'evt_1' } }),
-      folder(
-        'incoming',
-        makeFromProfile('Duplicate nested incoming handler', p, `${b}/incoming/generic`, { body: { source: 'unknown' } })
-      )
+      folder('incoming', makeFromProfile('Duplicate nested incoming handler', p, `${b}/incoming/generic`, { body: { source: 'unknown' } }))
     ),
     folder(
       'retry queue',
@@ -507,10 +505,7 @@ function buildPossibleDuplicatesSection() {
 
   return folder(
     'Possible Duplicates (review queue)',
-    folder(
-      'Same URL - different names',
-      ...pairs.map(([name, url]) => makeFromProfile(name, p, url))
-    ),
+    folder('Same URL - different names', ...pairs.map(([name, url]) => makeFromProfile(name, p, url))),
     folder(
       'Same name - different URLs',
       req('Health check', { method: 'GET', auth: 'noauth', url: '{{baseUrl}}/health' }),

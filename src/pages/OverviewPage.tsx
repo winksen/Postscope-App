@@ -1,24 +1,5 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import {
-  FileText,
-  FolderOpen,
-  GitBranch,
-  Hash,
-  Key,
-  ShieldWarning,
-  TreeStructure,
-} from '@phosphor-icons/react'
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { FileText, FolderOpen, GitBranch, Hash, Key, ShieldWarning, TreeStructure } from '@phosphor-icons/react'
 import { StatCard } from '../components/StatCard'
 import type { ParsedCollection } from '../lib/parser'
 import type { Finding } from '../lib/auditor'
@@ -26,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { extractVariableNames } from '@/lib/variables'
+import { analyzeVariableUsage } from '@/lib/variableUsage'
 
 /** Auth / accent slice colors (blue → green → orange). */
 const AUTH_COLORS: Record<string, string> = {
@@ -40,13 +21,7 @@ const AUTH_COLORS: Record<string, string> = {
   awsv4: 'hsl(24 90% 52%)',
 }
 
-const FALLBACK_AUTH_COLORS = [
-  'hsl(340 75% 52%)',
-  'hsl(187 72% 42%)',
-  'hsl(142 65% 40%)',
-  'hsl(285 70% 54%)',
-  'hsl(48 95% 48%)',
-] as const
+const FALLBACK_AUTH_COLORS = ['hsl(340 75% 52%)', 'hsl(187 72% 42%)', 'hsl(142 65% 40%)', 'hsl(285 70% 54%)', 'hsl(48 95% 48%)'] as const
 
 /** Distinct color per HTTP verb; DELETE uses destructive red. */
 const VERB_COLORS: Record<string, string> = {
@@ -108,15 +83,6 @@ interface StructureNode {
   children: StructureNode[]
 }
 
-function variableNamesUsedInRequests(requests: ParsedCollection['requests']): Set<string> {
-  const names = new Set<string>()
-  for (const request of requests) {
-    const blob = [request.url, ...request.headers.map((header) => header.key + header.value), request.bodyRaw ?? ''].join(' ')
-    extractVariableNames(blob).forEach((name) => names.add(name))
-  }
-  return names
-}
-
 function buildStructureTree(parsed: ParsedCollection): StructureNode {
   const root: StructureNode = { name: parsed.name, requests: [], children: [] }
 
@@ -154,19 +120,12 @@ function maxDepth(node: StructureNode): number {
   return 1 + Math.max(...node.children.map(maxDepth))
 }
 
-function StructureBranch({
-  node,
-  depth = 0,
-  isLast = true,
-}: {
-  node: StructureNode
-  depth?: number
-  isLast?: boolean
-}) {
+function StructureBranch({ node, depth = 0, isLast = true }: { node: StructureNode; depth?: number; isLast?: boolean }) {
   const requestCount = totalRequests(node)
   const directRequests = node.requests.length
   const hasChildren = node.children.length > 0
-  const shownChildren = depth >= 4 ? node.children.slice(0, 8) : node.children
+  // Very wide collections would put thousands of branches in the page; the rest is summarized.
+  const shownChildren = node.children.slice(0, depth >= 4 ? 8 : 100)
   const hiddenChildren = node.children.length - shownChildren.length
   const levelColor = fillForTreeLevel(depth)
 
@@ -180,28 +139,17 @@ function StructureBranch({
             aria-hidden
           />
           <span className="absolute left-1 top-6 h-px w-5" style={{ backgroundColor: levelColor }} aria-hidden />
-          <span
-            className="absolute left-[0.0625rem] top-5 h-2 w-2 rounded-full"
-            style={{ backgroundColor: levelColor }}
-            aria-hidden
-          />
+          <span className="absolute left-0.25 top-5 h-2 w-2 rounded-full" style={{ backgroundColor: levelColor }} aria-hidden />
         </>
       )}
       <div className="relative flex min-w-0 items-center gap-3 rounded-lg px-2 py-2">
-        <span
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center',
-          )}
-          style={{ color: levelColor }}
-        >
+        <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center')} style={{ color: levelColor }}>
           <FolderOpen className="h-5 w-5" weight="fill" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <p className="truncate text-sm font-medium">{node.name}</p>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              {requestCount} req
-            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{requestCount} req</span>
             {hasChildren && (
               <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground">
                 {node.children.length} folder{node.children.length === 1 ? '' : 's'}
@@ -225,9 +173,7 @@ function StructureBranch({
               isLast={index === shownChildren.length - 1 && hiddenChildren === 0}
             />
           ))}
-          {hiddenChildren > 0 && (
-            <div className="pl-7 text-xs text-muted-foreground">+ {hiddenChildren} more folder branches</div>
-          )}
+          {hiddenChildren > 0 && <div className="pl-7 text-xs text-muted-foreground">+ {hiddenChildren} more folder branches</div>}
         </div>
       )}
     </div>
@@ -258,20 +204,12 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
   }))
 
   const noauthCount = parsed.authTypes.noauth ?? 0
-  const typedAuthSharePct =
-    parsed.totalRequests > 0
-      ? Math.round(((parsed.totalRequests - noauthCount) / parsed.totalRequests) * 100)
-      : 0
+  const typedAuthSharePct = parsed.totalRequests > 0 ? Math.round(((parsed.totalRequests - noauthCount) / parsed.totalRequests) * 100) : 0
 
-  const maxFolderDepth =
-    parsed.folders.length > 0 ? Math.max(...parsed.folders.map((f) => f.path.length)) : 0
-  const avgRequestsPerFolder = parsed.totalFolders
-    ? (parsed.totalRequests / parsed.totalFolders).toFixed(1)
-    : '0'
+  const maxFolderDepth = parsed.folders.length > 0 ? Math.max(...parsed.folders.map((f) => f.path.length)) : 0
+  const avgRequestsPerFolder = parsed.totalFolders ? (parsed.totalRequests / parsed.totalFolders).toFixed(1) : '0'
   const busiestFolder =
-    parsed.folders.length > 0
-      ? parsed.folders.reduce((best, f) => (f.requestCount > best.requestCount ? f : best))
-      : undefined
+    parsed.folders.length > 0 ? parsed.folders.reduce((best, f) => (f.requestCount > best.requestCount ? f : best)) : undefined
   const topMethod = methodEntries[0]
   const structureDetailRows = [
     { label: 'Folders', value: parsed.totalFolders },
@@ -306,16 +244,20 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
         ? `${criticalCount} critical findings need review`
         : `${warningCount} warnings / ${infoCount} info items`
 
-  const varsUsedInRequests = variableNamesUsedInRequests(parsed.requests)
-  const unusedDefinedVars = parsed.definedVariables.filter((key) => !varsUsedInRequests.has(key)).length
+  const variableUsage = analyzeVariableUsage(parsed)
+  const definedVariableCount = variableUsage.definedAnywhere.size
+  const referencedVariableCount = new Set(variableUsage.references.map((reference) => reference.name)).size
+  const undefinedVariableCount = variableUsage.undefinedNames.size
+  const unusedDefinedVars = variableUsage.unusedCollectionVariables.length
   const secretFindings = findings.filter((finding) => finding.category === 'secrets').length
   const secretAffectedRequests = new Set(
     findings.filter((finding) => finding.category === 'secrets').flatMap((finding) => finding.affected)
   ).size
   const variableFindingCount = findings.filter((finding) => finding.category === 'variables').length
   const variablesSecretsRows = [
-    { label: 'Defined variables', value: parsed.definedVariables.length },
-    { label: 'Used variables', value: varsUsedInRequests.size },
+    { label: 'Defined variables', value: definedVariableCount },
+    { label: 'Referenced variables', value: referencedVariableCount },
+    { label: 'Undefined variables', value: undefinedVariableCount },
     { label: 'Unused definitions', value: unusedDefinedVars },
     { label: 'Secret findings', value: secretFindings },
     { label: 'Secret-affected requests', value: secretAffectedRequests },
@@ -323,7 +265,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
   const variablesSecretsSubtext =
     secretFindings > 0
       ? `${secretFindings} secret finding${secretFindings === 1 ? '' : 's'} across ${secretAffectedRequests} request${secretAffectedRequests === 1 ? '' : 's'}`
-      : `${parsed.definedVariables.length} defined / ${varsUsedInRequests.size} used variables`
+      : `${definedVariableCount} defined / ${referencedVariableCount} referenced / ${undefinedVariableCount} undefined`
 
   const structureTree = buildStructureTree(parsed)
   const rootDirectRequests = structureTree.requests.length
@@ -349,9 +291,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Collection overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Structure, auth coverage, and request inventory for this import.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Structure, auth coverage, and request inventory for this import.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -374,7 +314,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
         <StatCard
           icon={Key}
           label="Variables & secrets"
-          value={parsed.definedVariables.length}
+          value={definedVariableCount}
           subtext={variablesSecretsSubtext}
           details={variablesSecretsRows}
           gradient={secretFindings > 0 ? 'rose' : variableFindingCount > 0 ? 'amber' : 'violet'}
@@ -388,19 +328,13 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             <CardDescription>Distribution of verbs across the collection</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
-            <div className="h-64 w-full">
+            <p className="sr-only">
+              Requests per HTTP method: {methodData.map((entry) => `${entry.name} ${entry.count}`).join(', ') || 'none'}.
+            </p>
+            <div className="h-64 w-full" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={methodData}
-                  margin={{ top: 12, right: 8, left: 8, bottom: 4 }}
-                  barCategoryGap="40%"
-                >
-                  <CartesianGrid
-                    strokeDasharray="6 10"
-                    vertical={false}
-                    stroke="hsl(var(--border))"
-                    strokeLinecap="round"
-                  />
+                <BarChart data={methodData} margin={{ top: 12, right: 8, left: 8, bottom: 4 }} barCategoryGap="40%">
+                  <CartesianGrid strokeDasharray="6 10" vertical={false} stroke="hsl(var(--border))" strokeLinecap="round" />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
@@ -425,8 +359,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             </div>
             <p className="mt-4 text-center text-sm font-semibold text-foreground">Method mix</p>
             <p className="mx-auto mt-1 max-w-sm text-center text-xs leading-relaxed text-muted-foreground">
-              Each verb keeps its own color; DELETE uses a destructive red. Taller bars are more common
-              in this collection.
+              Each verb keeps its own color; DELETE uses a destructive red. Taller bars are more common in this collection.
             </p>
           </CardContent>
         </Card>
@@ -438,16 +371,16 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
           </CardHeader>
           <CardContent className="space-y-0 pt-2">
             <div className="mx-auto w-full max-w-md shrink-0 px-1 text-center">
-              <p
-                className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
-                style={{ fontFamily: CHART_FONT }}
-              >
+              <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground" style={{ fontFamily: CHART_FONT }}>
                 {typedAuthSharePct}
                 <span className="text-2xl font-semibold text-muted-foreground">%</span>
               </p>
               <p className="text-xs font-medium leading-snug text-muted-foreground">typed auth share</p>
             </div>
-            <div className="mx-auto h-[min(280px,42vw)] min-h-[240px] w-full max-w-md sm:h-[300px]">
+            <p className="sr-only">
+              Requests by authentication type: {authColorData.map((entry) => `${entry.name} ${entry.value}`).join(', ') || 'none'}.
+            </p>
+            <div className="mx-auto h-[min(280px,42vw)] min-h-[240px] w-full max-w-md sm:h-[300px]" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: -28, right: 8, left: 8, bottom: 4 }}>
                   <Pie
@@ -461,17 +394,14 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
                     innerRadius="46%"
                     outerRadius="82%"
                     paddingAngle={2}
+                    rootTabIndex={-1}
                     stroke="hsl(var(--card))"
                     strokeWidth={2}
                     animationBegin={200}
                     animationDuration={800}
                   >
                     {authColorData.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={entry.fill}
-                        className="transition-all duration-200 hover:opacity-80"
-                      />
+                      <Cell key={i} fill={entry.fill} className="transition-all duration-200 hover:opacity-80" />
                     ))}
                   </Pie>
                   <Tooltip
@@ -493,10 +423,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
               {authColorData.map((entry) => (
                 <div key={entry.name} className="flex items-center gap-2 text-xs">
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: entry.fill }}
-                  />
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.fill }} />
                   <span className="capitalize text-muted-foreground">{entry.name}</span>
                   <span className="tabular-nums font-semibold text-foreground">{entry.value}</span>
                 </div>
@@ -505,8 +432,8 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
 
             <p className="mt-5 text-center text-sm font-semibold text-foreground">Auth coverage</p>
             <p className="mx-auto mt-1 max-w-sm text-center text-xs leading-relaxed text-muted-foreground">
-              {typedAuthSharePct}% of requests use a non-empty auth type. The arc shows how requests split
-              across bearer, API keys, and other profiles.
+              {typedAuthSharePct}% of requests use a non-empty auth type. The arc shows how requests split across bearer, API keys, and
+              other profiles.
             </p>
           </CardContent>
         </Card>
@@ -569,27 +496,21 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Request collection tree</CardTitle>
-          <CardDescription>
-            Branch-level overview of the collection structure without expanding every request detail.
-          </CardDescription>
+          <CardDescription>Branch-level overview of the collection structure without expanding every request detail.</CardDescription>
         </CardHeader>
         <CardContent>
           {treeLevelLegend.length > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
               {treeLevelLegend.map((level) => (
                 <div key={level.label} className="flex items-center gap-2 text-xs">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: level.color }}
-                    aria-hidden
-                  />
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: level.color }} aria-hidden />
                   <span className="font-medium text-muted-foreground">{level.label}</span>
                 </div>
               ))}
             </div>
           )}
-          <ScrollArea className="h-[26rem]">
-            <div className="min-w-[42rem] py-2">
+          <ScrollArea className="h-104" focusable label="Collection structure">
+            <div className="min-w-2xl py-2">
               <StructureBranch node={structureTree} />
             </div>
           </ScrollArea>

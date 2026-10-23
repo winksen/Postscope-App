@@ -8,18 +8,10 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { SeverityBadge } from '@/components/SeverityBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import {
-  CheckCircle,
-  DownloadSimple,
-  Gauge,
-  Key,
-  Lightbulb,
-  Link,
-  Lock,
-  Sparkle,
-  WarningCircle,
-} from '@phosphor-icons/react'
+import { CheckCircle, DownloadSimple, Gauge, Key, Lightbulb, Link, Lock, Sparkle, WarningCircle } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 function getProgressTone(value: number): string {
@@ -30,11 +22,11 @@ function getProgressTone(value: number): string {
   return 'bg-[hsl(var(--chart-5))]'
 }
 
+/** Text colors that keep 4.5:1 on cards in both themes (the chart colors are for fills). */
 function getScoreTone(value: number): string {
-  if (value >= 90) return 'text-[hsl(var(--chart-2))]'
-  if (value >= 75) return 'text-[hsl(var(--chart-1))]'
-  if (value >= 55) return 'text-[hsl(var(--chart-3))]'
-  if (value >= 35) return 'text-[hsl(var(--chart-4))]'
+  if (value >= 90) return 'text-[hsl(var(--success-text))]'
+  if (value >= 55) return 'text-foreground'
+  if (value >= 35) return 'text-[hsl(var(--warning-text))]'
   return 'text-[hsl(var(--chart-5))]'
 }
 
@@ -57,15 +49,7 @@ interface ScorePageProps {
   findings: Finding[]
 }
 
-function CategoryBar({
-  keyName,
-  value,
-  delay,
-}: {
-  keyName: keyof ScoreBreakdown['categories']
-  value: number
-  delay: number
-}) {
+function CategoryBar({ keyName, value, delay }: { keyName: keyof ScoreBreakdown['categories']; value: number; delay: number }) {
   const Icon = CATEGORY_ICONS[keyName]
   const [animatedValue, setAnimatedValue] = useState(0)
 
@@ -92,26 +76,23 @@ function CategoryBar({
           </div>
           <span className="text-muted-foreground">{CATEGORY_LABELS[keyName]}</span>
         </div>
-        <span className={cn('text-xs tabular-nums font-semibold', getScoreTone(value))}>
-          {animatedValue}/100
-        </span>
+        <span className={cn('text-xs tabular-nums font-semibold', getScoreTone(value))}>{animatedValue}/100</span>
       </div>
-      <Progress value={animatedValue} indicatorClassName={getProgressTone(value)} className="h-2" />
+      <Progress
+        value={animatedValue}
+        indicatorClassName={getProgressTone(value)}
+        className="h-2"
+        aria-label={`${CATEGORY_LABELS[keyName]} score`}
+      />
     </div>
   )
 }
 
-function ActionCard({
-  advice,
-  priority,
-}: {
-  advice: string
-  priority: 'P0' | 'P1' | 'P2'
-}) {
+function ActionCard({ advice, priority }: { advice: string; priority: 'P0' | 'P1' | 'P2' }) {
   const priorityConfig = {
-    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive' },
-    P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]' },
-    P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]' },
+    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive-text' },
+    P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning-text))]' },
+    P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success-text))]' },
   }
 
   const config = priorityConfig[priority]
@@ -139,7 +120,6 @@ export function ScorePage({ score, findings }: ScorePageProps) {
   const critical = findings.filter((f) => f.severity === 'critical')
   const warning = findings.filter((f) => f.severity === 'warning')
   const info = findings.filter((f) => f.severity === 'info')
-  const bestCategory = Object.entries(score.categories).sort((a, b) => b[1] - a[1])[0]
   const weakestCategory = Object.entries(score.categories).sort((a, b) => a[1] - b[1])[0]
 
   if (critical.length > 0) {
@@ -167,7 +147,11 @@ export function ScorePage({ score, findings }: ScorePageProps) {
       score: score.total,
       grade: score.grade,
       summary: score.summary,
+      scoreModel: score.scoreModel,
+      security: score.security,
+      hygiene: score.hygiene,
       categories: score.categories,
+      penalties: score.penalties,
       findings: findings.length,
       advice: advice.map((a) => a.text),
       generatedAt: new Date().toISOString(),
@@ -186,7 +170,7 @@ export function ScorePage({ score, findings }: ScorePageProps) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Security score</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Weighted posture across secrets, variables, auth, and hygiene.
+          Security and hygiene are scored separately. A finding costs more when it affects more requests, up to a cap per rule.
         </p>
       </div>
 
@@ -203,26 +187,27 @@ export function ScorePage({ score, findings }: ScorePageProps) {
           gradient={score.total >= 90 ? 'green' : score.total >= 55 ? 'amber' : 'rose'}
         />
         <StatCard
-          icon={WarningCircle}
-          label="Risk items"
-          value={critical.length + warning.length}
+          icon={Lock}
+          label="Security score"
+          value={`${score.security}/100`}
           subtext={`${critical.length} critical / ${warning.length} warnings`}
           details={[
-            { label: 'Info items', value: info.length },
-            { label: 'Advice items', value: advice.length },
-          ]}
-          gradient={critical.length > 0 ? 'rose' : warning.length > 0 ? 'amber' : 'green'}
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Strongest area"
-          value={bestCategory ? `${bestCategory[1]}/100` : '0/100'}
-          subtext={bestCategory ? CATEGORY_LABELS[bestCategory[0] as keyof ScoreBreakdown['categories']] : 'No category'}
-          details={[
             { label: 'Secrets', value: score.categories.secrets },
+            { label: 'Variables', value: score.categories.variables },
             { label: 'Auth', value: score.categories.auth },
           ]}
-          gradient="green"
+          gradient={score.security >= 90 ? 'green' : score.security >= 55 ? 'amber' : 'rose'}
+        />
+        <StatCard
+          icon={Sparkle}
+          label="Hygiene score"
+          value={`${score.hygiene}/100`}
+          subtext={`${info.length} info items`}
+          details={[
+            { label: 'Share of headline score', value: '15%' },
+            { label: 'Advice items', value: advice.length },
+          ]}
+          gradient={score.hygiene >= 90 ? 'green' : 'amber'}
         />
         <StatCard
           icon={Lightbulb}
@@ -262,6 +247,49 @@ export function ScorePage({ score, findings }: ScorePageProps) {
       </div>
 
       <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Penalty breakdown</CardTitle>
+          <CardDescription>
+            Headline score = 85% security + 15% hygiene. Each finding deducts its severity weight times (1 + log2 of the requests it
+            affects), capped per rule.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {score.penalties.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No findings, so nothing is deducted.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Finding</TableHead>
+                  <TableHead className="w-24">Severity</TableHead>
+                  <TableHead className="w-28 text-right">Affected</TableHead>
+                  <TableHead className="w-28 text-right">Points</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {score.penalties.map((penalty) => (
+                  <TableRow key={penalty.ruleId}>
+                    <TableCell>
+                      <p className="text-sm font-medium">{penalty.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {CATEGORY_LABELS[penalty.category]} / {penalty.category === 'hygiene' ? 'hygiene score' : 'security score'}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <SeverityBadge severity={penalty.severity} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{penalty.affectedCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">-{penalty.penalty}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-lg">Guidance</CardTitle>
@@ -288,7 +316,16 @@ export function ScorePage({ score, findings }: ScorePageProps) {
               <ul className="space-y-3">
                 {advice.map((a, i) => (
                   <li key={i} className="flex gap-3 rounded-lg bg-muted/35 px-4 py-3">
-                    <span className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', a.priority === 'P0' ? 'bg-destructive' : a.priority === 'P1' ? 'bg-[hsl(var(--warning))]' : 'bg-[hsl(var(--success))]')} />
+                    <span
+                      className={cn(
+                        'mt-0.5 h-2 w-2 shrink-0 rounded-full',
+                        a.priority === 'P0'
+                          ? 'bg-destructive'
+                          : a.priority === 'P1'
+                            ? 'bg-[hsl(var(--warning))]'
+                            : 'bg-[hsl(var(--success))]'
+                      )}
+                    />
                     <div>
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 mb-1">
                         {a.priority}

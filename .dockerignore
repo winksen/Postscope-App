@@ -3,6 +3,7 @@
 node_modules
 dist
 dist-ssr
+dist-node
 coverage
 logs
 data
@@ -18,3 +19,5 @@ data
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+test-results
+playwright-report

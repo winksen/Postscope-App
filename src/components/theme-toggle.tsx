@@ -10,11 +10,7 @@ interface ThemeToggleProps {
   variant?: 'default' | 'secondary' | 'ghost'
 }
 
-export function ThemeToggle({
-  className,
-  size = 'icon',
-  variant = 'ghost',
-}: ThemeToggleProps) {
+export function ThemeToggle({ className, size = 'icon', variant = 'ghost' }: ThemeToggleProps) {
   const { resolvedTheme, toggleTheme } = useTheme()
 
   return (
@@ -27,11 +23,7 @@ export function ThemeToggle({
           onClick={toggleTheme}
           aria-label="Toggle theme"
         >
-          {resolvedTheme === 'dark' ? (
-            <SunDim className="h-4 w-4" weight="fill" />
-          ) : (
-            <Moon className="h-4 w-4" weight="fill" />
-          )}
+          {resolvedTheme === 'dark' ? <SunDim className="h-4 w-4" weight="fill" /> : <Moon className="h-4 w-4" weight="fill" />}
         </Button>
       </TooltipTrigger>
       <TooltipContent>Toggle theme</TooltipContent>

@@ -2,19 +2,21 @@
 
 This document describes how the PostScope application is structured, how data flows through it, and how to extend it safely.
 
+> **Source of truth:** [mindmap/TECHNICAL_MINDMAP.md](mindmap/TECHNICAL_MINDMAP.md) tracks every module, the server, configuration and known limitations release by release. This file is the shorter narrative; when the two disagree, trust the mindmap.
+
 ---
 
 ## 1. High-level overview
 
 ### What the app does
 
-PostScope is a **single-page React application** that runs entirely in the browser. Users upload a **Postman Collection v2.x JSON** export. The app:
+PostScope is a **single-page React application** whose analysis runs entirely in the browser (in a Web Worker). A small Node server hosts the built bundle and an optional team library. Users upload a **Postman Collection v2.x JSON** export. The app:
 
 1. **Parses** the file into a normalized in-memory model (`ParsedCollection`).
 2. **Audits** that model with deterministic rules and produces a list of **findings** (security, variables, auth, hygiene).
 3. **Scores** the collection from those findings and presents **Overview**, **Security**, **Hygiene**, and **Score** views.
 
-No network calls are required for core functionality; collection data is not sent to a backend.
+No network calls are required for core functionality; collection data is only sent to the server when a user explicitly saves it to the team library.
 
 ### Core business logic
 
@@ -22,8 +24,8 @@ No network calls are required for core functionality; collection data is not sen
 |--------|--------|----------------|
 | Parse Postman JSON → domain model | `src/lib/parser.ts` | Walk `item[]` tree, flatten requests, aggregate methods/auth/variables/folders |
 | Rule engine | `src/lib/auditor.ts` | Critical / warning / info checks; each rule emits `Finding` objects |
-| Scoring | `src/lib/scorer.ts` | Penalties per severity; overall grade + per-category scores |
-| Per-request rollups | `src/lib/requestFindings.ts` | Map findings to requests by name; optional per-request health score |
+| Scoring | `src/lib/scorer.ts` | Scoring model v2: weighted, request-scaled penalties; separate security and hygiene scores, headline grade and per-finding breakdown |
+| Per-request rollups | `src/lib/requestFindings.ts` | Map findings to requests by stable id; per-request health score |
 
 The **UI layer** (`App.tsx`, pages, components) is largely presentational: it renders parsed data and findings passed as props.
 
@@ -36,18 +38,18 @@ The **UI layer** (`App.tsx`, pages, components) is largely presentational: it re
 | Layer | Location | Role |
 |-------|----------|------|
 | Bootstrap | `src/main.tsx` | `createRoot`, global styles, `TooltipProvider` |
-| App shell / orchestration | `src/App.tsx` | File ingest, parse/audit/score pipeline, “which page” selection |
+| App shell / orchestration | `src/App.tsx`, `src/pages/AnalyzeApp.tsx` | Routes, file ingest, worker pipeline (parse/audit/score), “which page” selection |
 | Pages | `src/pages/*.tsx` | Full-width views: Overview, Requests, Security, Hygiene, Repair, Score |
 | Feature components | `src/components/*.tsx` | Drop zone, request tree, modals, badges, charts |
 | Layout | `src/components/layout/` | `DashboardShell`, `AppSidebar`, `AppHeader` |
 | Design system | `src/components/ui/` | Radix-based primitives (buttons, dialogs, tables, …) |
 | Domain types | `src/types/postman.ts` | TypeScript shapes for raw Postman JSON |
 
-**Routing:** Dashboard navigation is an in-memory **string union** `NavId`, held by the app shell and toggled from the sidebar. Security-impact findings and hygiene findings are split into separate pages, but scoring and repair still receive the full finding list.
+**Routing:** React Router handles the top-level routes (landing page, `/analyze`, samples). Inside the analyzer, dashboard navigation is an in-memory **string union** `NavId` held by `AnalyzeApp` and toggled from the sidebar, so pages cannot be deep-linked yet. Security-impact findings and hygiene findings are split into separate pages, but scoring and repair still receive the full finding list.
 
 ### 2.2 Backend
 
-**None.** The product is a static client bundle (Vite + React). File reading uses `FileReader` in the browser.
+A dependency-light Node HTTP server (`server/`) serves the built bundle, `/api/config`, `/api/health` and the optional team library (`/api/collections`). It adds security headers, rate limits, optional Basic auth and atomic file storage. Analysis itself never needs the server. See the technical mindmap section 4 and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### 2.3 Data flow
 
@@ -83,7 +85,7 @@ flowchart LR
 ```
 
 1. **Landing:** `App` renders `DropZone` until `parsed` is non-null.
-2. **Import:** User drops/selects `.json` → `handleFile` reads text → `JSON.parse` → `parseCollection` → `runAudit` → `setParsed` / `setFindings`.
+2. **Import:** User drops, selects or pastes JSON → `AnalyzeApp` posts the text to `analysis.worker.ts` → `JSON.parse` → `parseCollection` → `runAudit` → a compact copy of the result (bodies over 64 KB cut for display) → `calculateScore` → state is set from the worker result. The worker keeps the full parsed collection, so a rule or environment change sends only a small `audit` message.
 3. **Dashboard:** `calculateScore(parsed, findings)` is derived on each render (cheap; memoization optional).
 4. **Child views** receive `parsed`, `findings`, `score` (where needed), and `search` from `App`.
 
@@ -99,7 +101,7 @@ flowchart LR
 |---|--------|--------------|------------|
 | Import | Accept Postman export | Drag-and-drop or file input; validates extension; `FileReader.readAsText` → parse | `DropZone.tsx`, `App.tsx` |
 
-Errors surface via `alert` on parse failure; consider replacing with in-app toast/dialog for production polish.
+Errors surface as toasts and inline messages.
 
 ### 3.2 Overview
 
@@ -116,7 +118,7 @@ The tree builds a folder hierarchy from `ParsedRequest.folderPath`, filters by s
 | Security | Review security-impact audit results | Local state for severity/category filters + dialog detail; excludes `hygiene`; merges header `search` with `findingMatchesQuery` | `SecurityPage.tsx`, `SeverityBadge.tsx` |
 | Hygiene | Review maintainability notes | Local state for severity filter + dialog detail; shows only `hygiene` findings such as missing descriptions | `HygienePage.tsx`, `SeverityBadge.tsx` |
 
-Brief skeleton flash on mount (`useEffect` timeout) for perceived loading polish.
+Pages render immediately; heavy lists are bounded by the analysis result size.
 
 ### 3.4 Score
 
@@ -128,7 +130,7 @@ Brief skeleton flash on mount (`useEffect` timeout) for perceived loading polish
 
 | | Purpose | How it works | Main files |
 |---|--------|--------------|------------|
-| Drill-down | Tie findings to one request | `findingsForRequest` filters by stable `request.id`; labels via `findingDisplay.ts`; `requestHealthScore` applies same penalty table as global scorer (duplicated constants) | `RequestAnalysisModal.tsx`, `requestFindings.ts` |
+| Drill-down | Tie findings to one request | `findingsForRequest` filters by stable `request.id`; labels via `findingDisplay.ts`; `requestHealthScore` reuses the penalty function from `severity.ts` | `RequestAnalysisModal.tsx`, `requestFindings.ts` |
 
 ---
 
@@ -166,20 +168,17 @@ Layout uses **fixed** sidebar/header with `padding-left` / `left` offset derived
 
 | State | Owner | Notes |
 |-------|--------|------|
-| `parsed: ParsedCollection \| null` | `App` | Null ⇒ landing; non-null ⇒ dashboard |
-| `findings: Finding[]` | `App` | Produced when file loads; cleared on “analyze another” |
-| `active: NavId` | `App` | Which main page is visible |
-| `search: string` | `App` | Shared header search |
-| `landingLoading: boolean` | `App` | Drop zone loading indicator |
+| `parsed`, `findings`, `rawJson`, `originalRawJson` | `AnalyzeApp` | Null parsed ⇒ import screen; non-null ⇒ dashboard. The original JSON is kept for repair reset |
+| `userAuditPrefs` | `AnalyzeApp` | Browser rule policy over the server policy; changes re-run the audit without re-parsing |
+| `active: NavId` | `AnalyzeApp` | Which main page is visible |
+| `search: string` | `AnalyzeApp` | Shared header search |
+| Library, storage mode, consent | `AnalyzeApp` | Team library list and the incognito/shared choice |
 | Sidebar `collapsed` | `DashboardShell` | Pure UI preference |
-| Security filters, detail dialog | `SecurityPage` | Local only |
-| Hygiene filters, detail dialog | `HygienePage` | Local only |
+| Security / Hygiene filters, detail dialog | Each page | Local only |
 
-**No React Context** for domain data. **`TooltipProvider`** wraps the app in `main.tsx` for Radix tooltips.
+**No React Context** for domain data. **`TooltipProvider`** wraps the app in `main.tsx` for Radix tooltips. The complete state table is in the technical mindmap section 3.2.
 
-Derived data:
-
-- `score = calculateScore(parsed, findings)` computed in `App` when dashboard is shown.
+Derived data: `score` is memoized from `parsed` and `findings` inside `AnalyzeApp`.
 
 ---
 
@@ -187,28 +186,27 @@ Derived data:
 
 | Kind | Detail |
 |------|--------|
-| External HTTP APIs | **None** in application logic |
-| Browser APIs | `FileReader`, `JSON.parse` |
+| External HTTP APIs | **None**. PostScope never calls the APIs in a collection |
+| PostScope server API | `fetch` calls to the same origin only: `/api/config`, `/api/health`, `/api/collections` (team library) |
+| Browser APIs | `File.text()`, `JSON.parse`, Web Worker, `sessionStorage` / `localStorage` through safe wrappers |
 | Third-party scripts | None required for the stock offline build; Elms Sans font files are served locally from `public/fonts` |
-| npm libraries | React, Vite, Radix, Recharts, Lucide, Tailwind utilities |
-
-There is **no** `fetch`, GraphQL, or WebSocket layer today.
+| npm libraries | React, React Router, Vite, Radix, Recharts, framer-motion, Phosphor Icons, Tailwind utilities |
 
 ---
 
 ## 7. Design decisions
 
-1. **Client-only processing:** Keeps deployment simple (static hosting), avoids privacy concerns for secrets in collections, and removes backend operational cost. Trade-off: large collections only scale to browser memory/CPU limits.
+1. **Client-side processing:** Analysis never needs a server, which avoids sending secrets anywhere. The optional Node server only hosts the bundle and the team library. Trade-off: large collections only scale to browser memory/CPU limits.
 
-2. **Pure-function pipeline (parse → audit → score):** Predictable, test-friendly, and easy to reason about. Trade-off: no incremental parsing or Web Worker offload for huge files.
+2. **Pure-function pipeline (parse → audit → score):** Predictable, test-friendly, and easy to reason about. The pipeline runs in a Web Worker, so large files do not freeze the UI. Trade-off: no incremental parsing.
 
 3. **Findings keyed by stable request `id`:** Parser assigns folder-path ids and disambiguates duplicate names in the same folder (`#2`, `#3`, …). `findingDisplay.ts` maps ids to human-readable paths in the UI.
 
-4. **In-memory navigation instead of URL routes:** Few views; state resets on full reload. Trade-off: cannot deep-link to `/security`; refresh loses import (could add session storage or query params later).
+4. **In-memory navigation inside the analyzer:** Few views; state resets on full reload, but the last collection is restored from session storage. Trade-off: cannot deep-link to a page (planned in the roadmap).
 
 5. **Rule-based auditor vs. ML:** Deterministic rules give explainable results for compliance-minded users. Trade-off: false positives/negatives depend on rule quality only.
 
-6. **Severity penalties duplicated:** `scorer.ts` and `requestFindings.ts` both encode penalty weights; they can drift if only one is updated.
+6. **One set of weights:** `severity.ts` holds the weights and penalty functions used by both the global scorer and the per-request health score; deployments can override the weights (`SCORE_WEIGHTS`).
 
 ---
 
@@ -217,10 +215,9 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 - **Heuristic rules** can produce false positives/negatives; treat output as guidance, not proof.
 - **Audit coverage** is heuristic (regex, JSON body shape); non-JSON bodies and edge-case Postman features may be missed.
 - **`BASIC_AUTH_PLAINTEXT`** fires when Postman basic auth uses literal `username` / `password` fields (not `{{variables}}`).
-- **No persistence:** Refresh clears session; no export of reports.
-- **`alert` for errors** on failed parse: rough UX.
-- **Large files** may block the main thread during parse/audit.
-- **Scoring model** is linear penalty sum; caps at 0–100; may not match every team’s risk model.
+- **Session-only restore:** a refresh keeps the collection in the tab, closing it clears the session. Reports can be exported as Markdown, JSON and SARIF.
+- **Scoring model** is a weighted, capped penalty sum (see the technical mindmap section 2.4); it may not match every team's risk model, which is why the weights are configurable.
+- The full and current list is in the technical mindmap section 9, and the planned fixes are in [../mindmap/ROADMAP.md](../mindmap/ROADMAP.md).
 
 ---
 
@@ -229,9 +226,9 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 ### 9.1 Add a new audit rule
 
 1. Open `src/lib/auditor.ts`.
-2. Add checks in `runCriticalChecks`, `runWarningChecks`, or `runInfoChecks` as appropriate.
+2. Add the check to the rule engine and emit it through the shared finding helpers.
 3. Push a `Finding` with stable *meaning* for `category` and `severity`.
-4. If scoring should change, adjust `SEVERITY_PENALTY` in `src/lib/scorer.ts` and keep `requestFindings.ts` **in sync** (or extract shared constants).
+4. Register the rule in `src/lib/rules.ts` (title, category, severity, CWE) and add tests in `tests/auditor.test.ts`. If scoring should change, adjust the weights or caps in `src/lib/severity.ts`.
 
 ### 9.2 Add a new top-level page
 
@@ -244,13 +241,13 @@ There is **no** `fetch`, GraphQL, or WebSocket layer today.
 - Prefer `OverviewPage.tsx` or `ScorePage.tsx` for analytics widgets.
 - Reuse `src/components/ui/card.tsx` and existing chart patterns from `OverviewPage`.
 
-### 9.4 Add backend or sync (future)
+### 9.4 Add server behavior
 
-Introduce a thin `src/services/` layer with `fetch` wrappers; keep `parser` / `auditor` usable on both client and server if you later move analysis to Node. They are already framework-agnostic TypeScript.
+Server code lives in `server/` and shares `src/lib` (redaction, rule policy) with the browser bundle. Keep `parser` / `auditor` free of browser APIs so they stay usable in Node and in the CLI.
 
-### 9.5 Add routing
+### 9.5 Add routes
 
-Integrate React Router (or similar) in `main.tsx` / `App.tsx`. Persist `parsed`/`findings` in `sessionStorage` or pass file hash if deep-linking matters.
+Top-level routes live in `App.tsx` (React Router). Dashboard pages are still `NavId` state; moving them into routes is planned for V0.1.42.
 
 ---
 
@@ -262,4 +259,4 @@ Update this file when:
 - Changing **navigation** or **global state** ownership.
 - Introducing **network** behavior or **build/deploy** assumptions.
 
-Last aligned with repository layout and behavior as of the documented source tree (`App.tsx`, `parser.ts`, `auditor.ts`, `scorer.ts`, layout and pages).
+Last aligned with release V0.1.25. The technical mindmap is updated with every release.

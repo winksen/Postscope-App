@@ -4,10 +4,20 @@ import { cn } from '@/lib/utils'
 
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
+    /** Makes the scrolling region a tab stop. Use it when the content has nothing focusable, so keyboard users can still scroll. */
+    focusable?: boolean
+    /** Accessible name of the region when `focusable`. */
+    label?: string
+  }
+>(({ className, children, focusable = false, label, ...props }, ref) => (
   <ScrollAreaPrimitive.Root ref={ref} className={cn('relative overflow-hidden', className)} {...props}>
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport>
+    <ScrollAreaPrimitive.Viewport
+      className="h-full w-full rounded-[inherit]"
+      {...(focusable ? { tabIndex: 0, role: 'region', 'aria-label': label ?? 'Scrollable content' } : {})}
+    >
+      {children}
+    </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>

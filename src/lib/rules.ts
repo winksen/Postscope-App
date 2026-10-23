@@ -10,17 +10,21 @@ export type RuleId =
   | 'CREDENTIALS_IN_URL'
   | 'SECRET_IN_SCRIPT'
   | 'SECRET_IN_COLLECTION_VARIABLE'
+  | 'SECRET_IN_ENVIRONMENT'
   | 'SECRET_IN_SAVED_RESPONSE'
   | 'KNOWN_SECRET_PATTERN'
   | 'HARDCODED_BASEURL'
   | 'HARDCODED_ENV_URL'
+  | 'UNDEFINED_VARIABLE'
   | 'MISSING_AUTH'
   | 'BASIC_AUTH_PLAINTEXT'
   | 'INSECURE_HTTP'
   | 'TLS_VERIFICATION_DISABLED'
   | 'SECRET_LOGGED_IN_SCRIPT'
+  | 'HIGH_ENTROPY_LITERAL'
   | 'MISSING_DESCRIPTION'
   | 'NO_COLLECTION_VARIABLES'
+  | 'UNUSED_COLLECTION_VARIABLE'
   | 'INCONSISTENT_AUTH'
   | 'EMPTY_HEADERS'
   | 'DUPLICATE_REQUEST_NAMES'
@@ -28,6 +32,8 @@ export type RuleId =
   | 'ROOT_LEVEL_REQUESTS'
   | 'DEEP_FOLDER_NESTING'
   | 'GET_WITH_BODY'
+  | 'SUPPRESSION_EXPIRED'
+  | 'SUPPRESSION_INVALID'
 
 export interface RuleDefinition {
   id: RuleId
@@ -94,7 +100,8 @@ const definitions: RuleDefinition[] = [
   {
     id: 'SECRET_IN_QUERY',
     title: 'Secret passed in query string',
-    description: 'A credential-like query parameter (token, api_key, password, …) carries a literal value. URLs end up in logs, proxies, and browser history.',
+    description:
+      'A credential-like query parameter (token, api_key, password, …) carries a literal value. URLs end up in logs, proxies, and browser history.',
     recommendation: 'Send credentials in a header or auth helper and reference a variable instead of a literal value.',
     severity: 'critical',
     category: 'secrets',
@@ -113,7 +120,8 @@ const definitions: RuleDefinition[] = [
   {
     id: 'SECRET_IN_SCRIPT',
     title: 'Hardcoded secret in script',
-    description: 'A pre-request or test script contains a literal credential, such as pm.environment.set("token", "…") or a provider token.',
+    description:
+      'A pre-request or test script contains a literal credential, such as pm.environment.set("token", "…") or a provider token.',
     recommendation: 'Read secrets with pm.environment.get / pm.vault and keep the values outside the collection export.',
     severity: 'critical',
     category: 'secrets',
@@ -122,8 +130,20 @@ const definitions: RuleDefinition[] = [
   {
     id: 'SECRET_IN_COLLECTION_VARIABLE',
     title: 'Secret stored in collection variable',
-    description: 'A collection variable with a credential-like name has a literal value, which is shared with everyone who receives the export.',
+    description:
+      'A collection variable with a credential-like name has a literal value, which is shared with everyone who receives the export.',
     recommendation: 'Clear the value in the collection and set it in a private environment, Postman vault, or CI secret store.',
+    severity: 'critical',
+    category: 'secrets',
+    cwe: 'CWE-798',
+  },
+  {
+    id: 'SECRET_IN_ENVIRONMENT',
+    title: 'Secret stored in environment or globals export',
+    description:
+      'A Postman environment or globals file holds a credential in clear text. Postman exports "secret" typed variables unmasked, so the file leaks it just like the collection would.',
+    recommendation:
+      'Keep environment files out of source control and chat. Share a copy with the secret values emptied, and load real values from a vault or a private environment.',
     severity: 'critical',
     category: 'secrets',
     cwe: 'CWE-798',
@@ -159,15 +179,24 @@ const definitions: RuleDefinition[] = [
   {
     id: 'HARDCODED_ENV_URL',
     title: 'Environment-specific URL',
-    description: 'URL contains literal environment identifiers (prod, staging, dev, localhost).',
+    description: 'URL host contains a literal environment label (prod, staging, uat, qa, dev, sandbox, localhost).',
     recommendation: 'Parameterize host with variables to support multiple environments.',
+    severity: 'warning',
+    category: 'variables',
+  },
+  {
+    id: 'UNDEFINED_VARIABLE',
+    title: 'Variables referenced but never defined',
+    description:
+      'Requests reference {{variables}} that no collection, folder, request, environment or globals definition provides and no script sets.',
+    recommendation: 'Define the variable (collection variable or environment value), or fix the name if it is a typo.',
     severity: 'warning',
     category: 'variables',
   },
   {
     id: 'MISSING_AUTH',
     title: 'Potentially unprotected mutation request',
-    description: 'POST/PUT/PATCH/DELETE request has no auth and no Authorization header.',
+    description: 'POST/PUT/PATCH/DELETE request has no auth helper and no credential header, cookie, query credential or auth script.',
     recommendation: 'Add collection or request-level auth if the endpoint requires authentication.',
     severity: 'warning',
     category: 'auth',
@@ -206,11 +235,22 @@ const definitions: RuleDefinition[] = [
   {
     id: 'SECRET_LOGGED_IN_SCRIPT',
     title: 'Sensitive value logged by script',
-    description: 'A script writes tokens, passwords, or Authorization data to the Postman console, which is often shared in screenshots and bug reports.',
+    description:
+      'A script writes tokens, passwords, or Authorization data to the Postman console, which is often shared in screenshots and bug reports.',
     recommendation: 'Remove console logging of credentials or log a masked value.',
     severity: 'warning',
     category: 'secrets',
     cwe: 'CWE-532',
+  },
+  {
+    id: 'HIGH_ENTROPY_LITERAL',
+    title: 'High-entropy literal in a credential position',
+    description:
+      'A header, query parameter or body field with a credential-like name holds a long, random-looking literal that no other secret rule recognized.',
+    recommendation: 'If the value is a credential, move it to a {{variable}} defined in a private environment or vault.',
+    severity: 'warning',
+    category: 'secrets',
+    cwe: 'CWE-798',
   },
 
   // Info
@@ -229,6 +269,14 @@ const definitions: RuleDefinition[] = [
     recommendation: 'Define baseUrl, apiKey, and other shared values as collection variables.',
     severity: 'info',
     category: 'variables',
+  },
+  {
+    id: 'UNUSED_COLLECTION_VARIABLE',
+    title: 'Collection variables that are never used',
+    description: 'Collection variables are defined but no request, script, auth setting or other variable references them.',
+    recommendation: 'Remove variables nobody uses, or reference them where they belong. Unused values still ship with every export.',
+    severity: 'info',
+    category: 'hygiene',
   },
   {
     id: 'INCONSISTENT_AUTH',
@@ -283,6 +331,23 @@ const definitions: RuleDefinition[] = [
     title: 'GET or HEAD request with a body',
     description: 'GET/HEAD requests carry a request body, which many servers, proxies, and CDNs silently drop.',
     recommendation: 'Move the payload to query parameters or switch the request to POST.',
+    severity: 'info',
+    category: 'hygiene',
+  },
+  {
+    id: 'SUPPRESSION_EXPIRED',
+    title: 'Expired suppression',
+    description: 'A suppression passed its expiry date and no longer hides anything, so the findings it covered are active again.',
+    recommendation: 'Fix the underlying findings, or review the suppression and set a new expiry date with a fresh reason.',
+    severity: 'info',
+    category: 'hygiene',
+  },
+  {
+    id: 'SUPPRESSION_INVALID',
+    title: 'Malformed suppression',
+    description:
+      'A postscope-ignore line in a description is missing a reason, names an unknown rule, or has a bad expiry date, so it was not applied.',
+    recommendation: 'Use "postscope-ignore RULE_ID: reason", optionally with expires=YYYY-MM-DD after the rule id.',
     severity: 'info',
     category: 'hygiene',
   },

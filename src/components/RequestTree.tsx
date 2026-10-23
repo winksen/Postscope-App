@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  CaretRight,
-  Folder,
-  FolderOpen,
-  Lock,
-  LockOpen,
-} from '@phosphor-icons/react'
+import { CaretRight, Folder, FolderOpen, Lock, LockOpen } from '@phosphor-icons/react'
 import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
@@ -21,13 +15,7 @@ interface RequestTreeProps {
   search?: string
 }
 
-function RequestRow({
-  request,
-  onSelect,
-}: {
-  request: ParsedRequest
-  onSelect: (r: ParsedRequest) => void
-}) {
+function RequestRow({ request, onSelect }: { request: ParsedRequest; onSelect: (r: ParsedRequest) => void }) {
   const hasAuth = request.auth !== 'noauth'
   return (
     <Button
@@ -40,9 +28,9 @@ function RequestRow({
       <MethodBadge method={request.method} />
       <span className="min-w-0 flex-1 truncate text-left text-sm">{request.name}</span>
       {hasAuth ? (
-        <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success))] opacity-60 group-hover:opacity-100 transition-opacity" />
+        <Lock className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--success-text))] opacity-60 group-hover:opacity-100 transition-opacity" />
       ) : (
-        <LockOpen className="h-3.5 w-3.5 shrink-0 text-destructive opacity-60 group-hover:opacity-100 transition-opacity" />
+        <LockOpen className="h-3.5 w-3.5 shrink-0 text-destructive-text opacity-60 group-hover:opacity-100 transition-opacity" />
       )}
     </Button>
   )
@@ -136,7 +124,7 @@ function FolderNode({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary focus-visible:outline-none focus-visible:ring-0 group"
+        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary focus-visible:outline-hidden focus-visible:ring-0 group"
       >
         <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         {open ? (
@@ -147,12 +135,7 @@ function FolderNode({
         <span className="font-medium">{node.name}</span>
         <span className="text-xs text-muted-foreground">({total})</span>
       </button>
-      <div
-        className={cn(
-          'overflow-hidden transition-all duration-300',
-          open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
-        )}
-      >
+      <div className={cn('overflow-hidden transition-all duration-300', open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0')}>
         <div className="ml-1 mt-1 space-y-0.5 pl-2">
           {node.requests.map((req) => (
             <RequestRow key={req.id} request={req} onSelect={onSelectRequest} />
@@ -213,11 +196,7 @@ export function RequestTree({ parsed, findings, search = '' }: RequestTreeProps)
           </div>
         )}
       </ScrollArea>
-      <RequestAnalysisModal
-        request={selected}
-        findings={modalFindings}
-        onClose={() => setSelected(null)}
-      />
+      <RequestAnalysisModal request={selected} findings={modalFindings} onClose={() => setSelected(null)} />
     </>
   )
 }

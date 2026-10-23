@@ -1,8 +1,9 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { getDataDir, getLibraryDir, getLibraryLimits, getMaxCollectionBytes } from './runtimeConfig'
+import { getDataDir, getLibraryDir, getLibraryEncryption, getLibraryLimits, getMaxCollectionBytes } from './runtimeConfig'
 import { log } from './logger'
+import { DecryptionError, decryptRecord, encryptRecord, isEnvelope, keyedHash, warnOnce, type EncryptionKeys } from './libraryCrypto'
 
 export interface StoredCollectionMeta {
   id: string
@@ -15,6 +16,8 @@ export interface StoredCollectionMeta {
   deduplicated?: boolean
   /** Number of credentials scrubbed on the server (LIBRARY_REDACT_SECRETS). */
   redactedCount?: number
+  /** Signed-in user reported by the trusted reverse proxy when the collection was saved (TRUSTED_USER_HEADER). */
+  savedBy?: string
 }
 
 export interface StoredCollection extends StoredCollectionMeta {
@@ -46,6 +49,33 @@ function collectionPath(dir: string, id: string): string {
 
 export function hashContent(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex')
+}
+
+/**
+ * Hash used to spot duplicate saves. With encryption on it is an HMAC keyed with the encryption key, so a stolen
+ * metadata cache or API listing cannot be used to confirm that a known collection is stored.
+ */
+function contentHashFor(raw: string, keys: EncryptionKeys | null): string {
+  return keys ? keyedHash(raw, keys.current) : hashContent(raw)
+}
+
+/** Keys for this request, `null` when encryption is off. A configured but unusable key stops saves instead of storing plaintext. */
+function activeKeys(): EncryptionKeys | null {
+  const state = getLibraryEncryption()
+  if (!state.enabled) return null
+  if ('error' in state) {
+    warnOnce('library-key', `Library encryption is misconfigured: ${state.error}`)
+    throw new LibraryError(500, 'Library encryption is misconfigured. An operator must fix LIBRARY_ENCRYPTION_KEY.')
+  }
+  return state.keys
+}
+
+/** What encryption looks like right now, for the startup banner and the config endpoint. */
+export function libraryEncryptionStatus(): { enabled: boolean; keyId?: string; error?: string } {
+  const state = getLibraryEncryption()
+  if (!state.enabled) return { enabled: false }
+  if ('error' in state) return { enabled: true, error: state.error }
+  return { enabled: true, keyId: state.keys.current.id }
 }
 
 /** Control, zero-width, and bidi-override characters (used for spoofing names in lists). */
@@ -133,6 +163,7 @@ function toMeta(record: StoredCollection): StoredCollectionMeta {
     sizeBytes: record.sizeBytes,
     contentHash: record.contentHash,
     ...(record.redactedCount ? { redactedCount: record.redactedCount } : {}),
+    ...(record.savedBy ? { savedBy: record.savedBy } : {}),
   }
 }
 
@@ -156,7 +187,27 @@ async function readRecord(dir: string, id: string): Promise<StoredCollection | n
     return null
   }
   try {
-    const record = JSON.parse(raw) as unknown
+    let parsed = JSON.parse(raw) as unknown
+    if (isEnvelope(parsed)) {
+      const state = getLibraryEncryption()
+      if (!state.enabled || 'error' in state) {
+        warnOnce(
+          'library-encrypted-no-key',
+          'The library contains encrypted records but no usable LIBRARY_ENCRYPTION_KEY is configured; they are skipped.'
+        )
+        return null
+      }
+      try {
+        parsed = JSON.parse(decryptRecord(parsed, id, state.keys)) as unknown
+      } catch (error) {
+        if (error instanceof DecryptionError) {
+          log.warn('Skipping library record that cannot be decrypted', { id, reason: error.message })
+          return null
+        }
+        throw error
+      }
+    }
+    const record = parsed
     if (!isStoredCollection(record, id)) {
       log.warn('Skipping malformed library record', { id })
       return null
@@ -232,9 +283,16 @@ export async function getCollection(id: string): Promise<StoredCollection | null
 export interface SaveOptions {
   /** Optional transform applied before hashing/storing (server-side secret redaction). */
   transform?: (json: unknown) => { json: unknown; redactedCount: number }
+  /** Signed-in user from the trusted proxy, stored as `savedBy`. */
+  savedBy?: string | null
 }
 
-export async function saveCollection(rawJson: string, name: string, _requestCount?: number, options: SaveOptions = {}): Promise<StoredCollectionMeta> {
+export async function saveCollection(
+  rawJson: string,
+  name: string,
+  _requestCount?: number,
+  options: SaveOptions = {}
+): Promise<StoredCollectionMeta> {
   if (typeof rawJson !== 'string' || !rawJson.trim()) throw new LibraryError(400, 'rawJson is required.')
   const maxBytes = getMaxCollectionBytes()
   if (rawJson.length > maxBytes) throw new LibraryError(413, 'Collection is too large to store.')
@@ -258,7 +316,8 @@ export async function saveCollection(rawJson: string, name: string, _requestCoun
     }
   }
 
-  const contentHash = hashContent(stored)
+  const keys = activeKeys()
+  const contentHash = contentHashFor(stored, keys)
   const requestCount = countRequests(json)
   const safeName = sanitizeCollectionName(name)
 
@@ -271,7 +330,10 @@ export async function saveCollection(rawJson: string, name: string, _requestCoun
     if (maxTotalBytes > 0) {
       const used = [...state.items.values()].reduce((sum, item) => sum + item.sizeBytes, 0)
       if (used + stored.length > maxTotalBytes) {
-        throw new LibraryError(507, 'Library storage quota is full. Remove saved collections or ask an operator to raise LIBRARY_MAX_TOTAL_MB.')
+        throw new LibraryError(
+          507,
+          'Library storage quota is full. Remove saved collections or ask an operator to raise LIBRARY_MAX_TOTAL_MB.'
+        )
       }
     }
 
@@ -284,10 +346,15 @@ export async function saveCollection(rawJson: string, name: string, _requestCoun
       sizeBytes: stored.length,
       contentHash,
       ...(redactedCount ? { redactedCount } : {}),
+      ...(options.savedBy ? { savedBy: options.savedBy } : {}),
     }
 
     await ensureDir(state.dir)
-    await writeAtomic(collectionPath(state.dir, record.id), JSON.stringify(record))
+    const serialized = JSON.stringify(record)
+    await writeAtomic(
+      collectionPath(state.dir, record.id),
+      keys ? JSON.stringify(encryptRecord(serialized, record.id, keys.current)) : serialized
+    )
     state.items.set(record.id, toMeta(record))
     await pruneUnlocked()
     return toMeta(record)

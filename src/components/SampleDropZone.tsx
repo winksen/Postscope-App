@@ -1,22 +1,11 @@
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  FileCode,
-  Flask,
-  ShieldCheck,
-  Lightning,
-} from '@phosphor-icons/react'
+import { ArrowRight, FileCode, Flask, ShieldCheck, Lightning } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  FeatureCard,
-  MarketingBackground,
-  MarketingCtaButton,
-  MarketingHeader,
-} from '@/components/marketing/marketing-shell'
+import { FeatureCard, MarketingBackground, MarketingCtaButton, MarketingHeader } from '@/components/marketing/marketing-shell'
 import { SAMPLE_COLLECTIONS, type SampleCollectionId } from '@/lib/sampleCollections'
 
 interface SampleDropZoneProps {
@@ -25,11 +14,7 @@ interface SampleDropZoneProps {
   analyzePath?: string
 }
 
-export function SampleDropZone({
-  onSelectSample,
-  loading = false,
-  analyzePath = '/analyze',
-}: SampleDropZoneProps) {
+export function SampleDropZone({ onSelectSample, loading = false, analyzePath = '/analyze' }: SampleDropZoneProps) {
   const [loadingId, setLoadingId] = useState<SampleCollectionId | null>(null)
 
   const handleSelect = useCallback(
@@ -53,7 +38,7 @@ export function SampleDropZone({
       />
 
       <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
-        <Card className="w-full max-w-3xl border-border shadow-sm animate-fade-in-scale">
+        <Card className="w-full max-w-3xl border-border shadow-xs animate-fade-in-scale">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
               <Flask className="h-7 w-7 text-primary" weight="fill" />
@@ -84,9 +69,7 @@ export function SampleDropZone({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold">{sample.label}</p>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                          {sample.description}
-                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{sample.description}</p>
                       </div>
                     </div>
                     {isLoading ? (
@@ -104,13 +87,17 @@ export function SampleDropZone({
             <p className="text-center text-xs text-muted-foreground">
               Demo collections ship with the app. No upload or team storage involved.
             </p>
+            {/* Last child, so it takes no part in the spacing between the blocks above it. */}
+            <p role="status" aria-live="polite" className="sr-only">
+              {loading ? 'Opening the sample...' : ''}
+            </p>
           </CardContent>
         </Card>
 
         <div className="mt-6 animate-fade-in">
           <Button
             variant="secondary"
-            className="bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background"
+            className="bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background"
             asChild
           >
             <Link to={analyzePath}>
@@ -127,18 +114,8 @@ export function SampleDropZone({
             description="Samples never touch your saved library or session."
             delay={200}
           />
-          <FeatureCard
-            icon={Lightning}
-            title="Instant analysis"
-            description="Results in milliseconds, no waiting."
-            delay={400}
-          />
-          <FeatureCard
-            icon={Flask}
-            title="Realistic scenarios"
-            description="From clean APIs to messy enterprise exports."
-            delay={600}
-          />
+          <FeatureCard icon={Lightning} title="Instant analysis" description="Results in milliseconds, no waiting." delay={400} />
+          <FeatureCard icon={Flask} title="Realistic scenarios" description="From clean APIs to messy enterprise exports." delay={600} />
         </div>
       </div>
     </div>

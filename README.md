@@ -8,19 +8,23 @@
 
 API collections often accumulate hardcoded tokens, literal base URLs, and weak documentation. Reviewing them manually is slow and error-prone.
 
-PostScope **parses a collection file locally in the browser**, runs a rule-based audit, and presents:
+PostScope **parses a collection in the browser**, analyzes it in a Web Worker with a rule-based audit, and presents:
 
 - A **dashboard overview** (metrics, charts, request tree)
-- A **security / findings** view with severities and recommendations
+- A **requests** explorer with masked secrets and per-request findings
+- **Security** and **Hygiene** views with severities, evidence and recommendations
+- A **repair center** that proposes fixes and produces a sanitized copy of the collection
 - A **score** view with grade and category breakdowns (secrets, variables, auth, hygiene)
+- Exports as JSON, SARIF and Markdown, and a **CLI** (`npm run scan`) for CI
 
-**No server or API keys are required.** Collection analysis runs in the browser; the last imported collection is restored from **session storage** after a refresh (same tab, ~4.5 MB limit). There is no server-side persistence.
+Collection analysis never leaves the browser. An optional Node server hosts the built app and can keep a shared **team library** of past collections (see [Deployment](#deployment)). The last imported collection is restored from **session storage** after a refresh (same tab, about 4.5 MB limit).
 
 ### Limitations (by design)
 
 - **Rule-based auditor**: findings are heuristic; expect false positives and false negatives. Review recommendations before acting.
-- **No backend**: collections are not uploaded or stored on a server.
-- **Large collections**: parsing and audit yield to the browser event loop, but very large files may still feel slow on low-end devices.
+- **Static analysis only**: PostScope reads the export. It never calls the APIs in the collection.
+- **Postman environments and globals** can be loaded with a collection. They are not stored in the team library (the library keeps collections only).
+- **Large collections**: analysis runs in a Web Worker, but very large files can still be slow on low-end devices.
 
 ---
 
@@ -28,13 +32,17 @@ PostScope **parses a collection file locally in the browser**, runs a rule-based
 
 | Area | Choice |
 |------|--------|
-| Runtime / UI | React 18 |
+| Runtime / UI | React 18, React Router 7 |
 | Language | TypeScript |
 | Build / dev server | Vite 6 |
-| Styling | Tailwind CSS 3, tailwindcss-animate |
+| Styling | Tailwind CSS 4 (CSS-first `@theme` in `src/index.css`, `@tailwindcss/vite`), tw-animate-css |
 | Components | Radix UI primitives, shadcn-style UI (`src/components/ui`) |
-| Charts | Recharts |
-| Icons | Lucide React |
+| Charts and motion | Recharts, framer-motion |
+| Icons | Phosphor Icons (`@phosphor-icons/react`) |
+| Analysis | Pure TypeScript engine in `src/lib`, run in a Web Worker |
+| Server | Node.js `>=20.6` HTTP server (`server/`), no web framework |
+| CLI | `cli/postscope.ts`: run through `tsx` in development, compiled with esbuild to `dist-node/cli.js` (plain `node`) for CI and Docker |
+| Tests | `node:test` through `tsx` |
 | Utilities | `clsx`, `tailwind-merge`, `class-variance-authority` |
 
 Path alias: `@/` → `src/` (see `vite.config.ts`).
@@ -43,18 +51,30 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 
 - [docs/VISUAL_STYLE.md](docs/VISUAL_STYLE.md): voice, punctuation, colors, typography, and layout personality
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): component patterns and Tailwind conventions
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/CI.md](docs/CI.md): architecture, threat model, operations and CI integration (GitHub Action, GitLab, Azure DevOps, pre-commit)
+- [docs/schemas/postscope-report.v2.schema.json](docs/schemas/postscope-report.v2.schema.json): JSON Schema of the JSON report
+- [docs/mindmap/](docs/mindmap): functional and technical mindmaps (the source of truth for how the code is organized)
+- [mindmap/ROADMAP.md](mindmap/ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md): planned and shipped releases
 
 ---
 
 ## Features
 
-- **Import by drag-and-drop or file picker**: accepts `.json` and typical `*.postman_collection.json` exports
-- **Collection parsing**: folders, HTTP methods, URLs, headers, bodies, auth types, `{{variable}}` usage vs. defined collection variables
-- **Automated audit** with severities (critical / warning / info), categories (secrets, variables, auth, hygiene), and actionable recommendations
-- **Overview**: stat cards, method and auth distribution charts, collapsible request tree with search
-- **Security**: consolidated findings list, filtering, and per-request context where applicable
-- **Score**: numeric score, letter grade, per-category subscores, and improvement hints
-- **Responsive dashboard**: sidebar navigation, header search, analyze-another flow
+- **Import by drag-and-drop, file picker or pasted JSON**: accepts `.json` and typical `*.postman_collection.json` exports, plus optional `*.postman_environment.json` and `*.postman_globals.json` files
+- **Environments and globals**: checked for secrets, used to resolve `{{baseUrl}}` for transport checks, with an environment selector and a sanitized export
+- **Collection parsing**: folders, HTTP methods, URLs, headers, bodies, auth inheritance, scripts, saved responses, GraphQL and other request protocols, `{{variable}}` usage vs. defined collection variables
+- **Automated audit** with 33 rules, severities (critical / warning / info), categories (secrets, variables, auth, hygiene) and 32 provider secret patterns
+- **Overview**: stat cards, method and auth distribution charts, request tree with search
+- **Requests, Security and Hygiene**: filterable findings with masked evidence and per-request context
+- **Repair**: guided fixes (secrets to variables, base URL variables, auth cleanup and more) and a sanitized download
+- **Score**: headline score (85% security, 15% hygiene), letter grade, per-category subscores and a per-finding penalty breakdown; a finding costs more when it affects more requests, and teams can set `SCORE_WEIGHTS`
+- **Rule settings**: disable rules or override severities per browser, or set team defaults on the server
+- **Exports**: JSON (versioned, with a published schema), SARIF 2.1.0 with line and column locations, Markdown, and a self-contained HTML report
+- **Performance**: pages load on demand (the landing page ships about 120 KB of gzipped JavaScript, the analyzer about 250 KB, Recharts only with the Dashboard), the request tree is virtualized above 300 rows, analysis and re-audits run in a Web Worker, and CI enforces size and speed budgets (`npm run bench`)
+- **Deep links and keyboard use**: every page, filter, open finding and selected request has its own address (`/analyze/security?severity=critical&rule=HARDCODED_TOKEN`, `/analyze/requests/<id>`), so links and the back button work within a session; arrow-key navigation in the request tree, `/` or `Ctrl+K` to search, and a checked accessibility baseline (axe: no serious violations)
+- **Compare versions**: new, resolved and unchanged findings, the score change and added, removed or edited requests between two versions of a collection (two files, or the open collection and a library entry), also as `postscope diff old.json new.json` for pull request checks
+- **Team library** (server): shared history with quotas, retention and optional server-side redaction
+- **CLI**: `npm run scan` with `--fail-on`, `--min-score` and `--sanitize` for CI, a project config file (`.postscope.json`), baselines so CI fails only on new findings, and reviewed suppressions with a mandatory reason
 
 ---
 
@@ -75,7 +95,7 @@ Screenshots are not checked in yet. After running the app locally, capture these
 
 **Prerequisites**
 
-- [Node.js](https://nodejs.org/) 18+ or 20+ (LTS recommended)
+- [Node.js](https://nodejs.org/) 20.6 or newer (LTS recommended)
 - npm (bundled with Node) or another compatible package manager
 
 **Steps**
@@ -99,9 +119,7 @@ Screenshots are not checked in yet. After running the app locally, capture these
 
 ## Environment variables
 
-None are required for local development or a static production build. The application does not call a backend for collection analysis.
-
-If you add integrations later (e.g. telemetry, remote APIs), document them here with name, purpose, and example values.
+None are required for local development or a static production build. The Node server reads optional settings (logging mode, landing page, hardening, audit policy) documented in [`.env.example`](.env.example), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
@@ -110,8 +128,22 @@ If you add integrations later (e.g. telemetry, remote APIs), document them here 
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start Vite dev server on **port 3010** with hot reload |
-| `npm run build` | Typecheck (`tsc -b`) and produce an optimized production bundle in `dist/` |
+| `npm run build` | Typecheck the app and server, then produce the production bundle in `dist/` |
+| `npm run typecheck` | Typecheck the app (`tsconfig.json`) and the server (`tsconfig.server.json`) |
+| `npm run start` | Run the Node server from source (serves `dist/` and the `/api` endpoints) |
+| `npm run build:node` | Compile the server and CLI to `dist-node/` (plain JavaScript, no dependencies at run time) |
+| `npm run start:node` | Run the compiled server |
 | `npm run preview` | Serve the production build locally on **port 3010** |
+| `npm test` | Run every `tests/*.test.ts` suite with the Node test runner |
+| `npm run lint` | ESLint (typescript-eslint, react-hooks, jsx-a11y) with zero warnings allowed |
+| `npm run format` / `npm run format:check` | Write or check Prettier formatting (no semicolons, single quotes, 140 columns) |
+| `npm run check:style` | Fail when the em dash character appears anywhere in the project (docs/VISUAL_STYLE.md) |
+| `npm run test:visual` | Screenshot comparison of every page and dialog in both themes against snapshots taken on another commit (for styling changes; snapshots are not committed, see `playwright.visual.config.ts`) |
+| `npm run test:e2e` | Browser smoke, navigation, accessibility (axe) and large-collection tests with Playwright against the compiled server; run `npm run build && npm run build:node` first and `npx playwright install chromium` once (or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chromium) |
+| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports folders and globs, `postscope diff <old> <new>` to compare two versions, `--format junit`, `--auto-env`, `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
+| `npm run bench` | Parse and audit time on a 6000-request collection plus bundle sizes; `-- --check` fails when a number is more than 20 percent worse than `scripts/bench-baseline.json`, `-- --update` records a new baseline, `-- --report file` writes JSON |
+| `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
+| `npm run release:check` | Verify that package, Docker and compose versions match the changelog |
 
 ---
 
@@ -120,38 +152,32 @@ If you add integrations later (e.g. telemetry, remote APIs), document them here 
 ```
 Postscope-App/
 ├── index.html              # HTML shell, app title, font preconnect
-├── vite.config.ts          # Vite + React plugin, @ → src alias
-├── tailwind.config.ts
-├── postcss.config.js
-├── package.json
+├── vite.config.ts          # Vite + React plugin, @ alias
+├── playwright.config.ts    # browser tests (e2e/), playwright.visual.config.ts for screenshot comparison (visual/)
+├── eslint.config.js, .prettierrc.json
+├── Dockerfile, compose.yaml
+├── cli/                    # postscope.ts (CLI entry) and inputs.ts (folders, globs, sibling environments)
+├── action.yml              # GitHub composite action
+├── server/                 # Node server: static hosting, /api, team library, hardening
+├── scripts/                # Test runner, release check, node build, demo collection generator
+├── tests/                  # node:test suites and fixtures
+├── docs/                   # Architecture, security, deployment, style guides, mindmaps
+├── mindmap/ROADMAP.md      # Release plan
+├── CHANGELOG.md
 ├── src/
-│   ├── main.tsx            # React root, global TooltipProvider
-│   ├── App.tsx             # Upload flow, parse → audit → score, routing by nav
+│   ├── main.tsx            # React root, router, global providers
+│   ├── App.tsx             # Routes: landing, analyzer, samples
 │   ├── index.css           # Global styles / design tokens
-│   ├── types/
-│   │   └── postman.ts      # Postman collection JSON shapes
-│   ├── lib/
-│   │   ├── parser.ts       # JSON → ParsedCollection
-│   │   ├── auditor.ts      # Rule engine → Finding[]
-│   │   ├── scorer.ts       # Score + grade from findings
-│   │   ├── requestFindings.ts
-│   │   └── utils.ts
-│   ├── pages/
-│   │   ├── OverviewPage.tsx
-│   │   ├── SecurityPage.tsx
-│   │   └── ScorePage.tsx
-│   └── components/
-│       ├── DropZone.tsx
-│       ├── RequestTree.tsx
-│       ├── RequestAnalysisModal.tsx
-│       ├── StatCard.tsx, ScoreGauge.tsx, MethodBadge.tsx, SeverityBadge.tsx
-│       ├── layout/         # dashboard-shell, sidebar, header
-│       ├── charts/         # chart tooltips
-│       └── ui/             # Buttons, cards, dialogs, tabs, etc.
+│   ├── types/postman.ts    # Postman collection JSON shapes
+│   ├── lib/                # parser, auditor, rules, secretPatterns, scorer, repairEngine,
+│   │                       # redaction, reportExport and other engine modules
+│   ├── workers/            # analysis.worker.ts (parse, audit and score off the main thread)
+│   ├── pages/              # AnalyzeApp, Overview, Requests, Security, Hygiene, Repair, Score
+│   └── components/         # DropZone, RequestTree, modals, badges, layout/, charts/, ui/
 └── dist/                   # Production output (after build; gitignored)
 ```
 
-**Flow:** `App.tsx` loads a file → `parseCollection` → `runAudit` → `calculateScore`. Pages consume `ParsedCollection`, `Finding[]`, and `ScoreBreakdown`.
+**Flow:** `AnalyzeApp` sends the file to the analysis worker → `parseCollection` → `runAudit` → `calculateScore`. Pages consume `ParsedCollection`, `Finding[]`, and `ScoreBreakdown`.
 
 ---
 
@@ -199,21 +225,17 @@ No API keys are required for the stock app.
 
 1. Fork the repository and create a feature branch (`feat/…`, `fix/…`).
 2. Keep changes focused; match existing TypeScript and component patterns.
-3. Run `npm run build` locally to ensure typecheck and production build succeed.
+3. Run `npm run lint`, `npm run format:check`, `npm run check:style`, `npm test` and `npm run build` locally (CI also runs `npm run test:e2e`, the performance budgets and a Docker smoke test).
 4. Open a pull request with a short description of behavior changes and any UI impact.
 
-For audit rules, extend `src/lib/auditor.ts` and adjust scoring in `src/lib/scorer.ts` if penalties should change.
+For audit rules, register the rule in `src/lib/rules.ts`, implement it in `src/lib/auditor.ts` and add positive and false-positive tests. Release rules (one commit per version, changelog, tags) are in [mindmap/ROADMAP.md](mindmap/ROADMAP.md).
 
 ---
 
-## Future improvements (optional)
+## Roadmap and changelog
 
-- Export findings as JSON or SARIF for CI
-- Deeper Postman features (pre-request scripts, tests, multi-file collections)
-- Web Worker offload for very large collections
-- Custom rule packs or configurable severity weights
-- Offline / PWA packaging for air-gapped use
-- Internationalization
+- [mindmap/ROADMAP.md](mindmap/ROADMAP.md) lists the planned releases, why they exist and how to implement them.
+- [CHANGELOG.md](CHANGELOG.md) lists what shipped in each release.
 
 ---
 

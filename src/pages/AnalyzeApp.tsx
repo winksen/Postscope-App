@@ -1,36 +1,27 @@
-import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useCallback, useState, useEffect, useMemo, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DropZone } from '../components/DropZone'
 import { DashboardShell } from '../components/layout/dashboard-shell'
-import type { ExportFormat } from '../components/layout/app-header'
+import type { EnvironmentOption, ExportFormat } from '../components/layout/app-header'
 import { RequestSearchModal } from '../components/RequestSearchModal'
 import { CollectionLibraryModal } from '../components/CollectionLibraryModal'
 import { RuleSettingsDialog } from '../components/RuleSettingsDialog'
 import { useToast } from '../components/ui/toaster'
-import { OverviewPage } from './OverviewPage'
-import { RequestsPage } from './RequestsPage'
-import { SecurityPage } from './SecurityPage'
-import { HygienePage } from './HygienePage'
-import { ScorePage } from './ScorePage'
-import { RepairPage } from './RepairPage'
-import { analyzeCollectionText, describeAnalysisError } from '../lib/analyzeCollection'
-import {
-  clearCollectionSession,
-  loadCollectionSession,
-  saveCollectionSession,
-} from '../lib/collectionSession'
-import {
-  getSavedCollection,
-  listSavedCollections,
-  saveToLibrary,
-  type SavedCollectionMeta,
-} from '../lib/collectionLibrary'
-import {
-  getStorageMode,
-  setStorageMode,
-  hasUploadConsent,
-  setUploadConsent,
-  type StorageMode,
-} from '../lib/storagePreferences'
+import { PageFallback, lazyPage } from '../components/lazyPage'
+
+// Pages are separate chunks: Recharts only loads with the Dashboard, and a page nobody opens is never downloaded.
+const OverviewPage = lazyPage(() => import('./OverviewPage'), 'OverviewPage')
+const RequestsPage = lazyPage(() => import('./RequestsPage'), 'RequestsPage')
+const SecurityPage = lazyPage(() => import('./SecurityPage'), 'SecurityPage')
+const HygienePage = lazyPage(() => import('./HygienePage'), 'HygienePage')
+const ScorePage = lazyPage(() => import('./ScorePage'), 'ScorePage')
+const RepairPage = lazyPage(() => import('./RepairPage'), 'RepairPage')
+const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
+import { analyzeCollectionText, auditAgain, describeAnalysisError } from '../lib/analyzeCollection'
+import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
+import { clearCollectionSession, loadCollectionSession, saveCollectionSession } from '../lib/collectionSession'
+import { getSavedCollection, listSavedCollections, saveToLibrary, type SavedCollectionMeta } from '../lib/collectionLibrary'
+import { getStorageMode, setStorageMode, hasUploadConsent, setUploadConsent, type StorageMode } from '../lib/storagePreferences'
 import {
   canChoosePrivacyMode,
   canSaveToAppStorage,
@@ -48,24 +39,32 @@ import {
 } from '../lib/auditPreferences'
 import { calculateScore } from '../lib/scorer'
 import { createRepairPlan } from '../lib/repairEngine'
-import { runAudit, type AuditOptions, type Finding } from '../lib/auditor'
-import { buildReport, reportFileName, reportMimeType, safeFileStem } from '../lib/reportExport'
-import { redactCollection } from '../lib/redaction'
+import type { AuditOptions, Finding } from '../lib/auditor'
+import type { SuppressedFinding } from '../lib/suppressions'
+import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
+import { redactCollection, redactEnvironment } from '../lib/redaction'
+import { attachEvidencePointers } from '../lib/evidencePointers'
 import { downloadTextFile } from '../lib/download'
+import type { CompareInput } from '../lib/compare'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { NavId } from '../components/layout/app-sidebar'
+import { isSearchShortcut } from '../lib/keyboard'
+import { buildAppPath, parseAppLocation, type AppLocation } from '../lib/appRoutes'
 
 /** Upper bound for in-browser analysis; larger files risk exhausting tab memory. */
 const MAX_IMPORT_BYTES = 50_000_000
 
 interface AnalyzeAppProps {
   loggingMode: LoggingMode
+  /** Path the analyzer is mounted at (`/analyze`, or empty at the root); its pages are routes below it. */
+  basePath?: string
   samplesPath?: string
   showGitHubLink?: boolean
   showFeedbackLink?: boolean
   feedbackUrl?: string
   appVersion?: string
   libraryAllowDelete?: boolean
+  libraryEncrypted?: boolean
   auditPolicy?: AuditOptions
 }
 
@@ -77,30 +76,57 @@ function formatMegabytes(bytes: number): string {
 
 export function AnalyzeApp({
   loggingMode,
+  basePath = '',
   samplesPath = '/samples',
   showGitHubLink = true,
   showFeedbackLink = true,
   feedbackUrl = 'https://github.com/winksen/Postscope-App/issues/new',
   appVersion,
   libraryAllowDelete = true,
+  libraryEncrypted = false,
   auditPolicy = EMPTY_POLICY,
 }: AnalyzeAppProps) {
   const { notify } = useToast()
+  const navigate = useNavigate()
+  const routerLocation = useLocation()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  const route = useMemo(
+    () => parseAppLocation(routerLocation.pathname, routerLocation.search, basePath),
+    [routerLocation.pathname, routerLocation.search, basePath]
+  )
+  const location: AppLocation = route ?? { page: 'overview' }
+  const active: NavId = location.page
+  /** Moves to another page, request or filter set. Filters replace the entry so back and forward step through pages. */
+  const goTo = useCallback(
+    (next: AppLocation, replace = false) => navigateRef.current(buildAppPath(basePath, next), { replace }),
+    [basePath]
+  )
+  const setActive = useCallback((id: NavId) => goTo({ page: id }), [goTo])
+  // An address that is not a page of the analyzer goes to the dashboard.
+  useEffect(() => {
+    if (!route) navigateRef.current(buildAppPath(basePath, { page: 'overview' }), { replace: true })
+  }, [route, basePath])
   const [parsed, setParsed] = useState<ParsedCollection | null>(null)
   const [findings, setFindings] = useState<Finding[]>([])
+  const [suppressed, setSuppressed] = useState<SuppressedFinding[]>([])
   const [rawJson, setRawJson] = useState<string | null>(null)
   const [originalRawJson, setOriginalRawJson] = useState<string | null>(null)
+  /** Raw environment and globals exports loaded with the collection (kept for re-analysis and sanitized export). */
+  const [environmentTexts, setEnvironmentTexts] = useState<string[]>([])
   const [currentLibraryId, setCurrentLibraryId] = useState<string | null>(null)
   const [savedCollections, setSavedCollections] = useState<SavedCollectionMeta[]>([])
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-  const [active, setActive] = useState<NavId>('overview')
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [focusRequestId, setFocusRequestId] = useState<string | null>(null)
   const [landingLoading, setLandingLoading] = useState(false)
   const [restoringSession, setRestoringSession] = useState(true)
   const [savingToLibrary, setSavingToLibrary] = useState(false)
+  /** Older version used by the Compare page. It is analyzed with the current rule settings and never saved. */
+  const [referenceRaw, setReferenceRaw] = useState<string | null>(null)
+  const [reference, setReference] = useState<CompareInput | null>(null)
+  const [referenceLoading, setReferenceLoading] = useState(false)
   const [storageMode, setStorageModeState] = useState<StorageMode>(() => getStorageMode())
   const [uploadConsent, setUploadConsentState] = useState(() => hasUploadConsent())
   const [userAuditPrefs, setUserAuditPrefs] = useState<AuditOptions | null>(() => loadAuditPreferences())
@@ -108,6 +134,12 @@ export function AnalyzeApp({
   const auditOptions = useMemo(() => effectiveAuditOptions(auditPolicy, userAuditPrefs), [auditPolicy, userAuditPrefs])
   const auditOptionsRef = useRef(auditOptions)
   auditOptionsRef.current = auditOptions
+  const environmentTextsRef = useRef<string[]>([])
+  environmentTextsRef.current = environmentTexts
+  const parsedRef = useRef<ParsedCollection | null>(null)
+  parsedRef.current = parsed
+  const rawJsonRef = useRef<string | null>(null)
+  rawJsonRef.current = rawJson
   /** Incremented for every analysis; results from superseded analyses are discarded. */
   const analysisSeq = useRef(0)
   const restoreAttempted = useRef(false)
@@ -121,13 +153,60 @@ export function AnalyzeApp({
     }
   }, [loggingMode])
 
-  // Re-run the (cheap) audit step when rule settings change; parsing is not repeated.
+  /**
+   * Audits the collection on screen again in the analysis worker (rule settings or the selected environment changed).
+   * The worker keeps the full parsed collection, so nothing is parsed again; if it was restarted the text is analyzed again.
+   */
+  const reaudit = useCallback(async (options: AuditOptions, activeEnvironment?: number) => {
+    const result = await auditAgain(options, { activeEnvironment })
+    if (result) return result
+    const raw = rawJsonRef.current
+    if (raw === null) return null
+    return analyzeCollectionText(raw, options, { environments: environmentTextsRef.current, activeEnvironment })
+  }, [])
+
   const lastAuditOptions = useRef(auditOptions)
   useEffect(() => {
     if (lastAuditOptions.current === auditOptions) return
     lastAuditOptions.current = auditOptions
-    if (parsed) setFindings(runAudit(parsed, auditOptions))
-  }, [auditOptions, parsed])
+    const current = parsedRef.current
+    if (!current) return
+    const seq = analysisSeq.current
+    reaudit(auditOptions, current.activeEnvironment)
+      .then((result) => {
+        // A newer import or repair replaced the collection while the audit ran.
+        if (!result || seq !== analysisSeq.current) return
+        setParsed(result.parsed)
+        setFindings(result.findings)
+        setSuppressed(result.suppressed)
+      })
+      .catch((e) => console.error(e))
+  }, [auditOptions, reaudit])
+
+  useEffect(() => {
+    if (referenceRaw === null) {
+      setReference(null)
+      return
+    }
+    let cancelled = false
+    setReferenceLoading(true)
+    analyzeCollectionText(referenceRaw, auditOptions, { slot: 'reference' })
+      .then((result) => {
+        if (!cancelled) setReference({ parsed: result.parsed, findings: result.findings })
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        setReferenceRaw(null)
+        notify({ variant: 'error', title: 'Could not analyze the older version', description: describeAnalysisError(e) })
+      })
+      .finally(() => {
+        if (!cancelled) setReferenceLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [referenceRaw, auditOptions, notify])
 
   const handleStorageModeChange = useCallback(
     (mode: StorageMode) => {
@@ -162,7 +241,7 @@ export function AnalyzeApp({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if (isSearchShortcut(e, document.querySelector('[role="dialog"]') !== null)) {
         e.preventDefault()
         setSearchOpen(true)
       }
@@ -185,21 +264,33 @@ export function AnalyzeApp({
 
   /** Analyzes raw JSON and shows the dashboard. Returns false when a newer analysis superseded this one. */
   const applyCollectionJson = useCallback(
-    async (raw: string, libraryId?: string | null): Promise<boolean> => {
+    async (
+      raw: string,
+      libraryId?: string | null,
+      environments: string[] = [],
+      activeEnvironment?: number,
+      restoring = false
+    ): Promise<boolean> => {
       const seq = ++analysisSeq.current
-      const { parsed: p, findings: f } = await analyzeCollectionText(raw, auditOptionsRef.current)
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments, activeEnvironment })
       if (seq !== analysisSeq.current) return false
+      const p = analysis.parsed
+      const f = analysis.findings
+      const s = analysis.suppressed
 
       setParsed(p)
       setFindings(f)
+      setSuppressed(s)
       setRawJson(raw)
       setOriginalRawJson(raw)
-      setActive('overview')
+      setEnvironmentTexts(environments)
+      // A restored session keeps the page in the address; a new import starts on the dashboard.
+      if (!restoring) goTo({ page: 'overview' })
       setSearch('')
       notifyParseWarnings(p)
 
       if (shouldPersistSession(loggingMode, storageMode)) {
-        if (!saveCollectionSession(raw, p.name)) {
+        if (!saveCollectionSession(raw, p.name, environments, p.activeEnvironment)) {
           notify({ title: 'Collection not kept for refresh', description: 'It is larger than the browser session storage limit.' })
         }
       }
@@ -226,7 +317,7 @@ export function AnalyzeApp({
       }
       return true
     },
-    [loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify, notifyParseWarnings]
+    [loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify, notifyParseWarnings, goTo]
   )
 
   useEffect(() => {
@@ -241,7 +332,7 @@ export function AnalyzeApp({
       setRestoringSession(false)
       return
     }
-    void applyCollectionJson(session.rawJson)
+    void applyCollectionJson(session.rawJson, null, session.environments ?? [], session.activeEnvironment, true)
       .catch((e) => {
         console.error(e)
         clearCollectionSession()
@@ -252,49 +343,105 @@ export function AnalyzeApp({
   }, [])
 
   const importBlockedByConsent = useCallback(() => {
-    if (
-      canChoosePrivacyMode(loggingMode) &&
-      storageMode === 'history' &&
-      !canSaveToAppStorage(loggingMode, storageMode, uploadConsent)
-    ) {
-      notify({ variant: 'error', title: 'Upload warning not accepted', description: 'Accept the upload warning before saving a collection to app history.' })
+    if (canChoosePrivacyMode(loggingMode) && storageMode === 'history' && !canSaveToAppStorage(loggingMode, storageMode, uploadConsent)) {
+      notify({
+        variant: 'error',
+        title: 'Upload warning not accepted',
+        description: 'Accept the upload warning before saving a collection to app history.',
+      })
       return true
     }
     return false
   }, [loggingMode, storageMode, uploadConsent, notify])
 
   const runImport = useCallback(
-    (raw: string) => {
+    (raw: string, environments: string[] = [], olderRaw?: string) => {
       setLandingLoading(true)
-      void applyCollectionJson(raw)
+      void applyCollectionJson(raw, null, environments)
+        .then((applied) => {
+          // Two collections were dropped: the first is the older version, the second opens as the current one.
+          if (applied && olderRaw !== undefined) {
+            setReferenceRaw(olderRaw)
+            setActive('compare')
+          }
+        })
         .catch((e) => {
           console.error(e)
           notify({ variant: 'error', title: 'Import failed', description: describeAnalysisError(e) })
         })
         .finally(() => setLandingLoading(false))
     },
-    [applyCollectionJson, notify]
+    [applyCollectionJson, notify, setActive]
   )
 
-  const handleFile = useCallback(
-    (file: File) => {
+  const handleFiles = useCallback(
+    (files: File[]) => {
       if (importBlockedByConsent()) return
-      if (file.size > MAX_IMPORT_BYTES) {
+      const oversized = files.find((file) => file.size > MAX_IMPORT_BYTES)
+      if (oversized) {
         notify({
           variant: 'error',
           title: 'File is too large',
-          description: `${file.name} is ${formatMegabytes(file.size)}. The analyzer accepts files up to ${formatMegabytes(MAX_IMPORT_BYTES)}.`,
+          description: `${oversized.name} is ${formatMegabytes(oversized.size)}. The analyzer accepts files up to ${formatMegabytes(MAX_IMPORT_BYTES)}.`,
         })
         return
       }
-      if (file.size === 0) {
-        notify({ variant: 'error', title: 'File is empty', description: `${file.name} has no content.` })
+      const empty = files.find((file) => file.size === 0)
+      if (empty) {
+        notify({ variant: 'error', title: 'File is empty', description: `${empty.name} has no content.` })
         return
       }
       setLandingLoading(true)
-      file
-        .text()
-        .then((text) => runImport(text))
+      Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })))
+        .then((loaded) => {
+          const collections: string[] = []
+          const environments: string[] = []
+          let unknown: string | null = null
+          for (const { name, text } of loaded) {
+            let json: unknown = null
+            try {
+              json = JSON.parse(text) as unknown
+            } catch {
+              // Not JSON: a single file is analyzed so the usual "not valid JSON" message appears.
+            }
+            if (json !== null && detectEnvironmentKind(json, name)) environments.push(text)
+            else if (json === null || isCollectionJson(json)) collections.push(text)
+            else unknown = unknown ?? name
+          }
+          if (collections.length === 0 && !unknown) {
+            setLandingLoading(false)
+            notify({
+              variant: 'error',
+              title: 'Add a collection',
+              description: 'Environment and globals files are analyzed together with a Postman collection.',
+            })
+            return
+          }
+          if (collections.length > 2) {
+            setLandingLoading(false)
+            notify({
+              variant: 'error',
+              title: 'Add at most two collections',
+              description: 'Drop one collection, or two to compare them (older first), together with any environment or globals files.',
+            })
+            return
+          }
+          if (collections.length === 0) {
+            setLandingLoading(false)
+            notify({
+              variant: 'error',
+              title: 'Not a Postman file',
+              description: `${unknown} is neither a collection nor an environment export.`,
+            })
+            return
+          }
+          if (collections.length === 2) {
+            notify({ title: 'Comparing two collections', description: 'The first file is the older version, the second one is opened.' })
+            runImport(collections[1], environments, collections[0])
+            return
+          }
+          runImport(collections[0], environments)
+        })
         .catch((e) => {
           console.error(e)
           setLandingLoading(false)
@@ -308,7 +455,11 @@ export function AnalyzeApp({
     (raw: string) => {
       if (importBlockedByConsent()) return
       if (raw.length > MAX_IMPORT_BYTES) {
-        notify({ variant: 'error', title: 'Pasted JSON is too large', description: `Paste up to ${formatMegabytes(MAX_IMPORT_BYTES)} or upload the file instead.` })
+        notify({
+          variant: 'error',
+          title: 'Pasted JSON is too large',
+          description: `Paste up to ${formatMegabytes(MAX_IMPORT_BYTES)} or upload the file instead.`,
+        })
         return
       }
       runImport(raw)
@@ -321,14 +472,17 @@ export function AnalyzeApp({
     clearCollectionSession()
     setParsed(null)
     setFindings([])
+    setSuppressed([])
     setRawJson(null)
     setOriginalRawJson(null)
+    setEnvironmentTexts([])
     setCurrentLibraryId(null)
+    setReferenceRaw(null)
     setSearch('')
     setSearchOpen(false)
-    setFocusRequestId(null)
     setLandingLoading(false)
-  }, [])
+    goTo({ page: 'overview' }, true)
+  }, [goTo])
 
   const handleLoadFromLibrary = useCallback(
     async (id: string) => {
@@ -351,6 +505,46 @@ export function AnalyzeApp({
     [applyCollectionJson, refreshSavedCollections, notify]
   )
 
+  const handleCompareWithLibrary = useCallback(
+    async (id: string) => {
+      try {
+        const record = await getSavedCollection(id)
+        if (!record) {
+          notify({ variant: 'error', title: 'Saved collection not found', description: 'It may have been removed by a teammate.' })
+          await refreshSavedCollections()
+          return
+        }
+        setReferenceRaw(record.rawJson)
+        setActive('compare')
+      } catch (e) {
+        console.error(e)
+        notify({ variant: 'error', title: 'Failed to open saved collection', description: e instanceof Error ? e.message : undefined })
+      }
+    },
+    [notify, refreshSavedCollections, setActive]
+  )
+
+  const handleChooseReferenceFile = useCallback(
+    async (file: File) => {
+      if (file.size === 0 || file.size > MAX_IMPORT_BYTES) {
+        notify({ variant: 'error', title: file.size === 0 ? 'File is empty' : 'File is too large', description: file.name })
+        return
+      }
+      try {
+        const text = await file.text()
+        const json = JSON.parse(text) as unknown
+        if (!isCollectionJson(json)) {
+          notify({ variant: 'error', title: 'Not a Postman collection', description: `${file.name} needs an item array.` })
+          return
+        }
+        setReferenceRaw(text)
+      } catch {
+        notify({ variant: 'error', title: 'Could not read the file', description: `${file.name} is not valid JSON.` })
+      }
+    },
+    [notify]
+  )
+
   const handleSaveCurrentToLibrary = useCallback(async () => {
     if (!rawJson || !parsed || !canSaveToAppStorage(loggingMode, storageMode, uploadConsent)) return
     setSavingToLibrary(true)
@@ -371,26 +565,37 @@ export function AnalyzeApp({
     }
   }, [parsed, rawJson, loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify])
 
-  const handleSearchSelect = useCallback((request: ParsedRequest) => {
-    setActive('requests')
-    setSearch('')
-    setFocusRequestId(request.id)
-  }, [])
+  const handleSearchSelect = useCallback(
+    (request: ParsedRequest) => {
+      setSearch('')
+      goTo({ page: 'requests', requestId: request.id })
+    },
+    [goTo]
+  )
 
   const handleApplyRepairedCollection = useCallback(
     async (raw: string) => {
       const seq = ++analysisSeq.current
-      const { parsed: p, findings: f } = await analyzeCollectionText(raw, auditOptionsRef.current)
+      const environments = environmentTextsRef.current
+      // The environment the user selected stays selected after a repair.
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, {
+        environments,
+        activeEnvironment: parsedRef.current?.activeEnvironment,
+      })
+      const p = analysis.parsed
+      const f = analysis.findings
+      const s = analysis.suppressed
       if (seq === analysisSeq.current) {
         setParsed(p)
         setFindings(f)
+        setSuppressed(s)
         setRawJson(raw)
         setCurrentLibraryId(null)
-        setActive('repair')
+        goTo({ page: 'repair' }, true)
         setSearch('')
 
         if (shouldPersistSession(loggingMode, storageMode)) {
-          saveCollectionSession(raw, p.name)
+          saveCollectionSession(raw, p.name, environments, p.activeEnvironment)
         }
       }
 
@@ -399,7 +604,7 @@ export function AnalyzeApp({
         score: calculateScore(p, f),
       }
     },
-    [loggingMode, storageMode]
+    [loggingMode, storageMode, goTo]
   )
 
   const handleResetRepairs = useCallback(async () => {
@@ -434,14 +639,76 @@ export function AnalyzeApp({
           })
           return
         }
-        const content = buildReport(format, { parsed, findings, score, appVersion })
-        downloadTextFile(reportFileName(parsed.name, format), content, reportMimeType(format))
+        if (format === 'sanitized-environments') {
+          let total = 0
+          environmentTexts.forEach((text, index) => {
+            const source = JSON.parse(text) as unknown
+            const { json, redactedCount } = redactEnvironment(source)
+            total += redactedCount
+            const { name, kind } = parseEnvironment(source)
+            downloadTextFile(
+              `${safeFileStem(name || `environment-${index + 1}`)}-sanitized.postman_${kind}.json`,
+              JSON.stringify(json, null, 2)
+            )
+          })
+          notify({
+            variant: 'success',
+            title: 'Sanitized environments downloaded',
+            description: total
+              ? `${total} secret value(s) were emptied. Names and keys are unchanged.`
+              : 'No secret values were detected; the copies match the originals.',
+          })
+          return
+        }
+        const reportFormat: ReportFormat = format
+        const source = JSON.parse(rawJson) as unknown
+        const content = buildReport(reportFormat, {
+          parsed,
+          findings: attachEvidencePointers(source, parsed, findings),
+          suppressed: attachEvidencePointers(source, parsed, suppressed),
+          score,
+          appVersion,
+          sourceText: rawJson,
+        })
+        downloadTextFile(reportFileName(parsed.name, reportFormat), content, reportMimeType(reportFormat))
       } catch (e) {
         console.error(e)
         notify({ variant: 'error', title: 'Export failed', description: e instanceof Error ? e.message : undefined })
       }
     },
-    [parsed, score, rawJson, findings, appVersion, notify]
+    [parsed, score, rawJson, findings, suppressed, appVersion, environmentTexts, notify]
+  )
+
+  const handleSelectEnvironment = useCallback(
+    (index: number) => {
+      const current = parsedRef.current
+      if (!current || current.environments?.[index]?.kind !== 'environment' || current.activeEnvironment === index) return
+      const seq = analysisSeq.current
+      reaudit(auditOptionsRef.current, index)
+        .then((result) => {
+          if (!result || seq !== analysisSeq.current) return
+          setParsed(result.parsed)
+          setFindings(result.findings)
+          setSuppressed(result.suppressed)
+          const raw = rawJsonRef.current
+          if (raw && shouldPersistSession(loggingMode, storageMode))
+            saveCollectionSession(raw, result.parsed.name, environmentTextsRef.current, index)
+        })
+        .catch((e) => {
+          console.error(e)
+          notify({ variant: 'error', title: 'Could not switch environment', description: describeAnalysisError(e) })
+        })
+    },
+    [reaudit, loggingMode, storageMode, notify]
+  )
+
+  const environmentOptions = useMemo<EnvironmentOption[]>(
+    () =>
+      (parsed?.environments ?? [])
+        .map((environment, index) => ({ index, name: environment.name, kind: environment.kind }))
+        .filter((environment) => environment.kind === 'environment')
+        .map(({ index, name }) => ({ index, name })),
+    [parsed]
   )
 
   const handleSaveRules = useCallback(
@@ -466,7 +733,7 @@ export function AnalyzeApp({
     return (
       <>
         <DropZone
-          onFile={handleFile}
+          onFiles={handleFiles}
           onJsonText={handleJsonText}
           loading={landingLoading || restoringSession}
           loggingMode={loggingMode}
@@ -486,6 +753,7 @@ export function AnalyzeApp({
             onLoad={(id) => void handleLoadFromLibrary(id)}
             onLibraryChange={() => void refreshSavedCollections()}
             allowDelete={libraryAllowDelete}
+            encrypted={libraryEncrypted}
           />
         )}
       </>
@@ -517,35 +785,61 @@ export function AnalyzeApp({
         onExport={handleExport}
         onOpenRules={() => setRulesOpen(true)}
         customRulesActive={userAuditPrefs !== null && isCustomized(auditOptions)}
+        environments={environmentOptions}
+        activeEnvironment={parsed.activeEnvironment}
+        onEnvironmentChange={handleSelectEnvironment}
+        hasEnvironmentFiles={environmentTexts.length > 0}
       >
-        {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}
-        {active === 'requests' && (
-          <RequestsPage
-            parsed={parsed}
-            findings={findings}
-            search={search}
-            focusRequestId={focusRequestId}
-            onFocusRequestHandled={() => setFocusRequestId(null)}
-          />
-        )}
-        {active === 'security' && (
-          <SecurityPage parsed={parsed} findings={securityFindings} score={score} search={search} />
-        )}
-        {active === 'hygiene' && (
-          <HygienePage parsed={parsed} findings={hygieneFindings} search={search} />
-        )}
-        {active === 'repair' && rawJson && (
-          <RepairPage
-            parsed={parsed}
-            findings={findings}
-            score={score}
-            rawJson={rawJson}
-            originalRawJson={originalRawJson || rawJson}
-            onApplyRepairedCollection={handleApplyRepairedCollection}
-            onResetRepairs={handleResetRepairs}
-          />
-        )}
-        {active === 'score' && <ScorePage score={score} findings={findings} />}
+        <Suspense fallback={<PageFallback />}>
+          {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}
+          {active === 'requests' && (
+            <RequestsPage
+              parsed={parsed}
+              findings={findings}
+              search={search}
+              selectedId={location.requestId ?? null}
+              onSelectId={(id) => goTo({ page: 'requests', requestId: id ?? undefined })}
+            />
+          )}
+          {active === 'security' && (
+            <SecurityPage
+              parsed={parsed}
+              findings={securityFindings}
+              suppressed={suppressed}
+              score={score}
+              search={search}
+              location={location}
+              onLocationChange={goTo}
+            />
+          )}
+          {active === 'hygiene' && (
+            <HygienePage parsed={parsed} findings={hygieneFindings} search={search} location={location} onLocationChange={goTo} />
+          )}
+          {active === 'repair' && rawJson && (
+            <RepairPage
+              parsed={parsed}
+              findings={findings}
+              score={score}
+              rawJson={rawJson}
+              originalRawJson={originalRawJson || rawJson}
+              onApplyRepairedCollection={handleApplyRepairedCollection}
+              onResetRepairs={handleResetRepairs}
+            />
+          )}
+          {active === 'score' && <ScorePage score={score} findings={findings} />}
+          {active === 'compare' && (
+            <ComparePage
+              current={{ parsed, findings, score }}
+              reference={reference}
+              loading={referenceLoading}
+              library={teamLibraryVisible ? savedCollections : []}
+              currentLibraryId={currentLibraryId}
+              onChooseFile={(file) => void handleChooseReferenceFile(file)}
+              onChooseLibrary={(id) => void handleCompareWithLibrary(id)}
+              onClear={() => setReferenceRaw(null)}
+            />
+          )}
+        </Suspense>
       </DashboardShell>
 
       <RequestSearchModal
@@ -574,6 +868,8 @@ export function AnalyzeApp({
           onLoad={(id) => void handleLoadFromLibrary(id)}
           onLibraryChange={() => void refreshSavedCollections()}
           allowDelete={libraryAllowDelete}
+          encrypted={libraryEncrypted}
+          onCompare={(id) => void handleCompareWithLibrary(id)}
         />
       )}
     </>
