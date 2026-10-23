@@ -2,6 +2,7 @@ import {
   BookmarkSimple,
   DownloadSimple,
   FileCode,
+  FileHtml,
   FileText,
   MagnifyingGlass,
   ShieldCheck,
@@ -23,7 +24,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
-export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'sanitized' | 'sanitized-environments'
+export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'html' | 'sanitized' | 'sanitized-environments'
 
 export interface EnvironmentOption {
   /** Index into the loaded environment files. */
@@ -146,6 +147,9 @@ export function AppHeader({
               <DropdownMenuLabel className="text-xs text-muted-foreground">Findings report</DropdownMenuLabel>
               <DropdownMenuItem onSelect={() => onExport('markdown')}>
                 <FileText weight="fill" /> Markdown (.md)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport('html')}>
+                <FileHtml weight="fill" /> HTML (.html)
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onExport('json')}>
                 <FileCode weight="fill" /> JSON (.json)

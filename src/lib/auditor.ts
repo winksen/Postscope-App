@@ -32,6 +32,8 @@ export interface FindingEvidence {
   location: string
   /** Masked preview. Never contains the full secret value. */
   preview?: string
+  /** JSON pointer of the value inside the exported collection (set when a report is built from the raw file). */
+  pointer?: string
 }
 
 export interface Finding {

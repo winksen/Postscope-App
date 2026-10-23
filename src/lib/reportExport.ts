@@ -5,8 +5,13 @@ import { RULES, RULE_LIST } from './rules'
 import { SEVERITY_ORDER } from './severity'
 import { findingOccurrences, occurrenceFingerprint } from './occurrences'
 import type { SuppressedFinding } from './suppressions'
+import { locatePointers } from './jsonPositions'
+import { buildHtmlReport } from './htmlReport'
 
-export type ReportFormat = 'json' | 'sarif' | 'markdown'
+export type ReportFormat = 'json' | 'sarif' | 'markdown' | 'html'
+
+/** Version of the JSON report layout; the schema lives in docs/schemas/postscope-report.v2.schema.json. */
+export const REPORT_VERSION = 2
 
 export interface ReportContext {
   parsed: ParsedCollection
@@ -20,6 +25,11 @@ export interface ReportContext {
   suppressed?: SuppressedFinding[]
   /** Occurrences hidden because they are in the baseline file. */
   baselined?: number
+  /**
+   * Text of the collection file as scanned. With evidence pointers (`attachEvidencePointers`) it lets SARIF carry
+   * a line and column for each result.
+   */
+  sourceText?: string
 }
 
 const TOOL_NAME = 'PostScope'
@@ -50,12 +60,14 @@ export function reportFileName(collectionName: string, format: ReportFormat): st
   const stem = `${safeFileStem(collectionName)}.postscope`
   if (format === 'sarif') return `${stem}.sarif`
   if (format === 'markdown') return `${stem}.md`
+  if (format === 'html') return `${stem}.html`
   return `${stem}.json`
 }
 
 export function reportMimeType(format: ReportFormat): string {
   if (format === 'markdown') return 'text/markdown'
   if (format === 'sarif') return 'application/sarif+json'
+  if (format === 'html') return 'text/html'
   return 'application/json'
 }
 
@@ -72,6 +84,7 @@ export function buildJsonReport(ctx: ReportContext): string {
   const labels = labelMap(ctx.parsed.requests)
   return JSON.stringify(
     {
+      reportVersion: REPORT_VERSION,
       tool: { name: TOOL_NAME, version: ctx.appVersion ?? 'unknown', informationUri: TOOL_URI },
       generatedAt: (ctx.generatedAt ?? new Date()).toISOString(),
       collection: {
@@ -150,13 +163,30 @@ export function buildSarifReport(ctx: ReportContext): string {
   const uri = ctx.sourceName ?? `${safeFileStem(ctx.parsed.name)}.postman_collection.json`
   const ruleIndex = new Map(RULE_LIST.map((rule, index) => [rule.id, index]))
 
+  // Positions of every pointer the results need, found in one pass over the original text.
+  const wanted = new Set<string>()
+  const requestPointers = new Map(ctx.parsed.requests.map((request) => [request.id, request.pointer]))
+  for (const finding of [...ctx.findings, ...(ctx.suppressed ?? [])]) {
+    for (const entry of finding.evidence ?? []) if (entry.pointer) wanted.add(entry.pointer)
+    for (const id of finding.affected) {
+      const pointer = requestPointers.get(id)
+      if (pointer) wanted.add(`${pointer}/request`)
+    }
+  }
+  const positions = ctx.sourceText ? locatePointers(ctx.sourceText, wanted) : new Map()
+  let truncated = 0
+
   const results: unknown[] = []
   const addResults = (finding: Finding, suppressions?: SuppressedFinding['suppressions']) => {
     const targets = finding.affected.length ? finding.affected : [null]
     for (const requestId of targets) {
-      if (results.length >= MAX_SARIF_RESULTS) break
+      if (results.length >= MAX_SARIF_RESULTS) {
+        truncated += 1
+        continue
+      }
       const label = requestId ? labels.get(requestId) ?? requestId : null
       const evidence = finding.evidence?.find((entry) => (requestId ? entry.requestId === requestId : !entry.requestId))
+      const position = positions.get(evidence?.pointer ?? '') ?? (requestId ? positions.get(`${requestPointers.get(requestId)}/request`) : undefined)
       const message = [label ? `${finding.title}: ${label}.` : `${finding.title}.`, evidence ? `Location: ${evidence.location}.` : '', finding.recommendation]
         .filter(Boolean)
         .join(' ')
@@ -168,7 +198,10 @@ export function buildSarifReport(ctx: ReportContext): string {
         message: { text: message },
         locations: [
           {
-            physicalLocation: { artifactLocation: { uri } },
+            physicalLocation: {
+              artifactLocation: { uri },
+              ...(position ? { region: { startLine: position.line, startColumn: position.column } } : {}),
+            },
             ...(label ? { logicalLocations: [{ fullyQualifiedName: label, kind: 'member' }] } : {}),
           },
         ],
@@ -198,6 +231,20 @@ export function buildSarifReport(ctx: ReportContext): string {
       version: '2.1.0',
       runs: [
         {
+          automationDetails: { id: `postscope/${safeFileStem(ctx.parsed.name)}/${(ctx.generatedAt ?? new Date()).toISOString().slice(0, 10)}` },
+          columnKind: 'utf16CodeUnits',
+          invocations: [
+            {
+              executionSuccessful: true,
+              ...(truncated > 0
+                ? {
+                    toolExecutionNotifications: [
+                      { level: 'warning', message: { text: `Results were truncated at ${MAX_SARIF_RESULTS}; ${truncated} more result(s) were not written.` } },
+                    ],
+                  }
+                : {}),
+            },
+          ],
           tool: {
             driver: {
               name: TOOL_NAME,
@@ -309,5 +356,6 @@ export function buildMarkdownReport(ctx: ReportContext): string {
 export function buildReport(format: ReportFormat, ctx: ReportContext): string {
   if (format === 'sarif') return buildSarifReport(ctx)
   if (format === 'markdown') return buildMarkdownReport(ctx)
+  if (format === 'html') return buildHtmlReport(ctx)
   return buildJsonReport(ctx)
 }

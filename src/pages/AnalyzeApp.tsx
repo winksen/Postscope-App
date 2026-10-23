@@ -53,6 +53,7 @@ import { runAuditDetailed, type AuditOptions, type Finding } from '../lib/audito
 import type { SuppressedFinding } from '../lib/suppressions'
 import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
 import { redactCollection, redactEnvironment } from '../lib/redaction'
+import { attachEvidencePointers } from '../lib/evidencePointers'
 import { downloadTextFile } from '../lib/download'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { NavId } from '../components/layout/app-sidebar'
@@ -527,7 +528,15 @@ export function AnalyzeApp({
           return
         }
         const reportFormat: ReportFormat = format
-        const content = buildReport(reportFormat, { parsed, findings, score, appVersion, suppressed })
+        const source = JSON.parse(rawJson) as unknown
+        const content = buildReport(reportFormat, {
+          parsed,
+          findings: attachEvidencePointers(source, parsed, findings),
+          suppressed: attachEvidencePointers(source, parsed, suppressed),
+          score,
+          appVersion,
+          sourceText: rawJson,
+        })
         downloadTextFile(reportFileName(parsed.name, reportFormat), content, reportMimeType(reportFormat))
       } catch (e) {
         console.error(e)

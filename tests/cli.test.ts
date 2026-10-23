@@ -243,3 +243,35 @@ test('baseline problems are usage errors', () => {
   assert.match(cli(clean, '--baseline', broken).stderr, /unsupported baseline version/)
   assert.equal(cli(clean, '--baseline', broken, '--write-baseline', broken).code, 2)
 })
+
+test('--format html writes one self-contained report without secrets', () => {
+  const result = cli(risky, '--format', 'html', '--fail-on', 'none')
+  assert.equal(result.code, 0)
+  assert.match(result.stdout, /^<!doctype html>/)
+  assert.ok(!/<script/i.test(result.stdout))
+  for (const secret of Object.values(FAKE)) assert.ok(!result.stdout.includes(secret))
+  const two = cli(risky, clean, '--format', 'html', '--fail-on', 'none').stdout
+  assert.equal(two.match(/<!doctype html>/g)?.length, 1)
+  assert.match(two, /2 collections/)
+})
+
+test('SARIF from the CLI points at the exact line and column, also in CRLF files', () => {
+  for (const eol of ['\n', '\r\n']) {
+    const file = path.join(tmp, `crlf-${eol.length}.postman_collection.json`)
+    fs.writeFileSync(file, JSON.stringify(kitchenSinkCollection(), null, 2).replace(/\n/g, eol))
+    const sarif = JSON.parse(cli(file, '--format', 'sarif', '--fail-on', 'none').stdout)
+    const run = sarif.runs[0]
+    assert.equal(run.invocations[0].executionSuccessful, true)
+    const result = run.results.find((candidate: { ruleId: string }) => candidate.ruleId === 'HARDCODED_API_KEY')
+    const { startLine, startColumn } = result.locations[0].physicalLocation.region
+    const line = fs.readFileSync(file, 'utf8').split(/\r?\n/)[startLine - 1]
+    assert.ok(line.slice(startColumn - 1).startsWith(`"${FAKE.apiKey}"`), `${JSON.stringify(line)} @${startColumn}`)
+  }
+})
+
+test('the JSON report is version 2 and every evidence entry names a pointer where possible', () => {
+  const report = JSON.parse(cli(risky, '--format', 'json', '--fail-on', 'none').stdout)
+  assert.equal(report.reportVersion, 2)
+  const evidence = report.findings.flatMap((finding: { evidence: Array<{ pointer?: string }> }) => finding.evidence)
+  assert.ok(evidence.filter((entry: { pointer?: string }) => entry.pointer).length / evidence.length > 0.9)
+})

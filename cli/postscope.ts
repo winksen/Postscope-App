@@ -13,6 +13,8 @@ import { parseCollection } from '../src/lib/parser'
 import { runAuditDetailed, sanitizeAuditOptions, type AuditOptions, type Finding } from '../src/lib/auditor'
 import { calculateScore } from '../src/lib/scorer'
 import { buildJsonReport, buildMarkdownReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
+import { renderHtmlReports } from '../src/lib/htmlReport'
+import { attachEvidencePointers } from '../src/lib/evidencePointers'
 import { redactCollection, redactEnvironment } from '../src/lib/redaction'
 import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src/lib/projectConfig'
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
@@ -21,7 +23,7 @@ import { RULE_LIST } from '../src/lib/rules'
 import { readPackageVersion } from '../server/appVersion'
 import { isSeverity, parseScoreWeights, severityRank, type ScoreWeights, type Severity } from '../src/lib/severity'
 
-type Format = 'text' | 'json' | 'sarif' | 'markdown'
+type Format = 'text' | 'json' | 'sarif' | 'markdown' | 'html'
 type FailOn = Severity | 'none'
 
 interface CliOptions {
@@ -48,7 +50,8 @@ const HELP = `PostScope CLI: audit Postman collections for secrets, auth gaps, a
 Usage: npm run scan -- [options] <collection.json ...>   (use "-" to read stdin)
 
 Options:
-  -f, --format <text|json|sarif|markdown>  Report format (default: text)
+  -f, --format <text|json|sarif|markdown|html>
+                                           Report format (default: text). html is one self-contained file without scripts
   -o, --output <file>                      Write the report to a file instead of stdout
       --fail-on <critical|warning|info|none>
                                            Exit 1 when a finding at or above this severity exists (default: critical)
@@ -101,7 +104,7 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
       case '-f':
       case '--format': {
         const format = value()
-        if (!['text', 'json', 'sarif', 'markdown'].includes(format)) throw new UsageError(`Unknown format "${format}"`)
+        if (!['text', 'json', 'sarif', 'markdown', 'html'].includes(format)) throw new UsageError(`Unknown format "${format}"`)
         options.format = format as Format
         break
       }
@@ -269,14 +272,17 @@ function environmentStem(file: string): string {
 
 function analyzeFile(input: string, options: CliOptions, appVersion: string, environments: LoadedEnvironment[], baseline?: Baseline): { result: AnalyzedFile; json: unknown } {
   let json: unknown
+  let sourceText = ''
   try {
-    json = JSON.parse(readInput(input))
+    sourceText = readInput(input)
+    json = JSON.parse(sourceText)
   } catch (error) {
     throw new UsageError(`${input}: not valid JSON (${error instanceof Error ? error.message : String(error)})`)
   }
   // Accept PostScope library records ({ rawJson }) as well as plain exports.
   if (json && typeof json === 'object' && typeof (json as { rawJson?: unknown }).rawJson === 'string') {
-    json = JSON.parse((json as { rawJson: string }).rawJson)
+    sourceText = (json as { rawJson: string }).rawJson
+    json = JSON.parse(sourceText)
   }
   let parsed
   try {
@@ -290,12 +296,22 @@ function analyzeFile(input: string, options: CliOptions, appVersion: string, env
   const applied = baseline ? applyBaseline(allActive, baseline) : undefined
   const findings = applied ? applied.findings : allActive
   const score = calculateScore(parsed, findings, options.weights ?? config?.weights)
+  const located = attachEvidencePointers(json, parsed, findings)
   return {
     result: {
       input,
       configFile,
       beforeBaseline: allActive,
-      ctx: { parsed, findings, score, appVersion, sourceName: input === '-' ? undefined : path.basename(input), suppressed, baselined: applied?.hidden },
+      ctx: {
+        parsed,
+        findings: located,
+        score,
+        appVersion,
+        sourceName: input === '-' ? undefined : path.basename(input),
+        suppressed: attachEvidencePointers(json, parsed, suppressed),
+        baselined: applied?.hidden,
+        sourceText,
+      },
     },
     json,
   }
@@ -325,6 +341,7 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
 function render(files: AnalyzedFile[], format: Format, appVersion: string): string {
   if (format === 'text') return textReport(files, appVersion)
   if (format === 'markdown') return files.map(({ ctx }) => buildMarkdownReport(ctx)).join('\n\n---\n\n')
+  if (format === 'html') return renderHtmlReports(files.map(({ ctx }) => ctx))
   if (format === 'json') {
     const reports = files.map(({ ctx }) => JSON.parse(buildJsonReport(ctx)) as unknown)
     return JSON.stringify(reports.length === 1 ? reports[0] : reports, null, 2)
