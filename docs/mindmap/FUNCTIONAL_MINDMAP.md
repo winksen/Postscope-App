@@ -179,6 +179,7 @@ Available in `hybrid` and `on` modes.
 | `--disable`, `--severity` | Same rule policy controls as the UI |
 | `--sanitize out.json` | Write a sanitized copy |
 | `--list-rules` | Print the rule catalog |
+| `--version` | Print the PostScope version (same value as the app, Docker image and `/api/config`, from any directory) |
 
 Exit codes: `0` pass, `1` policy failure, `2` usage or input error.
 
