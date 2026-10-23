@@ -383,7 +383,10 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
             <CardDescription>Distribution of verbs across the collection</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
-            <div className="h-64 w-full">
+            <p className="sr-only">
+              Requests per HTTP method: {methodData.map((entry) => `${entry.name} ${entry.count}`).join(', ') || 'none'}.
+            </p>
+            <div className="h-64 w-full" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={methodData}
@@ -442,7 +445,10 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
               </p>
               <p className="text-xs font-medium leading-snug text-muted-foreground">typed auth share</p>
             </div>
-            <div className="mx-auto h-[min(280px,42vw)] min-h-[240px] w-full max-w-md sm:h-[300px]">
+            <p className="sr-only">
+              Requests by authentication type: {authColorData.map((entry) => `${entry.name} ${entry.value}`).join(', ') || 'none'}.
+            </p>
+            <div className="mx-auto h-[min(280px,42vw)] min-h-[240px] w-full max-w-md sm:h-[300px]" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: -28, right: 8, left: 8, bottom: 4 }}>
                   <Pie
@@ -456,6 +462,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
                     innerRadius="46%"
                     outerRadius="82%"
                     paddingAngle={2}
+                    rootTabIndex={-1}
                     stroke="hsl(var(--card))"
                     strokeWidth={2}
                     animationBegin={200}
@@ -583,7 +590,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
               ))}
             </div>
           )}
-          <ScrollArea className="h-[26rem]">
+          <ScrollArea className="h-[26rem]" focusable label="Collection structure">
             <div className="min-w-[42rem] py-2">
               <StructureBranch node={structureTree} />
             </div>

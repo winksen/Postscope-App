@@ -74,9 +74,9 @@ function countBySeverity(findings: Finding[]): Record<Finding['severity'], numbe
 }
 
 function scoreTone(score: number): string {
-  if (score >= 90) return 'text-[hsl(var(--success))]'
-  if (score >= 55) return 'text-[hsl(var(--warning))]'
-  return 'text-destructive'
+  if (score >= 90) return 'text-[hsl(var(--success-text))]'
+  if (score >= 55) return 'text-[hsl(var(--warning-text))]'
+  return 'text-destructive-text'
 }
 
 function FixRow({
@@ -330,9 +330,9 @@ export function RepairPage({
                 Clear selection
               </Button>
               <div className="ml-0 grid w-full gap-2 sm:w-40 lg:ml-auto">
-                <Label className="text-xs">Category</Label>
+                <Label htmlFor="repair-category" className="text-xs">Category</Label>
                 <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger id="repair-category" className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -344,9 +344,9 @@ export function RepairPage({
                 </Select>
               </div>
               <div className="grid w-full gap-2 sm:w-36">
-                <Label className="text-xs">Risk</Label>
+                <Label htmlFor="repair-risk" className="text-xs">Risk</Label>
                 <Select value={riskFilter} onValueChange={(value) => setRiskFilter(value as RiskFilter)}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger id="repair-risk" className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -369,7 +369,7 @@ export function RepairPage({
             <CardContent className="p-0">
               {grouped.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--success))]/10 text-[hsl(var(--success-text))]">
                     <Wrench className="h-6 w-6" weight="fill" />
                   </div>
                   <p className="text-sm font-medium">No repairs match this view</p>
@@ -408,7 +408,7 @@ export function RepairPage({
                 <span className="text-muted-foreground">Before score</span>
                 <span className="font-semibold tabular-nums">{score.total}/100</span>
               </div>
-              <Progress value={score.total} className="h-2" />
+              <Progress value={score.total} className="h-2" aria-label="Score before repairs" />
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between text-sm">
@@ -417,7 +417,7 @@ export function RepairPage({
                   {estimatedScore.total}/100
                 </span>
               </div>
-              <Progress value={estimatedScore.total} className="h-2" />
+              <Progress value={estimatedScore.total} className="h-2" aria-label="Estimated score after repairs" />
             </div>
 
             <Separator />
@@ -438,7 +438,7 @@ export function RepairPage({
                 <Separator />
                 <div className="space-y-3">
                   <div className="rounded-lg bg-[hsl(var(--success)/0.08)] px-3 py-2">
-                    <p className="text-xs font-medium text-[hsl(var(--success))]">Applied {lastRun.applied.length} fix group{lastRun.applied.length === 1 ? '' : 's'}</p>
+                    <p className="text-xs font-medium text-[hsl(var(--success-text))]">Applied {lastRun.applied.length} fix group{lastRun.applied.length === 1 ? '' : 's'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Actual score moved from {lastRun.beforeScore}/100 to {lastRun.afterScore}/100 after re-analysis.
                     </p>

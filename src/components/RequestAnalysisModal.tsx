@@ -32,7 +32,7 @@ function CopyButton({ text }: { text: string }) {
         setTimeout(() => setCopied(false), 1500)
       }}
     >
-      {copied ? <Check className="h-3 w-3 text-[hsl(var(--success))]" /> : <Copy className="h-3 w-3" />}
+      {copied ? <Check className="h-3 w-3 text-[hsl(var(--success-text))]" /> : <Copy className="h-3 w-3" />}
     </Button>
   )
 }
@@ -91,11 +91,11 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {request.hasDescription ? (
-                    <span className="inline-flex items-center gap-1 text-[hsl(var(--success))]">
+                    <span className="inline-flex items-center gap-1 text-[hsl(var(--success-text))]">
                       <Check className="h-3.5 w-3.5" /> Present
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[hsl(var(--warning))]">
+                    <span className="inline-flex items-center gap-1 text-[hsl(var(--warning-text))]">
                       <LockOpen className="h-3.5 w-3.5" /> Missing
                     </span>
                   )}
@@ -143,8 +143,8 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
                 </p>
                 {findings.length === 0 ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4">
-                    <Check className="h-5 w-5 text-[hsl(var(--success))]" />
-                    <p className="text-sm text-[hsl(var(--success))]">No issues flagged for this request.</p>
+                    <Check className="h-5 w-5 text-[hsl(var(--success-text))]" />
+                    <p className="text-sm text-[hsl(var(--success-text))]">No issues flagged for this request.</p>
                   </div>
                 ) : (
                   <ul className="mt-3 space-y-3">

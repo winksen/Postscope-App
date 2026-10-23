@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   CheckCircle,
   ArrowSquareOut,
@@ -16,6 +15,7 @@ import type { SuppressedFinding } from '../lib/suppressions'
 import { affectedLabels } from '../lib/findingDisplay'
 import type { ParsedCollection } from '../lib/parser'
 import type { ScoreBreakdown } from '../lib/scorer'
+import type { AppLocation } from '../lib/appRoutes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -37,6 +37,9 @@ interface SecurityPageProps {
   suppressed?: SuppressedFinding[]
   score: ScoreBreakdown
   search: string
+  /** Filters and the open finding come from the address, so they can be shared and the back button works. */
+  location: AppLocation
+  onLocationChange: (next: AppLocation, replace?: boolean) => void
 }
 
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
@@ -55,11 +58,16 @@ function findingMatchesQuery(f: Finding, q: string, requests: ParsedCollection['
   )
 }
 
-export function SecurityPage({ parsed, findings, suppressed = [], score, search }: SecurityPageProps) {
-  const [view, setView] = useState<'active' | 'suppressed'>('active')
-  const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
-  const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORIES)[number]>('all')
-  const [detail, setDetail] = useState<Finding | null>(null)
+export function SecurityPage({ parsed, findings, suppressed = [], score, search, location, onLocationChange }: SecurityPageProps) {
+  const view = location.view === 'suppressed' ? 'suppressed' : 'active'
+  const severityFilter: (typeof SEVERITIES)[number] = location.severity ?? 'all'
+  const categoryFilter: (typeof CATEGORIES)[number] = location.category ?? 'all'
+  const ruleFilter = location.rule
+  const update = (patch: Partial<AppLocation>, replace = true) => onLocationChange({ ...location, ...patch }, replace)
+  const setSeverityFilter = (value: (typeof SEVERITIES)[number]) => update({ severity: value === 'all' ? undefined : value })
+  const setCategoryFilter = (value: (typeof CATEGORIES)[number]) => update({ category: value === 'all' ? undefined : value })
+  const setView = (value: 'active' | 'suppressed') => update({ view: value === 'suppressed' ? 'suppressed' : undefined })
+  const clearAllFilters = () => update({ severity: undefined, category: undefined, rule: undefined })
 
   const criticalCount = findings.filter((f) => f.severity === 'critical').length
   const warningCount = findings.filter((f) => f.severity === 'warning').length
@@ -67,7 +75,11 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search 
   const affectedRequests = new Set(findings.flatMap((finding) => finding.affected)).size
 
   const showingSuppressed = view === 'suppressed' && suppressed.length > 0
-  const filtered = (showingSuppressed ? suppressed : findings).filter((f) => {
+  const shown = showingSuppressed ? suppressed : findings
+  const detail: Finding | null = (location.finding && shown.find((f) => f.ruleId === location.finding)) || null
+  const setDetail = (finding: Finding | null) => update({ finding: finding?.ruleId }, finding === null)
+  const filtered = shown.filter((f) => {
+    if (ruleFilter && f.ruleId !== ruleFilter) return false
     if (severityFilter !== 'all' && f.severity !== severityFilter) return false
     if (categoryFilter !== 'all' && f.category !== categoryFilter) return false
     if (!findingMatchesQuery(f, search, parsed.requests)) return false
@@ -79,6 +91,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search 
   const activeFilters = [
     severityFilter !== 'all' ? { key: 'severity', value: severityFilter, label: severityFilter } : null,
     categoryFilter !== 'all' ? { key: 'category', value: categoryFilter, label: categoryFilter } : null,
+    ruleFilter ? { key: 'rule', value: ruleFilter, label: ruleFilter } : null,
   ].filter(Boolean) as { key: string; value: string; label: string }[]
 
   return (
@@ -196,6 +209,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search 
                   onClick={() => {
                     if (f.key === 'severity') setSeverityFilter('all')
                     if (f.key === 'category') setCategoryFilter('all')
+                    if (f.key === 'rule') update({ rule: undefined })
                   }}
                   className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
                 >
@@ -204,10 +218,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search 
                 </button>
               ))}
               <button
-                onClick={() => {
-                  setSeverityFilter('all')
-                  setCategoryFilter('all')
-                }}
+                onClick={clearAllFilters}
                 className="text-xs text-muted-foreground underline-offset-2 hover:underline"
               >
                 Clear all
@@ -228,7 +239,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search 
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
-                <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" weight="fill" />
+                <CheckCircle className="h-7 w-7 text-[hsl(var(--success-text))]" weight="fill" />
               </div>
               <p className="text-lg font-medium">Nothing to show</p>
               <p className="max-w-md text-sm text-muted-foreground">
@@ -273,7 +284,7 @@ export function SecurityPage({ parsed, findings, suppressed = [], score, search 
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="gap-1 text-muted-foreground opacity-60 transition-opacity hover:text-foreground group-hover:opacity-100"
+                          className="gap-1 text-muted-foreground transition-colors hover:text-foreground"
                           onClick={(e) => {
                             e.stopPropagation()
                             setDetail(f)

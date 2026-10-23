@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   ArrowSquareOut,
   CheckCircle,
@@ -12,6 +11,7 @@ import { StatCard } from '../components/StatCard'
 import type { Finding } from '../lib/auditor'
 import { affectedLabels } from '../lib/findingDisplay'
 import type { ParsedCollection } from '../lib/parser'
+import type { AppLocation } from '../lib/appRoutes'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +30,9 @@ interface HygienePageProps {
   parsed: ParsedCollection
   findings: Finding[]
   search: string
+  /** Filters and the open finding come from the address, so they can be shared and the back button works. */
+  location: AppLocation
+  onLocationChange: (next: AppLocation, replace?: boolean) => void
 }
 
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
@@ -47,15 +50,20 @@ function findingMatchesQuery(finding: Finding, q: string, requests: ParsedCollec
   )
 }
 
-export function HygienePage({ parsed, findings, search }: HygienePageProps) {
-  const [severityFilter, setSeverityFilter] = useState<(typeof SEVERITIES)[number]>('all')
-  const [detail, setDetail] = useState<Finding | null>(null)
+export function HygienePage({ parsed, findings, search, location, onLocationChange }: HygienePageProps) {
+  const severityFilter: (typeof SEVERITIES)[number] = location.severity ?? 'all'
+  const ruleFilter = location.rule
+  const update = (patch: Partial<AppLocation>, replace = true) => onLocationChange({ ...location, ...patch }, replace)
+  const setSeverityFilter = (value: (typeof SEVERITIES)[number]) => update({ severity: value === 'all' ? undefined : value })
+  const detail: Finding | null = (location.finding && findings.find((f) => f.ruleId === location.finding)) || null
+  const setDetail = (finding: Finding | null) => update({ finding: finding?.ruleId }, finding === null)
 
   const warningCount = findings.filter((finding) => finding.severity === 'warning').length
   const infoCount = findings.filter((finding) => finding.severity === 'info').length
   const affectedRequests = new Set(findings.flatMap((finding) => finding.affected)).size
 
   const filtered = findings.filter((finding) => {
+    if (ruleFilter && finding.ruleId !== ruleFilter) return false
     if (severityFilter !== 'all' && finding.severity !== severityFilter) return false
     return findingMatchesQuery(finding, search, parsed.requests)
   })
@@ -129,8 +137,8 @@ export function HygienePage({ parsed, findings, search }: HygienePageProps) {
               </SelectContent>
             </Select>
           </div>
-          {severityFilter !== 'all' && (
-            <Button variant="ghost" size="sm" onClick={() => setSeverityFilter('all')}>
+          {(severityFilter !== 'all' || ruleFilter) && (
+            <Button variant="ghost" size="sm" onClick={() => update({ severity: undefined, rule: undefined })}>
               Clear filter
             </Button>
           )}
@@ -146,7 +154,7 @@ export function HygienePage({ parsed, findings, search }: HygienePageProps) {
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-5 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--success))]/10">
-                <CheckCircle className="h-7 w-7 text-[hsl(var(--success))]" weight="fill" />
+                <CheckCircle className="h-7 w-7 text-[hsl(var(--success-text))]" weight="fill" />
               </div>
               <p className="text-lg font-medium">Nothing to show</p>
               <p className="max-w-md text-sm text-muted-foreground">
@@ -185,7 +193,7 @@ export function HygienePage({ parsed, findings, search }: HygienePageProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="gap-1 text-muted-foreground opacity-60 transition-opacity hover:text-foreground group-hover:opacity-100"
+                          className="gap-1 text-muted-foreground transition-colors hover:text-foreground"
                           onClick={(event) => {
                             event.stopPropagation()
                             setDetail(finding)

@@ -78,6 +78,8 @@ export function AppHeader({
         <button
           type="button"
           onClick={onOpenSearch}
+          aria-label="Search requests"
+          aria-keyshortcuts="/ Control+K Meta+K"
           className="flex h-9 w-full items-center rounded-xl bg-card pl-9 pr-9 text-left text-sm shadow-[0_8px_22px_hsl(var(--background)/0.28)] transition-colors duration-200 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 dark:bg-muted/70 dark:hover:bg-muted"
         >
           <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -85,7 +87,9 @@ export function AppHeader({
             {search || 'Search requests…'}
           </span>
         </button>
-        <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[10px] text-muted-foreground/60 sm:flex">
+        <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 text-[10px] text-muted-foreground sm:flex" aria-hidden>
+          <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">/</kbd>
+          <span>or</span>
           <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">Ctrl</kbd>
           <kbd className="rounded bg-background/40 px-1 py-0.5 text-[10px]">K</kbd>
         </div>

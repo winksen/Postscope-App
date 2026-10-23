@@ -32,6 +32,8 @@ mindmap
         CWE / OWASP refs
       Hygiene notes
       Score and grade
+      Deep links and back button
+      Keyboard and screen reader use
       Compare versions
         New and resolved findings
         Score change
@@ -243,6 +245,19 @@ A `.postscope.json` found in the scanned file's folder or any parent (or passed 
 - The server rejects cross-site requests, oversized uploads, malformed IDs, and path tricks; it applies a strict Content Security Policy.
 
 Full details: [../SECURITY.md](../SECURITY.md).
+
+### Links and keyboard
+
+| Feature | Behavior |
+|---|---|
+| Page addresses | Each page has its own address: `/security`, `/hygiene`, `/requests`, `/repair`, `/score`, `/compare` (below `/analyze` when the landing page is public). The browser back and forward buttons move between pages |
+| Filters | Severity, category, rule and the Suppressed view are part of the address of the Security and Hygiene pages, for example `/analyze/security?severity=critical&rule=HARDCODED_TOKEN`. Changing a filter does not add history entries |
+| Open finding | `?finding=RULE_ID` opens that finding's detail; closing it removes the parameter |
+| Selected request | `/requests/<encoded id>` selects the request; the back button clears it |
+| Within a session | A link opens the page only for someone who has the same collection loaded (reload, same tab with session restore, or the team library). It carries ids and filter words, never values, evidence or bodies. An unknown address returns to the dashboard |
+| Request tree | Arrow keys move between folders and requests, Right opens a folder, Left closes it or goes to the parent, Home and End jump to the ends |
+| Search | `/` or `Ctrl+K` opens request search (`/` is ignored while typing in a field or when a dialog is open); Escape closes any dialog |
+| Screen readers | Skip link, labeled icon buttons and progress bars, charts replaced by a text summary, announced analysis progress, one `h1` per page |
 
 ## 8. Limitations
 

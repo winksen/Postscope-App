@@ -66,7 +66,8 @@
     --muted-foreground: 220 10% 42%;
     --accent: 220 10% 90%;
     --accent-foreground: 220 15% 15%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 42%;
+    --destructive-text: 0 72% 38%;
     --destructive-foreground: 210 40% 98%;
     --border: 220 10% 86%;
     --input: 220 10% 86%;
@@ -76,12 +77,15 @@
     --chart-2: 220 6% 52%;
     --chart-3: 220 10% 36%;
     --chart-4: 220 7% 62%;
-    --chart-5: 0 84% 60%;
+    --chart-5: 0 72% 42%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    /* Text-safe variants: the base colors are for fills and icons and fail 4.5:1 as text on light surfaces. */
+    --success-text: 142 72% 22%;
     --warning: 38 92% 50%;
     --warning-foreground: 26 83% 14%;
-    --critical: 0 84% 60%;
+    --warning-text: 28 90% 25%;
+    --critical: 0 72% 42%;
     --postman: 220 10% 42%;
     --surface: 220 16% 98%;
     --surface-foreground: 220 15% 15%;
@@ -103,6 +107,7 @@
     --accent: 220 10% 18%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 63% 51%;
+    --destructive-text: 0 84% 70%;
     --destructive-foreground: 210 40% 98%;
     --border: 220 10% 20%;
     --input: 220 10% 20%;
@@ -111,11 +116,13 @@
     --chart-2: 220 6% 52%;
     --chart-3: 220 8% 42%;
     --chart-4: 220 6% 72%;
-    --chart-5: 0 63% 51%;
+    --chart-5: 0 75% 62%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    --success-text: 142 65% 58%;
     --warning: 38 92% 50%;
     --warning-foreground: 26 83% 14%;
+    --warning-text: 38 92% 60%;
     --critical: 0 63% 51%;
     --postman: 220 8% 70%;
     --surface: 220 14% 10%;
@@ -159,6 +166,11 @@
   kbd,
   samp {
     @apply font-sans;
+  }
+  /* Keyboard focus is always visible; components may refine it with ring utilities. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 

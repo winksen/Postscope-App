@@ -103,6 +103,19 @@ test('static server serves SPA routes, assets with caching and gzip, and 404s mi
   assert.equal((await raw('/index.html', { method: 'POST' })).status, 405)
 })
 
+test('browser navigations to deep links open the app, even when the last segment looks like a file', async () => {
+  const html = { headers: { Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' } }
+  for (const link of ['/analyze/requests/Users%2FList%20users', '/analyze/requests/v1.2%2FGet%20item.v2', '/requests/%2Ehidden%2Fa', '/analyze/security?severity=critical&rule=HARDCODED_TOKEN']) {
+    const res = await raw(link, html)
+    assert.equal(res.status, 200, link)
+    assert.match(String(res.headers['content-type']), /text\/html/)
+    assert.ok(!res.body.includes('top-secret'), link)
+  }
+  // Only navigations fall back: script and data requests for unknown files still 404.
+  assert.equal((await raw('/analyze/requests/v1.2%2FGet%20item.v2')).status, 404)
+  assert.equal((await raw('/assets/missing.js')).status, 404)
+})
+
 test('responses carry security headers and a CSP', async () => {
   const res = await raw('/')
   assert.equal(res.headers['x-content-type-options'], 'nosniff')

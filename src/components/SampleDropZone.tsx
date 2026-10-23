@@ -64,6 +64,9 @@ export function SampleDropZone({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <p role="status" aria-live="polite" className="sr-only">
+              {loading ? 'Opening the sample...' : ''}
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {SAMPLE_COLLECTIONS.map((sample) => {
                 const isLoading = loading && loadingId === sample.id

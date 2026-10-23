@@ -32,8 +32,12 @@ export default function App() {
     return <div className="min-h-screen bg-background" />
   }
 
+  // The analyzer lives under /analyze when the landing page is public, otherwise at the root. Its own pages
+  // (/security, /requests/<id>, ...) are routes below that base, so links and the back button work.
+  const analyzerBase = config.publicLandingPage ? '/analyze' : ''
   const analyzer = (
     <AnalyzeApp
+      basePath={analyzerBase}
       loggingMode={config.loggingMode}
       samplesPath="/samples"
       showGitHubLink={config.showGitHubLink}
@@ -52,16 +56,15 @@ export default function App() {
         {config.publicLandingPage ? (
           <>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/analyze" element={analyzer} />
+            <Route path="/analyze/*" element={analyzer} />
             <Route path="/samples" element={<SamplesApp analyzePath="/analyze" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <>
-            <Route path="/" element={analyzer} />
-            <Route path="/analyze" element={<Navigate to="/" replace />} />
+            <Route path="/analyze/*" element={<Navigate to="/" replace />} />
             <Route path="/samples" element={<SamplesApp analyzePath="/" />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/*" element={analyzer} />
           </>
         )}
       </Routes>

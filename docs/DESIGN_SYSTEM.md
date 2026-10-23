@@ -314,11 +314,12 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 | Token | Use |
 |-------|-----|
 | `--success` | Positive states, lock-secured icons, success badges |
+| `--success-text`, `--warning-text`, `--destructive-text` | Text colors for badges, scores and messages. The base `--success`, `--warning` and `--destructive` are for fills and icons: as text on light tints they stay below 4.5:1 |
 | `--warning` | Warnings, caution copy accents |
 | `--critical` | Aligns with destructive emphasis where named explicitly |
 | `--postman` | Reserved for Postman-adjacent branding accents (use sparingly) |
 
-**In Tailwind:** Prefer `bg-primary/10`, `text-destructive`, `border-border`, `text-muted-foreground`. For success/warning fills not in `theme.colors`, use arbitrary values: `bg-[hsl(var(--success)/0.12)]`, `text-[hsl(var(--warning))]`. Match existing `Badge` patterns.
+**In Tailwind:** Prefer `bg-primary/10`, `text-destructive`, `border-border`, `text-muted-foreground`. For success/warning fills not in `theme.colors`, use arbitrary values: `bg-[hsl(var(--success)/0.12)]`, `text-[hsl(var(--warning-text))]`. Use `text-destructive-text`, `text-[hsl(var(--success-text))]` and `text-[hsl(var(--warning-text))]` for text, never the base tokens. Match existing `Badge` patterns.
 
 ---
 
@@ -361,7 +362,10 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 ### Focus
 
 - Standard: `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`.
-- Keep **visible focus** for keyboard users. Do not remove ring without a replacement.
+- Keep **visible focus** for keyboard users. Do not remove ring without a replacement. `index.css` adds a base `:focus-visible` outline (2px `ring`), so an element that drops the ring utilities still shows focus.
+- Collapsed content that stays in the DOM for an animation must be `inert` so Tab and screen readers skip it (see the request tree).
+- Icon-only buttons need an `aria-label`; progress bars need a name (`aria-label` on `Progress`); charts are hidden from assistive technology with `aria-hidden` and a `sr-only` sentence with the same data.
+- Pages have one `h1`; `CardTitle` renders an `h2` (use `as` for another level). A scrolling region without focusable content takes `focusable` on `ScrollArea`.
 
 ### Transitions
 

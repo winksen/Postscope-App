@@ -451,6 +451,8 @@ docker run -d \
 
 Proxy `https://postscope.internal.example.com` to `http://127.0.0.1:3010`.
 
+PostScope pages have their own addresses (`/security`, `/requests/<id>`, or the same below `/analyze` when `PUBLIC_LANDING_PAGE=true`), so the proxy must pass every path through to PostScope and must not rewrite or cache the HTML. Browser navigations to unknown paths receive the app shell; requests for missing scripts, styles and data still return 404.
+
 ### Single sign-on with a reverse proxy
 
 Basic auth is one shared credential. To know who saved a collection, put an SSO-aware proxy in front, for example [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) with nginx, and let it pass the user through:

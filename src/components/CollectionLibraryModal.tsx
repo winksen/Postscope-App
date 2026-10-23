@@ -146,7 +146,7 @@ export function CollectionLibraryModal({
               ))
             ) : loadError ? (
               <div className="flex flex-col items-center gap-3 rounded-xl bg-destructive/10 px-6 py-8 text-center">
-                <p className="text-sm font-medium text-destructive">{loadError}</p>
+                <p className="text-sm font-medium text-destructive-text">{loadError}</p>
                 <Button size="sm" variant="secondary" onClick={() => void refresh()}>
                   Try again
                 </Button>
@@ -244,7 +244,7 @@ export function CollectionLibraryModal({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-destructive"
+                            className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-destructive-text"
                             disabled={isBusy}
                             onClick={() => void handleDelete(item)}
                           >

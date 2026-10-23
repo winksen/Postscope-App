@@ -151,7 +151,10 @@ export function DropZone({
 
       <MarketingHeader />
 
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
+      <main className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
+        <p role="status" aria-live="polite" className="sr-only">
+          {loading ? 'Analyzing the collection...' : ''}
+        </p>
         <div className="mb-6 w-full max-w-3xl animate-fade-in">
           <p className="mb-3 text-center text-sm font-medium text-foreground">
             {canChoosePrivacyMode(loggingMode) ? 'Privacy mode' : 'Deployment mode'}
@@ -315,7 +318,7 @@ export function DropZone({
             >
               <FileCode className="h-7 w-7 text-primary" weight="fill" />
             </div>
-            <CardTitle className="text-2xl font-semibold">
+            <CardTitle as="h1" className="text-2xl font-semibold">
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
@@ -473,7 +476,7 @@ export function DropZone({
             </AnimatePresence>
 
             {entryError && (
-              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
+              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive-text">
                 {entryError}
               </div>
             )}
@@ -551,7 +554,7 @@ export function DropZone({
             )}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

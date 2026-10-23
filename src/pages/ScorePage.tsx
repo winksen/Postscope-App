@@ -32,11 +32,11 @@ function getProgressTone(value: number): string {
   return 'bg-[hsl(var(--chart-5))]'
 }
 
+/** Text colors that keep 4.5:1 on cards in both themes (the chart colors are for fills). */
 function getScoreTone(value: number): string {
-  if (value >= 90) return 'text-[hsl(var(--chart-2))]'
-  if (value >= 75) return 'text-[hsl(var(--chart-1))]'
-  if (value >= 55) return 'text-[hsl(var(--chart-3))]'
-  if (value >= 35) return 'text-[hsl(var(--chart-4))]'
+  if (value >= 90) return 'text-[hsl(var(--success-text))]'
+  if (value >= 55) return 'text-foreground'
+  if (value >= 35) return 'text-[hsl(var(--warning-text))]'
   return 'text-[hsl(var(--chart-5))]'
 }
 
@@ -98,7 +98,7 @@ function CategoryBar({
           {animatedValue}/100
         </span>
       </div>
-      <Progress value={animatedValue} indicatorClassName={getProgressTone(value)} className="h-2" />
+      <Progress value={animatedValue} indicatorClassName={getProgressTone(value)} className="h-2" aria-label={`${CATEGORY_LABELS[keyName]} score`} />
     </div>
   )
 }
@@ -111,9 +111,9 @@ function ActionCard({
   priority: 'P0' | 'P1' | 'P2'
 }) {
   const priorityConfig = {
-    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive' },
-    P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]' },
-    P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]' },
+    P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive-text' },
+    P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning-text))]' },
+    P2: { icon: CheckCircle, color: 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success-text))]' },
   }
 
   const config = priorityConfig[priority]

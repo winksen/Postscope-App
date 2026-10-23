@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DropZone } from '../components/DropZone'
 import { DashboardShell } from '../components/layout/dashboard-shell'
 import type { EnvironmentOption, ExportFormat } from '../components/layout/app-header'
@@ -59,12 +60,16 @@ import { downloadTextFile } from '../lib/download'
 import type { CompareInput } from '../lib/compare'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { NavId } from '../components/layout/app-sidebar'
+import { isSearchShortcut } from '../lib/keyboard'
+import { buildAppPath, parseAppLocation, type AppLocation } from '../lib/appRoutes'
 
 /** Upper bound for in-browser analysis; larger files risk exhausting tab memory. */
 const MAX_IMPORT_BYTES = 50_000_000
 
 interface AnalyzeAppProps {
   loggingMode: LoggingMode
+  /** Path the analyzer is mounted at (`/analyze`, or empty at the root); its pages are routes below it. */
+  basePath?: string
   samplesPath?: string
   showGitHubLink?: boolean
   showFeedbackLink?: boolean
@@ -83,6 +88,7 @@ function formatMegabytes(bytes: number): string {
 
 export function AnalyzeApp({
   loggingMode,
+  basePath = '',
   samplesPath = '/samples',
   showGitHubLink = true,
   showFeedbackLink = true,
@@ -93,6 +99,20 @@ export function AnalyzeApp({
   auditPolicy = EMPTY_POLICY,
 }: AnalyzeAppProps) {
   const { notify } = useToast()
+  const navigate = useNavigate()
+  const routerLocation = useLocation()
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+  const route = useMemo(() => parseAppLocation(routerLocation.pathname, routerLocation.search, basePath), [routerLocation.pathname, routerLocation.search, basePath])
+  const location: AppLocation = route ?? { page: 'overview' }
+  const active: NavId = location.page
+  /** Moves to another page, request or filter set. Filters replace the entry so back and forward step through pages. */
+  const goTo = useCallback((next: AppLocation, replace = false) => navigateRef.current(buildAppPath(basePath, next), { replace }), [basePath])
+  const setActive = useCallback((id: NavId) => goTo({ page: id }), [goTo])
+  // An address that is not a page of the analyzer goes to the dashboard.
+  useEffect(() => {
+    if (!route) navigateRef.current(buildAppPath(basePath, { page: 'overview' }), { replace: true })
+  }, [route, basePath])
   const [parsed, setParsed] = useState<ParsedCollection | null>(null)
   const [findings, setFindings] = useState<Finding[]>([])
   const [suppressed, setSuppressed] = useState<SuppressedFinding[]>([])
@@ -104,10 +124,8 @@ export function AnalyzeApp({
   const [savedCollections, setSavedCollections] = useState<SavedCollectionMeta[]>([])
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
-  const [active, setActive] = useState<NavId>('overview')
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [focusRequestId, setFocusRequestId] = useState<string | null>(null)
   const [landingLoading, setLandingLoading] = useState(false)
   const [restoringSession, setRestoringSession] = useState(true)
   const [savingToLibrary, setSavingToLibrary] = useState(false)
@@ -209,7 +227,7 @@ export function AnalyzeApp({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if (isSearchShortcut(e, document.querySelector('[role="dialog"]') !== null)) {
         e.preventDefault()
         setSearchOpen(true)
       }
@@ -232,7 +250,7 @@ export function AnalyzeApp({
 
   /** Analyzes raw JSON and shows the dashboard. Returns false when a newer analysis superseded this one. */
   const applyCollectionJson = useCallback(
-    async (raw: string, libraryId?: string | null, environments: string[] = [], activeEnvironment?: number): Promise<boolean> => {
+    async (raw: string, libraryId?: string | null, environments: string[] = [], activeEnvironment?: number, restoring = false): Promise<boolean> => {
       const seq = ++analysisSeq.current
       const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments })
       if (seq !== analysisSeq.current) return false
@@ -255,7 +273,8 @@ export function AnalyzeApp({
       setRawJson(raw)
       setOriginalRawJson(raw)
       setEnvironmentTexts(environments)
-      setActive('overview')
+      // A restored session keeps the page in the address; a new import starts on the dashboard.
+      if (!restoring) goTo({ page: 'overview' })
       setSearch('')
       notifyParseWarnings(p)
 
@@ -287,7 +306,7 @@ export function AnalyzeApp({
       }
       return true
     },
-    [loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify, notifyParseWarnings]
+    [loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify, notifyParseWarnings, goTo]
   )
 
   useEffect(() => {
@@ -302,7 +321,7 @@ export function AnalyzeApp({
       setRestoringSession(false)
       return
     }
-    void applyCollectionJson(session.rawJson, null, session.environments ?? [], session.activeEnvironment)
+    void applyCollectionJson(session.rawJson, null, session.environments ?? [], session.activeEnvironment, true)
       .catch((e) => {
         console.error(e)
         clearCollectionSession()
@@ -434,9 +453,9 @@ export function AnalyzeApp({
     setReferenceRaw(null)
     setSearch('')
     setSearchOpen(false)
-    setFocusRequestId(null)
     setLandingLoading(false)
-  }, [])
+    goTo({ page: 'overview' }, true)
+  }, [goTo])
 
   const handleLoadFromLibrary = useCallback(
     async (id: string) => {
@@ -519,11 +538,13 @@ export function AnalyzeApp({
     }
   }, [parsed, rawJson, loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify])
 
-  const handleSearchSelect = useCallback((request: ParsedRequest) => {
-    setActive('requests')
-    setSearch('')
-    setFocusRequestId(request.id)
-  }, [])
+  const handleSearchSelect = useCallback(
+    (request: ParsedRequest) => {
+      setSearch('')
+      goTo({ page: 'requests', requestId: request.id })
+    },
+    [goTo]
+  )
 
   const handleApplyRepairedCollection = useCallback(
     async (raw: string) => {
@@ -549,7 +570,7 @@ export function AnalyzeApp({
         setSuppressed(s)
         setRawJson(raw)
         setCurrentLibraryId(null)
-        setActive('repair')
+        goTo({ page: 'repair' }, true)
         setSearch('')
 
         if (shouldPersistSession(loggingMode, storageMode)) {
@@ -562,7 +583,7 @@ export function AnalyzeApp({
         score: calculateScore(p, f),
       }
     },
-    [loggingMode, storageMode]
+    [loggingMode, storageMode, goTo]
   )
 
   const handleResetRepairs = useCallback(async () => {
@@ -740,15 +761,15 @@ export function AnalyzeApp({
             parsed={parsed}
             findings={findings}
             search={search}
-            focusRequestId={focusRequestId}
-            onFocusRequestHandled={() => setFocusRequestId(null)}
+            selectedId={location.requestId ?? null}
+            onSelectId={(id) => goTo({ page: 'requests', requestId: id ?? undefined })}
           />
         )}
         {active === 'security' && (
-          <SecurityPage parsed={parsed} findings={securityFindings} suppressed={suppressed} score={score} search={search} />
+          <SecurityPage parsed={parsed} findings={securityFindings} suppressed={suppressed} score={score} search={search} location={location} onLocationChange={goTo} />
         )}
         {active === 'hygiene' && (
-          <HygienePage parsed={parsed} findings={hygieneFindings} search={search} />
+          <HygienePage parsed={parsed} findings={hygieneFindings} search={search} location={location} onLocationChange={goTo} />
         )}
         {active === 'repair' && rawJson && (
           <RepairPage

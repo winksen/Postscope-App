@@ -32,7 +32,7 @@ function Delta({ value }: { value: number }) {
   }
   const better = value > 0
   return (
-    <span className={cn('inline-flex items-center gap-1 font-medium', better ? 'text-[hsl(var(--success))]' : 'text-destructive')}>
+    <span className={cn('inline-flex items-center gap-1 font-medium', better ? 'text-[hsl(var(--success-text))]' : 'text-destructive-text')}>
       {better ? <ArrowUp className="h-3.5 w-3.5" aria-hidden /> : <ArrowDown className="h-3.5 w-3.5" aria-hidden />}
       {better ? `+${value}` : value}
       <span className="sr-only">{better ? ' (better)' : ' (worse)'}</span>
@@ -218,7 +218,7 @@ export function ComparePage({ current, reference, loading, library, currentLibra
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <CheckCircle className="h-4 w-4 text-[hsl(var(--success))]" weight="fill" />
+                <CheckCircle className="h-4 w-4 text-[hsl(var(--success-text))]" weight="fill" />
                 Resolved findings
               </CardTitle>
               <CardDescription>In the older version and gone now.</CardDescription>
