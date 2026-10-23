@@ -3,6 +3,8 @@ import type { ParsedCollection, ParsedRequest } from './parser'
 import type { ScoreBreakdown } from './scorer'
 import { RULES, RULE_LIST } from './rules'
 import { SEVERITY_ORDER } from './severity'
+import { findingOccurrences, occurrenceFingerprint } from './occurrences'
+import type { SuppressedFinding } from './suppressions'
 
 export type ReportFormat = 'json' | 'sarif' | 'markdown'
 
@@ -14,6 +16,10 @@ export interface ReportContext {
   generatedAt?: Date
   /** File name used as the SARIF artifact location (defaults to a name derived from the collection). */
   sourceName?: string
+  /** Occurrences hidden by reviewed suppressions. Reported, but not scored. */
+  suppressed?: SuppressedFinding[]
+  /** Occurrences hidden because they are in the baseline file. */
+  baselined?: number
 }
 
 const TOOL_NAME = 'PostScope'
@@ -96,7 +102,25 @@ export function buildJsonReport(ctx: ReportContext): string {
         owasp: finding.owasp,
         affected: finding.affected.map((id) => ({ id, label: labels.get(id) ?? id })),
         evidence: finding.evidence ?? [],
+        occurrences: findingOccurrences(finding).map(({ fingerprint, requestId, location }) => ({ fingerprint, requestId, location })),
       })),
+      suppressed: (ctx.suppressed ?? []).map((finding) => ({
+        ruleId: finding.ruleId,
+        severity: finding.severity,
+        category: finding.category,
+        title: finding.title,
+        suppressed: true,
+        affected: finding.affected.map((id) => ({ id, label: labels.get(id) ?? id })),
+        suppressions: finding.suppressions.map((item) => ({
+          fingerprint: occurrenceFingerprint(finding.ruleId, item.requestId, item.location),
+          requestId: item.requestId,
+          location: item.location,
+          reason: item.reason,
+          source: item.source,
+          expires: item.expires,
+        })),
+      })),
+      baseline: ctx.baselined === undefined ? undefined : { hiddenOccurrences: ctx.baselined },
     },
     null,
     2
@@ -127,7 +151,7 @@ export function buildSarifReport(ctx: ReportContext): string {
   const ruleIndex = new Map(RULE_LIST.map((rule, index) => [rule.id, index]))
 
   const results: unknown[] = []
-  for (const finding of ctx.findings) {
+  const addResults = (finding: Finding, suppressions?: SuppressedFinding['suppressions']) => {
     const targets = finding.affected.length ? finding.affected : [null]
     for (const requestId of targets) {
       if (results.length >= MAX_SARIF_RESULTS) break
@@ -136,6 +160,7 @@ export function buildSarifReport(ctx: ReportContext): string {
       const message = [label ? `${finding.title}: ${label}.` : `${finding.title}.`, evidence ? `Location: ${evidence.location}.` : '', finding.recommendation]
         .filter(Boolean)
         .join(' ')
+      const reasons = suppressions?.filter((item) => (requestId ? item.requestId === requestId : !item.requestId))
       results.push({
         ruleId: finding.ruleId,
         ruleIndex: ruleIndex.get(finding.ruleId),
@@ -147,10 +172,24 @@ export function buildSarifReport(ctx: ReportContext): string {
             ...(label ? { logicalLocations: [{ fullyQualifiedName: label, kind: 'member' }] } : {}),
           },
         ],
-        partialFingerprints: { 'postscope/v1': fingerprint(`${finding.ruleId}|${requestId ?? 'collection'}`) },
+        partialFingerprints: {
+          'postscope/v1': fingerprint(`${finding.ruleId}|${requestId ?? 'collection'}`),
+          'postscope/v2': occurrenceFingerprint(finding.ruleId, requestId ?? undefined, evidence?.location),
+        },
+        ...(suppressions
+          ? {
+              suppressions: (reasons?.length ? reasons : suppressions).slice(0, 1).map((item) => ({
+                kind: item.source === 'inline' ? 'inSource' : 'external',
+                status: 'accepted',
+                justification: item.reason,
+              })),
+            }
+          : {}),
       })
     }
   }
+  for (const finding of ctx.findings) addResults(finding)
+  for (const finding of ctx.suppressed ?? []) addResults(finding, finding.suppressions)
 
   const severityByRule = new Map(ctx.findings.map((finding) => [finding.ruleId, finding.severity]))
   return JSON.stringify(
@@ -221,10 +260,7 @@ export function buildMarkdownReport(ctx: ReportContext): string {
     lines.push('## Parse warnings', '', ...ctx.parsed.parseWarnings.map((warning) => `- ${escapeMarkdown(warning)}`), '')
   }
 
-  if (!ctx.findings.length) {
-    lines.push('No findings.', '')
-    return lines.join('\n')
-  }
+  if (!ctx.findings.length) lines.push('No findings.', '')
 
   for (const severity of SEVERITY_ORDER) {
     const group = ctx.findings.filter((finding) => finding.severity === severity)
@@ -252,6 +288,20 @@ export function buildMarkdownReport(ctx: ReportContext): string {
       }
     }
   }
+
+  if (ctx.suppressed?.length) {
+    lines.push(`## Suppressed (${ctx.suppressed.length}, not scored)`, '')
+    for (const finding of ctx.suppressed) {
+      lines.push(`### ${escapeMarkdown(finding.title)}`, '', `\`${finding.ruleId}\` · ${finding.category}`, '')
+      for (const item of finding.suppressions.slice(0, MAX_MARKDOWN_AFFECTED)) {
+        const where = [item.requestId ? labels.get(item.requestId) ?? item.requestId : 'collection', item.location].filter(Boolean).join(': ')
+        lines.push(`- ${escapeMarkdown(where)}. Reason: ${escapeMarkdown(item.reason)} (${item.source}${item.expires ? `, expires ${item.expires}` : ''})`)
+      }
+      if (finding.suppressions.length > MAX_MARKDOWN_AFFECTED) lines.push(`- … and ${finding.suppressions.length - MAX_MARKDOWN_AFFECTED} more`)
+      lines.push('')
+    }
+  }
+  if (ctx.baselined) lines.push(`${ctx.baselined} known occurrence(s) are hidden by the baseline.`, '')
 
   return lines.join('\n')
 }

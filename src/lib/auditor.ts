@@ -8,6 +8,7 @@ import { findDescriptionSecrets } from './descriptions'
 import { findScriptSecrets } from './scriptSecrets'
 import { lookupVariableValue } from './environment'
 import { analyzeVariableUsage } from './variableUsage'
+import { applySuppressions, type ConfigSuppression, type SuppressedFinding } from './suppressions'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
   AUTH_HEADER_SCHEME,
@@ -54,6 +55,10 @@ export interface AuditOptions {
   disabledRules?: readonly string[]
   /** Per-rule severity overrides (team policy or personal preference). */
   severityOverrides?: Partial<Record<string, Severity>>
+  /** Reviewed suppressions (from `.postscope.json`); inline `postscope-ignore` lines are always honored. */
+  suppressions?: readonly ConfigSuppression[]
+  /** Clock used to decide whether a suppression has expired. Defaults to now. */
+  now?: Date
 }
 
 const MAX_EVIDENCE_PER_FINDING = 100
@@ -954,7 +959,19 @@ export function sanitizeAuditOptions(input: unknown): AuditOptions {
   return { disabledRules, severityOverrides }
 }
 
-export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): Finding[] {
+export interface AuditResult {
+  /** Active findings: what is reported, scored and checked by `--fail-on`. */
+  findings: Finding[]
+  /** Occurrences hidden by a reviewed suppression, kept for reports. */
+  suppressed: SuppressedFinding[]
+}
+
+function sortFindings(findings: Finding[]): Finding[] {
+  const order = new Map(RULE_LIST.map((rule, index) => [rule.id, index]))
+  return findings.sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || (order.get(a.ruleId) ?? 0) - (order.get(b.ruleId) ?? 0))
+}
+
+export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions = {}): AuditResult {
   const out = new FindingCollector()
 
   for (const req of parsed.requests) {
@@ -975,5 +992,14 @@ export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): 
   checkVariableIntegrity(parsed, out)
   runInfoChecks(parsed, out)
 
-  return out.build(options)
+  const { active, suppressed, notices } = applySuppressions(parsed, out.build(options), options)
+  if (notices.length === 0) return { findings: active, suppressed }
+
+  const noticeCollector = new FindingCollector()
+  for (const notice of notices) noticeCollector.add(notice.ruleId, undefined, { location: notice.location })
+  return { findings: sortFindings([...active, ...noticeCollector.build(options)]), suppressed }
+}
+
+export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): Finding[] {
+  return runAuditDetailed(parsed, options).findings
 }

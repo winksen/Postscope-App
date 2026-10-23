@@ -127,6 +127,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Warning | Sensitive value logged by script | `console.log(pm.environment.get("token"))` |
 | Warning | Variables referenced but never defined | `{{tenant}}` used in a URL or header, or `pm.environment.get('x')`, but no variable, environment or script provides it. Shown as info when no environment is loaded, because the value may live there |
 | Info | Collection variables that are never used | Defined but not referenced by any request, script, auth setting or other variable |
+| Info | Expired or malformed suppression | A `postscope-ignore` line or config suppression that no longer applies |
 | Info | Hygiene and structure notes | Descriptions, duplicates, placeholders, nesting, few variables, many auth types, GET with body |
 
 Entries that are switched off in Postman (disabled headers, query params, form fields, scripts) are still checked for secrets, because they stay in the exported file. Their evidence is labelled `(disabled)` and the Requests page shows them greyed out with a **Disabled** badge. Repair and the sanitized copy cover them too.
@@ -192,10 +193,36 @@ Available in `hybrid` and `on` modes.
 | `--sanitize out.json` | Write a sanitized copy; sanitized environment copies are written next to it as `<name>.sanitized.postman_environment.json` |
 | `-e, --environment file.json` | Analyze a Postman environment export with the collections (repeatable) |
 | `--globals file.json` | Analyze a Postman globals export with the collections (repeatable) |
+| `--config file`, `--no-config` | Use a specific project config, or ignore the `.postscope.json` that would be found above the scanned file |
+| `--baseline file` | Report and fail only on findings that are not in the baseline file |
+| `--write-baseline file` | Record the current findings as a baseline and exit 0 |
 | `--list-rules` | Print the rule catalog |
 | `--version` | Print the PostScope version (same value as the app, Docker image and `/api/config`, from any directory) |
 
 Exit codes: `0` pass, `1` policy failure, `2` usage or input error.
+
+### Project config, baselines and suppressions
+
+A `.postscope.json` found in the scanned file's folder or any parent (or passed with `--config`) sets team defaults. Command line flags add to it or override it. Unknown keys, unknown rule ids and suppressions without a reason are errors, so typos never silently weaken the policy.
+
+```json
+{
+  "disabledRules": ["GET_WITH_BODY"],
+  "severityOverrides": { "INSECURE_HTTP": "critical" },
+  "weights": { "critical": 20, "warning": 8, "info": 2 },
+  "suppressions": [
+    { "ruleId": "MISSING_AUTH", "request": "Public/**", "reason": "Public endpoints by design", "expires": "2027-01-31" }
+  ]
+}
+```
+
+| Feature | Behavior |
+|---|---|
+| Suppressions | Hide specific occurrences of a rule (`request` is a glob on the request id, `location` a substring of the evidence location) with a mandatory `reason` and an optional `expires` date. An expired suppression stops applying and raises `SUPPRESSION_EXPIRED` |
+| Inline suppressions | A line `postscope-ignore RULE_ID: reason` (optionally `RULE_ID expires=YYYY-MM-DD: reason`) in a request, folder or collection description. Missing reason, unknown rule or bad date: not applied, `SUPPRESSION_INVALID` raised |
+| Suppressed occurrences | Stay in the reports (JSON `suppressed`, SARIF `suppressions`, Markdown section, the **Show: Suppressed** view on the Security page) but do not count toward the score or `--fail-on` |
+| Baseline | `--write-baseline` stores a fingerprint (a SHA-256 of rule, request and location, no values) for every current occurrence; `--baseline` then hides those, so CI fails only on new ones. Commit the baseline file and refresh it when findings are fixed |
+| Fingerprints | Also exported per occurrence in the JSON report and as `postscope/v2` SARIF fingerprints |
 
 ## 7. Privacy and security guarantees (user view)
 

@@ -10,10 +10,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseCollection } from '../src/lib/parser'
-import { runAudit, sanitizeAuditOptions, type AuditOptions, type Finding } from '../src/lib/auditor'
+import { runAuditDetailed, sanitizeAuditOptions, type AuditOptions, type Finding } from '../src/lib/auditor'
 import { calculateScore } from '../src/lib/scorer'
 import { buildJsonReport, buildMarkdownReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
 import { redactCollection, redactEnvironment } from '../src/lib/redaction'
+import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src/lib/projectConfig'
+import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
 import { readPackageVersion } from '../server/appVersion'
@@ -30,6 +32,11 @@ interface CliOptions {
   minScore?: number
   audit: AuditOptions
   weights?: ScoreWeights
+  /** Project config file (`.postscope.json`); discovered upward from each input when omitted. */
+  config?: string
+  noConfig: boolean
+  baseline?: string
+  writeBaseline?: string
   sanitize?: string
   /** Postman environment and globals export files (applied to every collection). */
   environments: Array<{ file: string; globals: boolean }>
@@ -48,6 +55,10 @@ Options:
       --min-score <0-100>                  Exit 1 when any collection scores below this value
       --disable <RULE,RULE>                Disable rules (see --list-rules)
       --severity <RULE=level,...>          Override rule severities (critical, warning, info)
+      --config <file>                      Project config (default: the nearest .postscope.json above the input file)
+      --no-config                          Ignore any .postscope.json
+      --baseline <file>                    Report and fail only on findings that are not in this baseline file
+      --write-baseline <file>              Write the current findings as a baseline and exit 0
       --weights <critical=N,warning=N,info=N>
                                            Points deducted per finding severity (default critical=20,warning=8,info=2)
       --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input).
@@ -67,7 +78,7 @@ function readVersion(): string {
 }
 
 function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
-  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, environments: [], quiet: false }
+  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, environments: [], noConfig: false, quiet: false }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
 
@@ -120,6 +131,18 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
           overrides[rule.toUpperCase()] = level
         }
         break
+      case '--config':
+        options.config = value()
+        break
+      case '--no-config':
+        options.noConfig = true
+        break
+      case '--baseline':
+        options.baseline = value()
+        break
+      case '--write-baseline':
+        options.writeBaseline = value()
+        break
       case '--weights': {
         const parsed = parseScoreWeights(value())
         if (parsed.errors.length) throw new UsageError(`Invalid --weights: ${parsed.errors.join('; ')}`)
@@ -153,6 +176,8 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
 
   if (!options.inputs.length) throw new UsageError('Provide at least one collection file.')
   if (options.sanitize && options.inputs.length > 1) throw new UsageError('--sanitize works with a single input.')
+  if (options.baseline && options.writeBaseline) throw new UsageError('Use either --baseline or --write-baseline, not both.')
+  if (options.config && options.noConfig) throw new UsageError('Use either --config or --no-config, not both.')
   return options
 }
 
@@ -164,6 +189,52 @@ function readInput(input: string): string {
 interface AnalyzedFile {
   input: string
   ctx: ReportContext
+  /** Project config file that applied to this input, if any. */
+  configFile?: string
+  /** Active findings before the baseline was applied (what `--write-baseline` records). */
+  beforeBaseline: Finding[]
+}
+
+/** Finds the nearest `.postscope.json` at or above the input's folder (the working folder for stdin). */
+function discoverConfig(input: string): string | undefined {
+  let dir = input === '-' ? process.cwd() : path.dirname(path.resolve(input))
+  for (;;) {
+    const candidate = path.join(dir, CONFIG_FILE_NAME)
+    if (fs.existsSync(candidate)) return candidate
+    const parent = path.dirname(dir)
+    if (parent === dir) return undefined
+    dir = parent
+  }
+}
+
+function loadProjectConfig(file: string): ProjectConfig {
+  let json: unknown
+  try {
+    json = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch (error) {
+    throw new UsageError(`${file}: cannot read project config (${error instanceof Error ? error.message : String(error)})`)
+  }
+  const { config, errors } = parseProjectConfig(json)
+  if (errors.length) throw new UsageError(`${file}: invalid project config\n  - ${errors.join('\n  - ')}`)
+  return config
+}
+
+/** Config file values are defaults; command line flags add to them or override them. */
+function mergeAuditOptions(cli: AuditOptions, config: ProjectConfig | undefined): AuditOptions {
+  if (!config) return cli
+  const merged = sanitizeAuditOptions({
+    disabledRules: [...new Set([...(config.disabledRules ?? []), ...(cli.disabledRules ?? [])])],
+    severityOverrides: { ...config.severityOverrides, ...cli.severityOverrides },
+  })
+  return { ...merged, suppressions: config.suppressions }
+}
+
+function loadBaseline(file: string): Baseline {
+  try {
+    return parseBaseline(JSON.parse(fs.readFileSync(file, 'utf8')))
+  } catch (error) {
+    throw new UsageError(`${file}: cannot read baseline (${error instanceof Error ? error.message : String(error)})`)
+  }
 }
 
 interface LoadedEnvironment {
@@ -196,7 +267,7 @@ function environmentStem(file: string): string {
   return path.basename(file).replace(/\.postman_(?:environment|globals)\.json$/i, '').replace(/\.json$/i, '')
 }
 
-function analyzeFile(input: string, audit: AuditOptions, appVersion: string, environments: LoadedEnvironment[], weights?: ScoreWeights): { result: AnalyzedFile; json: unknown } {
+function analyzeFile(input: string, options: CliOptions, appVersion: string, environments: LoadedEnvironment[], baseline?: Baseline): { result: AnalyzedFile; json: unknown } {
   let json: unknown
   try {
     json = JSON.parse(readInput(input))
@@ -213,10 +284,19 @@ function analyzeFile(input: string, audit: AuditOptions, appVersion: string, env
   } catch {
     throw new UsageError(`${input}: not a Postman collection (missing item array)`)
   }
-  const findings = runAudit(parsed, audit)
-  const score = calculateScore(parsed, findings, weights)
+  const configFile = options.noConfig ? undefined : (options.config ?? discoverConfig(input))
+  const config = configFile ? loadProjectConfig(configFile) : undefined
+  const { findings: allActive, suppressed } = runAuditDetailed(parsed, mergeAuditOptions(options.audit, config))
+  const applied = baseline ? applyBaseline(allActive, baseline) : undefined
+  const findings = applied ? applied.findings : allActive
+  const score = calculateScore(parsed, findings, options.weights ?? config?.weights)
   return {
-    result: { input, ctx: { parsed, findings, score, appVersion, sourceName: input === '-' ? undefined : path.basename(input) } },
+    result: {
+      input,
+      configFile,
+      beforeBaseline: allActive,
+      ctx: { parsed, findings, score, appVersion, sourceName: input === '-' ? undefined : path.basename(input), suppressed, baselined: applied?.hidden },
+    },
     json,
   }
 }
@@ -284,8 +364,9 @@ export function main(argv: string[]): number {
   const files: AnalyzedFile[] = []
   try {
     const environments = loadEnvironments(options.environments)
+    const baseline = options.baseline ? loadBaseline(options.baseline) : undefined
     for (const input of options.inputs) {
-      const { result, json } = analyzeFile(input, options.audit, appVersion, environments, options.weights)
+      const { result, json } = analyzeFile(input, options, appVersion, environments, baseline)
       files.push(result)
       if (options.sanitize) {
         const { json: sanitized, redactedCount } = redactCollection(json)
@@ -308,11 +389,28 @@ export function main(argv: string[]): number {
   if (options.output) fs.writeFileSync(options.output, report)
   else process.stdout.write(report.endsWith('\n') ? report : `${report}\n`)
 
+  if (options.writeBaseline) {
+    const baseline = buildBaseline(files.flatMap((file) => file.beforeBaseline))
+    try {
+      fs.writeFileSync(options.writeBaseline, `${JSON.stringify(baseline, null, 2)}\n`)
+    } catch (error) {
+      process.stderr.write(`Error: cannot write baseline (${error instanceof Error ? error.message : String(error)})\n`)
+      return 2
+    }
+    if (!options.quiet) process.stderr.write(`PostScope: baseline of ${baseline.entries.length} occurrence(s) written to ${options.writeBaseline}\n`)
+    return 0
+  }
+
   const failures = files.flatMap(({ ctx }) => failingFindings(ctx.findings, options.failOn))
   const lowScores = options.minScore === undefined ? [] : files.filter(({ ctx }) => ctx.score.total < (options.minScore ?? 0))
   const passed = failures.length === 0 && lowScores.length === 0
 
   if (!options.quiet) {
+    const suppressedCount = files.reduce((total, { ctx }) => total + (ctx.suppressed ?? []).reduce((sum, finding) => sum + finding.suppressions.length, 0), 0)
+    const baselinedCount = files.reduce((total, { ctx }) => total + (ctx.baselined ?? 0), 0)
+    for (const file of files) if (file.configFile) process.stderr.write(`Config: ${file.configFile}\n`)
+    if (suppressedCount) process.stderr.write(`Suppressed: ${suppressedCount} occurrence(s) with a reviewed reason (not scored)\n`)
+    if (baselinedCount) process.stderr.write(`Baseline: ${baselinedCount} known occurrence(s) hidden\n`)
     const reasons = [
       failures.length ? `${failures.length} finding(s) at or above "${options.failOn}"` : '',
       lowScores.length ? `${lowScores.length} collection(s) below score ${options.minScore}` : '',

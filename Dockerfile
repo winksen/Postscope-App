@@ -13,7 +13,7 @@ RUN npm run build
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-ARG APP_VERSION=0.1.36
+ARG APP_VERSION=0.1.37
 
 LABEL org.opencontainers.image.title="PostScope"
 LABEL org.opencontainers.image.description="Offline-capable Postman collection analyzer"

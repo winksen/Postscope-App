@@ -39,6 +39,7 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 
 ### Out of scope
 
+- Suppressions are a governance tool, not a detector: they hide findings only for the occurrences they name, need a written reason, can expire, and stay visible in every report. Review `.postscope.json` and baseline changes in code review like any other security policy change. Baseline files contain rule ids, request ids and evidence locations but never credential values.
 - Environment and globals files are analyzed in the browser or CLI only. They are never sent to the team library, so a library record cannot leak them.
 - PostScope does not verify whether a detected secret is still valid. Treat every finding as exposed and rotate it.
 - Basic auth is a gate, not identity management. Use an SSO-aware reverse proxy if you need per-user audit trails.

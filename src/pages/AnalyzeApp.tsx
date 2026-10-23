@@ -49,7 +49,8 @@ import {
 } from '../lib/auditPreferences'
 import { calculateScore } from '../lib/scorer'
 import { createRepairPlan } from '../lib/repairEngine'
-import { runAudit, type AuditOptions, type Finding } from '../lib/auditor'
+import { runAuditDetailed, type AuditOptions, type Finding } from '../lib/auditor'
+import type { SuppressedFinding } from '../lib/suppressions'
 import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
 import { redactCollection, redactEnvironment } from '../lib/redaction'
 import { downloadTextFile } from '../lib/download'
@@ -89,6 +90,7 @@ export function AnalyzeApp({
   const { notify } = useToast()
   const [parsed, setParsed] = useState<ParsedCollection | null>(null)
   const [findings, setFindings] = useState<Finding[]>([])
+  const [suppressed, setSuppressed] = useState<SuppressedFinding[]>([])
   const [rawJson, setRawJson] = useState<string | null>(null)
   const [originalRawJson, setOriginalRawJson] = useState<string | null>(null)
   /** Raw environment and globals exports loaded with the collection (kept for re-analysis and sanitized export). */
@@ -133,7 +135,11 @@ export function AnalyzeApp({
   useEffect(() => {
     if (lastAuditOptions.current === auditOptions) return
     lastAuditOptions.current = auditOptions
-    if (parsed) setFindings(runAudit(parsed, auditOptions))
+    if (parsed) {
+      const result = runAuditDetailed(parsed, auditOptions)
+      setFindings(result.findings)
+      setSuppressed(result.suppressed)
+    }
   }, [auditOptions, parsed])
 
   const handleStorageModeChange = useCallback(
@@ -198,16 +204,20 @@ export function AnalyzeApp({
       if (seq !== analysisSeq.current) return false
       let p = analysis.parsed
       let f = analysis.findings
+      let s = analysis.suppressed
       if (activeEnvironment !== undefined && activeEnvironment !== p.activeEnvironment) {
         const selected = withActiveEnvironment(p, activeEnvironment)
         if (selected !== p) {
           p = selected
-          f = runAudit(p, auditOptionsRef.current)
+          const result = runAuditDetailed(p, auditOptionsRef.current)
+          f = result.findings
+          s = result.suppressed
         }
       }
 
       setParsed(p)
       setFindings(f)
+      setSuppressed(s)
       setRawJson(raw)
       setOriginalRawJson(raw)
       setEnvironmentTexts(environments)
@@ -370,6 +380,7 @@ export function AnalyzeApp({
     clearCollectionSession()
     setParsed(null)
     setFindings([])
+    setSuppressed([])
     setRawJson(null)
     setOriginalRawJson(null)
     setEnvironmentTexts([])
@@ -434,17 +445,21 @@ export function AnalyzeApp({
       const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments })
       let p = analysis.parsed
       let f = analysis.findings
+      let s = analysis.suppressed
       const selectedBefore = parsedRef.current?.activeEnvironment
       if (selectedBefore !== undefined && selectedBefore !== p.activeEnvironment) {
         const selected = withActiveEnvironment(p, selectedBefore)
         if (selected !== p) {
           p = selected
-          f = runAudit(p, auditOptionsRef.current)
+          const result = runAuditDetailed(p, auditOptionsRef.current)
+          f = result.findings
+          s = result.suppressed
         }
       }
       if (seq === analysisSeq.current) {
         setParsed(p)
         setFindings(f)
+        setSuppressed(s)
         setRawJson(raw)
         setCurrentLibraryId(null)
         setActive('repair')
@@ -512,14 +527,14 @@ export function AnalyzeApp({
           return
         }
         const reportFormat: ReportFormat = format
-        const content = buildReport(reportFormat, { parsed, findings, score, appVersion })
+        const content = buildReport(reportFormat, { parsed, findings, score, appVersion, suppressed })
         downloadTextFile(reportFileName(parsed.name, reportFormat), content, reportMimeType(reportFormat))
       } catch (e) {
         console.error(e)
         notify({ variant: 'error', title: 'Export failed', description: e instanceof Error ? e.message : undefined })
       }
     },
-    [parsed, score, rawJson, findings, appVersion, environmentTexts, notify]
+    [parsed, score, rawJson, findings, suppressed, appVersion, environmentTexts, notify]
   )
 
   const handleSelectEnvironment = useCallback(
@@ -527,8 +542,10 @@ export function AnalyzeApp({
       if (!parsed) return
       const next = withActiveEnvironment(parsed, index)
       if (next === parsed) return
+      const result = runAuditDetailed(next, auditOptionsRef.current)
       setParsed(next)
-      setFindings(runAudit(next, auditOptionsRef.current))
+      setFindings(result.findings)
+      setSuppressed(result.suppressed)
       if (rawJson && shouldPersistSession(loggingMode, storageMode)) saveCollectionSession(rawJson, next.name, environmentTexts, index)
     },
     [parsed, rawJson, environmentTexts, loggingMode, storageMode]
@@ -632,7 +649,7 @@ export function AnalyzeApp({
           />
         )}
         {active === 'security' && (
-          <SecurityPage parsed={parsed} findings={securityFindings} score={score} search={search} />
+          <SecurityPage parsed={parsed} findings={securityFindings} suppressed={suppressed} score={score} search={search} />
         )}
         {active === 'hygiene' && (
           <HygienePage parsed={parsed} findings={hygieneFindings} search={search} />

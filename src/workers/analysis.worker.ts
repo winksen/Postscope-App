@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { parseCollection } from '../lib/parser'
-import { runAudit, type AuditOptions } from '../lib/auditor'
+import { runAuditDetailed, type AuditOptions } from '../lib/auditor'
 import { attachEnvironments } from '../lib/environment'
 
 interface AnalysisRequest {
@@ -18,8 +18,8 @@ ctx.onmessage = (event: MessageEvent<AnalysisRequest>) => {
   try {
     const json = JSON.parse(raw) as unknown
     const parsed = attachEnvironments(parseCollection(json), environments)
-    const findings = runAudit(parsed, options)
-    ctx.postMessage({ id, ok: true, parsed, findings })
+    const { findings, suppressed } = runAuditDetailed(parsed, options)
+    ctx.postMessage({ id, ok: true, parsed, findings, suppressed })
   } catch (error) {
     ctx.postMessage({ id, ok: false, error: error instanceof Error ? error.message : 'Analysis failed' })
   }
