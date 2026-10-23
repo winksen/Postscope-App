@@ -1,5 +1,6 @@
 import { parseCollection } from './parser'
 import { runAudit, type AuditOptions } from './auditor'
+import { attachEnvironments } from './environment'
 import type { ParsedCollection } from './parser'
 import type { Finding } from './auditor'
 
@@ -22,9 +23,9 @@ function yieldToMain(): Promise<void> {
 }
 
 /** Parse and audit off the critical path so large collections stay responsive. */
-export async function analyzeCollection(json: unknown, options?: AuditOptions): Promise<AnalysisResult> {
+export async function analyzeCollection(json: unknown, options?: AuditOptions, environments?: readonly string[]): Promise<AnalysisResult> {
   await yieldToMain()
-  const parsed = parseCollection(json)
+  const parsed = attachEnvironments(parseCollection(json), environments)
   await yieldToMain()
   const findings = runAudit(parsed, options)
   return { parsed, findings }
@@ -112,7 +113,7 @@ function getWorker(): Worker | null {
   return worker
 }
 
-function runInWorker(raw: string, options: AuditOptions | undefined, timeoutMs: number): Promise<AnalysisResult> {
+function runInWorker(raw: string, options: AuditOptions | undefined, timeoutMs: number, environments?: readonly string[]): Promise<AnalysisResult> {
   const instance = getWorker()
   if (!instance) return Promise.reject(new WorkerUnavailableError())
   const id = nextJobId++
@@ -125,25 +126,25 @@ function runInWorker(raw: string, options: AuditOptions | undefined, timeoutMs: 
       reject(new Error(`Analysis timed out after ${Math.round(timeoutMs / 1000)} seconds.`))
     }, timeoutMs)
     pending.set(id, { resolve, reject, timer })
-    instance.postMessage({ id, raw, options })
+    instance.postMessage({ id, raw, options, environments })
   })
 }
 
 /**
- * Parses and audits raw collection JSON. Runs in a Web Worker when available so even
+ * Parses and audits raw collection JSON, optionally with Postman environment and globals exports. Runs in a Web Worker when available so even
  * very large files never block the UI; falls back to the main thread otherwise.
  */
 export async function analyzeCollectionText(
   raw: string,
   options?: AuditOptions,
-  { timeoutMs = DEFAULT_TIMEOUT_MS }: { timeoutMs?: number } = {}
+  { timeoutMs = DEFAULT_TIMEOUT_MS, environments }: { timeoutMs?: number; environments?: readonly string[] } = {}
 ): Promise<AnalysisResult> {
   try {
-    return await runInWorker(raw, options, timeoutMs)
+    return await runInWorker(raw, options, timeoutMs, environments)
   } catch (error) {
     if (!(error instanceof WorkerUnavailableError)) throw error
   }
   await yieldToMain()
   const json = JSON.parse(raw) as unknown
-  return analyzeCollection(json, options)
+  return analyzeCollection(json, options, environments)
 }

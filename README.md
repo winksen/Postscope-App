@@ -23,7 +23,7 @@ Collection analysis never leaves the browser. An optional Node server hosts the 
 
 - **Rule-based auditor**: findings are heuristic; expect false positives and false negatives. Review recommendations before acting.
 - **Static analysis only**: PostScope reads the export. It never calls the APIs in the collection.
-- **Postman environments and globals** are not analyzed yet (planned, see [ROADMAP](mindmap/ROADMAP.md)).
+- **Postman environments and globals** can be loaded with a collection. They are not stored in the team library (the library keeps collections only).
 - **Large collections**: analysis runs in a Web Worker, but very large files can still be slow on low-end devices.
 
 ---
@@ -59,9 +59,10 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 
 ## Features
 
-- **Import by drag-and-drop, file picker or pasted JSON**: accepts `.json` and typical `*.postman_collection.json` exports
+- **Import by drag-and-drop, file picker or pasted JSON**: accepts `.json` and typical `*.postman_collection.json` exports, plus optional `*.postman_environment.json` and `*.postman_globals.json` files
+- **Environments and globals**: checked for secrets, used to resolve `{{baseUrl}}` for transport checks, with an environment selector and a sanitized export
 - **Collection parsing**: folders, HTTP methods, URLs, headers, bodies, auth inheritance, scripts, saved responses, GraphQL and other request protocols, `{{variable}}` usage vs. defined collection variables
-- **Automated audit** with 28 rules, severities (critical / warning / info), categories (secrets, variables, auth, hygiene) and 32 provider secret patterns
+- **Automated audit** with 29 rules, severities (critical / warning / info), categories (secrets, variables, auth, hygiene) and 32 provider secret patterns
 - **Overview**: stat cards, method and auth distribution charts, request tree with search
 - **Requests, Security and Hygiene**: filterable findings with masked evidence and per-request context
 - **Repair**: guided fixes (secrets to variables, base URL variables, auth cleanup and more) and a sanitized download

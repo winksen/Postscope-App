@@ -3,6 +3,7 @@ import { detectRequestProtocol, type RequestProtocol } from './requestProtocol'
 import { getAuthEntries, isInheritedAuth, normalizeAuthType, type AuthEntry } from './authSchemes'
 import { extractVariableNames } from './variables'
 import { MAX_DESCRIPTION_LENGTH } from './descriptions'
+import type { ParsedEnvironment } from './environment'
 
 export type { RequestProtocol }
 
@@ -137,6 +138,10 @@ export interface ParsedCollection {
   requests: ParsedRequest[];
   folders: ParsedFolder[];
   collectionVariables?: ParsedVariable[];
+  /** Postman environment and globals exports loaded with the collection (see `environment.ts`). */
+  environments?: ParsedEnvironment[];
+  /** Index into `environments` of the selected environment; globals are always applied. */
+  activeEnvironment?: number;
   /** Folder and request level variables. */
   scopedVariables?: ParsedScopedVariable[];
   /** Collection, folder and request descriptions. */

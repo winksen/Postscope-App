@@ -637,7 +637,12 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
     description: finding.recommendation,
     risk: 'manual',
     selectedByDefault: false,
-    manualReason: 'This finding needs human context before changing the collection.',
+    manualReason:
+      finding.ruleId === 'SECRET_IN_ENVIRONMENT'
+        ? 'The secret lives in an environment or globals file, not in the collection. Use Export, Sanitized environments (or the CLI --sanitize option) to get copies with the values emptied.'
+        : finding.ruleId === 'HIGH_ENTROPY_LITERAL'
+          ? 'Confirm whether the value is a credential before moving it to a variable.'
+          : 'This finding needs human context before changing the collection.',
   }
 }
 

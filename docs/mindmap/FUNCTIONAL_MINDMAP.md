@@ -82,11 +82,12 @@ mindmap
 
 | Way in | Behavior |
 |---|---|
-| Drag and drop / Browse | Accepts `.json` and `*.postman_collection.json`. Empty files and files over 50 MB are refused with a clear message. |
+| Drag and drop / Browse | Accepts `.json` and `*.postman_collection.json`, plus any number of `*.postman_environment.json` and `*.postman_globals.json` files in the same drop (one collection at a time; environment files alone are refused). Empty files and files over 50 MB are refused with a clear message. |
 | Paste JSON | Validates that the text is JSON with `info` and an `item` array before importing. |
 | Sample collections | Four bundled demos: clean default, large messy enterprise collection, secrets + auth, intentionally vulnerable. |
 | Team library | "Recently saved" list on the import page and a full library dialog (open, export, remove). |
-| Session restore | In history/on modes the last collection survives a page refresh (same tab, ≈4.5 MB limit). |
+| Session restore | In history/on modes the last collection, its environment files and the selected environment survive a page refresh (same tab, ≈4.5 MB limit). |
+| Environments | The header shows the loaded environment, or a selector when several are loaded. The selected environment (then collection variables, then globals) is used to resolve `{{baseUrl}}`, so transport checks such as plaintext HTTP follow the environment you test against. Environment files are not saved to the team library. |
 
 Analysis runs in a **background worker**, so the page stays responsive even for very large collections. If a file is only partly readable (malformed folders, broken items), PostScope imports what it can and shows a notice listing what was skipped. Errors appear as dismissible notifications rather than blocking pop-ups.
 
@@ -112,6 +113,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret passed in query string | `?api_key=…`, `?sig=…` |
 | Critical | Credentials embedded in URL | `https://admin:pass@host` |
 | Critical | Hardcoded secret in script | `pm.environment.set("token", "abc…")`, `pm.request.headers.add({ key: 'Authorization', value: 'Bearer abc…' })`, `pm.sendRequest` headers, `btoa('user:password')` |
+| Critical | Secret stored in an environment or globals file | `clientSecret`, `secret` typed variables and token-shaped values in `*.postman_environment.json` |
 | Critical | Secret stored in collection variable | `clientSecret = cs-0a1b…` exported with the collection, or defined on a folder or request |
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
@@ -183,7 +185,9 @@ Available in `hybrid` and `on` modes.
 | `--fail-on critical|warning|info|none` | Exit code 1 when findings at or above this severity exist (default: critical) |
 | `--min-score N` | Exit code 1 when a collection scores below N |
 | `--disable`, `--severity` | Same rule policy controls as the UI |
-| `--sanitize out.json` | Write a sanitized copy |
+| `--sanitize out.json` | Write a sanitized copy; sanitized environment copies are written next to it as `<name>.sanitized.postman_environment.json` |
+| `-e, --environment file.json` | Analyze a Postman environment export with the collections (repeatable) |
+| `--globals file.json` | Analyze a Postman globals export with the collections (repeatable) |
 | `--list-rules` | Print the rule catalog |
 | `--version` | Print the PostScope version (same value as the app, Docker image and `/api/config`, from any directory) |
 
@@ -203,7 +207,8 @@ Full details: [../SECURITY.md](../SECURITY.md).
 - Detection is heuristic: expect some false positives and false negatives. Tune with Rules.
 - PostScope does not check whether a found credential is still valid. Rotate anything it reports.
 - Collections larger than 50 MB are refused in the browser; the library stores up to `MAX_COLLECTION_MB` (15 MB default).
-- Postman environments, globals, and multi-file workspaces are not analyzed (only collection exports).
+- Multi-collection workspaces are not analyzed as one unit (one collection per import; the CLI scans several files separately).
+- Environment and globals files are used for URL resolution and secret detection only; variable precedence is simplified to environment, then collection, then globals.
 
 ## Glossary
 

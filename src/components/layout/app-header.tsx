@@ -10,6 +10,7 @@ import {
   TreeStructure,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
@@ -22,7 +23,13 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
-export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'sanitized'
+export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'sanitized' | 'sanitized-environments'
+
+export interface EnvironmentOption {
+  /** Index into the loaded environment files. */
+  index: number
+  name: string
+}
 
 interface AppHeaderProps {
   sidebarOffset: string
@@ -36,6 +43,12 @@ interface AppHeaderProps {
   onExport?: (format: ExportFormat) => void
   onOpenRules?: () => void
   customRulesActive?: boolean
+  /** Environments (not globals) loaded with the collection. */
+  environments?: EnvironmentOption[]
+  activeEnvironment?: number
+  onEnvironmentChange?: (index: number) => void
+  /** True when any environment or globals file is loaded, which enables the sanitized environment export. */
+  hasEnvironmentFiles?: boolean
 }
 
 export function AppHeader({
@@ -50,6 +63,10 @@ export function AppHeader({
   onExport,
   onOpenRules,
   customRulesActive = false,
+  environments = [],
+  activeEnvironment,
+  onEnvironmentChange,
+  hasEnvironmentFiles = false,
 }: AppHeaderProps) {
   return (
     <header
@@ -74,6 +91,25 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-1">
+        {environments.length === 1 && (
+          <span className="hidden max-w-[10rem] truncate rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground lg:inline" title={`Environment: ${environments[0].name}`}>
+            Environment: {environments[0].name}
+          </span>
+        )}
+        {environments.length > 1 && onEnvironmentChange && (
+          <Select value={String(activeEnvironment ?? environments[0].index)} onValueChange={(value) => onEnvironmentChange(Number(value))}>
+            <SelectTrigger className="hidden h-8 w-44 text-xs lg:flex" aria-label="Active environment">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {environments.map((environment) => (
+                <SelectItem key={environment.index} value={String(environment.index)}>
+                  {environment.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <ThemeToggle />
 
         {onOpenRules && (
@@ -122,6 +158,11 @@ export function AppHeader({
               <DropdownMenuItem onSelect={() => onExport('sanitized')}>
                 <ShieldCheck weight="fill" /> Sanitized copy (secrets removed)
               </DropdownMenuItem>
+              {hasEnvironmentFiles && (
+                <DropdownMenuItem onSelect={() => onExport('sanitized-environments')}>
+                  <ShieldCheck weight="fill" /> Sanitized environments
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

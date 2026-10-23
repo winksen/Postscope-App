@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { FAKE, cleanCollection, kitchenSinkCollection } from './fixtures'
+import { FAKE, cleanCollection, environmentExport, globalsExport, kitchenSinkCollection } from './fixtures'
 import { RULE_LIST } from '../src/lib/rules'
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'postscope-cli-'))
@@ -73,4 +73,52 @@ test('reports usage errors with exit code 2', () => {
   fs.writeFileSync(notCollection, '{"hello":"world"}')
   assert.match(cli(notCollection).stderr, /not a Postman collection/)
   assert.match(cli('--list-rules').stdout, /SECRET_IN_QUERY/)
+})
+
+test('analyzes environment and globals files passed with --environment and --globals', () => {
+  const environment = path.join(tmp, 'staging.postman_environment.json')
+  const globals = path.join(tmp, 'workspace.postman_globals.json')
+  fs.writeFileSync(environment, JSON.stringify(environmentExport()))
+  fs.writeFileSync(globals, JSON.stringify(globalsExport()))
+
+  const result = cli(clean, '-e', environment, '--globals', globals, '--format', 'json', '--fail-on', 'none')
+  assert.equal(result.code, 0)
+  const report = JSON.parse(result.stdout)
+  assert.deepEqual(report.collection.environments.map((item: { name: string }) => item.name), ['Staging', 'Workspace Globals'])
+  const finding = report.findings.find((item: { ruleId: string }) => item.ruleId === 'SECRET_IN_ENVIRONMENT')
+  assert.equal(finding.severity, 'critical')
+  for (const secret of [FAKE.clientSecret, FAKE.password, FAKE.githubToken]) assert.ok(!result.stdout.includes(secret))
+
+  assert.equal(cli(clean, '-e', environment).code, 1)
+  assert.match(cli(clean, '-e', environment, '--fail-on', 'none').stdout, /Environments: Staging \(environment\)/)
+})
+
+test('rejects missing, invalid and mismatched environment files with exit code 2', () => {
+  const notEnvironment = path.join(tmp, 'collection-as-env.json')
+  fs.writeFileSync(notEnvironment, JSON.stringify(cleanCollection()))
+  const environment = path.join(tmp, 'plain.postman_environment.json')
+  fs.writeFileSync(environment, JSON.stringify(environmentExport()))
+  assert.equal(cli(clean, '-e', path.join(tmp, 'missing.json')).code, 2)
+  assert.match(cli(clean, '-e', notEnvironment).stderr, /not a Postman environment or globals export/)
+  assert.match(cli(clean, '--globals', environment).stderr, /--globals expects a globals export/)
+  assert.equal(cli(clean, '-e').code, 2)
+})
+
+test('--sanitize also writes sanitized environment copies next to the output', () => {
+  const environment = path.join(tmp, 'dev.postman_environment.json')
+  const globals = path.join(tmp, 'team.postman_globals.json')
+  fs.writeFileSync(environment, JSON.stringify(environmentExport()))
+  fs.writeFileSync(globals, JSON.stringify(globalsExport()))
+  const out = path.join(tmp, 'sanitized-out')
+  fs.mkdirSync(out)
+  const result = cli(risky, '-e', environment, '--globals', globals, '--sanitize', path.join(out, 'collection.json'), '--fail-on', 'none')
+  assert.equal(result.code, 0)
+  assert.deepEqual(fs.readdirSync(out).sort(), ['collection.json', 'dev.sanitized.postman_environment.json', 'team.sanitized.postman_globals.json'])
+  const sanitizedEnvironment = fs.readFileSync(path.join(out, 'dev.sanitized.postman_environment.json'), 'utf8')
+  const sanitizedGlobals = fs.readFileSync(path.join(out, 'team.sanitized.postman_globals.json'), 'utf8')
+  for (const secret of [FAKE.clientSecret, FAKE.githubToken, FAKE.bearer, FAKE.password]) {
+    assert.ok(!sanitizedEnvironment.includes(secret) && !sanitizedGlobals.includes(secret))
+  }
+  assert.equal(JSON.parse(sanitizedEnvironment).values.find((item: { key: string }) => item.key === 'clientSecret').value, '')
+  assert.equal(JSON.parse(sanitizedGlobals).values.find((item: { key: string }) => item.key === 'gatewayHost').value, 'https://gateway.example.com')
 })

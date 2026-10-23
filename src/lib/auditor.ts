@@ -6,6 +6,7 @@ import { parseTemplatedJson } from './jsonBody'
 import { scanRawBodyFields } from './rawBody'
 import { findDescriptionSecrets } from './descriptions'
 import { findScriptSecrets } from './scriptSecrets'
+import { lookupVariableValue } from './environment'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
   AUTH_HEADER_SCHEME,
@@ -488,6 +489,48 @@ export function findLeakedScopedVariables(parsed: ParsedCollection): LeakedScope
   }))
 }
 
+export interface LeakedEnvironmentVariable extends LeakedVariable {
+  /** Name of the environment or globals file. */
+  environment: string
+  kind: 'environment' | 'globals'
+  enabled: boolean
+}
+
+/** Environment and globals variables whose literal values look like credentials. Shared with redaction tests. */
+export function findLeakedEnvironmentVariables(parsed: ParsedCollection): LeakedEnvironmentVariable[] {
+  const leaked: LeakedEnvironmentVariable[] = []
+  for (const environment of parsed.environments ?? []) {
+    for (const variable of leakedFrom(environment.variables)) {
+      leaked.push({
+        key: variable.key,
+        value: variable.value,
+        reason: variable.reason,
+        environment: environment.name,
+        kind: environment.kind,
+        enabled: variable.enabled,
+      })
+    }
+  }
+  return leaked
+}
+
+function checkEnvironments(parsed: ParsedCollection, out: FindingCollector): void {
+  const leaked = findLeakedEnvironmentVariables(parsed)
+  if (!leaked.length) return
+  const names = new Set(leaked.map((variable) => variable.key))
+  out.touch('SECRET_IN_ENVIRONMENT', `${plural(leaked.length, 'environment variable')} with credential-like names, the secret type or token-shaped values ${leaked.length === 1 ? 'has' : 'have'} a literal value in the loaded environment or globals files.`)
+  for (const variable of leaked) {
+    const place = variable.kind === 'globals' ? `globals "${variable.environment}"` : `environment "${variable.environment}"`
+    out.add('SECRET_IN_ENVIRONMENT', undefined, {
+      location: `${place} variable ${variable.key}${variable.enabled ? '' : DISABLED_SUFFIX}${variable.reason ? ` (${variable.reason})` : ''}`,
+      preview: evidencePreview(variable.value),
+    })
+  }
+  for (const req of parsed.requests) {
+    if (extractVariableNames(requestText(req)).some((name) => names.has(name))) out.add('SECRET_IN_ENVIRONMENT', req.id)
+  }
+}
+
 function checkCollectionVariables(parsed: ParsedCollection, out: FindingCollector): void {
   const leaked = findLeakedCollectionVariables(parsed)
   const leakedScoped = findLeakedScopedVariables(parsed)
@@ -668,9 +711,9 @@ export function isLocalHost(hostname: string): boolean {
 export function resolveLeadingVariable(url: string, parsed: ParsedCollection): string {
   const match = url.match(URL_VARIABLE_PREFIX)
   if (!match) return url
-  const variable = parsed.collectionVariables?.find((candidate) => candidate.key === match[1])
-  if (!variable?.value || isVariableOrEmpty(variable.value)) return url
-  return variable.value.replace(/\/+$/, '') + url.slice(match[0].length)
+  const value = lookupVariableValue(parsed, match[1].trim())
+  if (!value || isVariableOrEmpty(value)) return url
+  return value.replace(/\/+$/, '') + url.slice(match[0].length)
 }
 
 export function plaintextOrigin(url: string): string | null {
@@ -882,6 +925,7 @@ export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): 
   checkAuthHelpers(parsed, out)
   checkScripts(parsed, out)
   checkCollectionVariables(parsed, out)
+  checkEnvironments(parsed, out)
   checkKnownPatterns(parsed, out)
   checkDescriptions(parsed, out)
   checkHighEntropy(parsed, out)

@@ -235,3 +235,36 @@ export const PROVIDER_SAMPLES: Record<string, { label: string; token: string; ne
   'pypi-token': { label: 'PyPI upload token', token: ['pypi', '-', 'AgE', rep('xY9_', 20)].join(''), near: ['pypi', '-', 'AgE', 'short'].join('') },
   'square-token': { label: 'Square access token', token: ['sq0atp', '-', rep('aB3_', 5), 'aB'].join(''), near: ['sq0atp', '-', 'short'].join('') },
 }
+
+/** A Postman environment export. Postman writes `secret` typed values in clear text. */
+export function environmentExport(name = 'Staging', baseUrl = 'http://staging.corp.internal'): Record<string, unknown> {
+  return {
+    id: '00000000-0000-4000-8000-000000000001',
+    name,
+    values: [
+      { key: 'baseUrl', value: baseUrl, type: 'default', enabled: true },
+      { key: 'clientId', value: 'client-12345', type: 'default', enabled: true },
+      { key: 'clientSecret', value: FAKE.clientSecret, type: 'default', enabled: true },
+      { key: 'sessionNote', value: 'q8Zr2LmXa9PdW4sT7vBn3KcYe6', type: 'secret', enabled: true },
+      { key: 'apiToken', value: FAKE.bearer, type: 'default', enabled: false },
+      { key: 'githubKey', value: FAKE.githubToken, type: 'default', enabled: true },
+      { key: 'emptySecret', value: '', type: 'secret', enabled: true },
+      { key: 'region', value: 'eu-west-1', type: 'default', enabled: true },
+    ],
+    _postman_variable_scope: 'environment',
+    _postman_exported_at: '2026-10-01T10:00:00.000Z',
+    _postman_exported_using: 'Postman/11.0.0',
+  }
+}
+
+export function globalsExport(): Record<string, unknown> {
+  return {
+    id: '00000000-0000-4000-8000-000000000002',
+    name: 'Workspace Globals',
+    values: [
+      { key: 'gatewayHost', value: 'https://gateway.example.com', type: 'default', enabled: true },
+      { key: 'adminPassword', value: FAKE.password, type: 'default', enabled: true },
+    ],
+    _postman_variable_scope: 'globals',
+  }
+}

@@ -27,12 +27,13 @@ mindmap
         scripts, responses
         malformed-input guards
       auditor
-        28 rules
+        29 rules
         evidence + policy
       jsonBody (templated JSON)
       rawBody (XML / pair scanners)
       descriptions (docs scanner)
       scriptSecrets (script literals)
+      environment (env + globals)
       secretPatterns
       scorer
       repairEngine
@@ -122,6 +123,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | Scripts | Request `event[]` → `scripts.prerequest/test` (disabled events in `scripts.disabledPrerequest/disabledTest`); collection/folder events → `ParsedCollection.scripts` with `disabled: true` when switched off |
 | Saved responses | Up to 50 per request; headers, body (first 64 KB), original request headers (`disabledRequestHeaders` for disabled ones)/URL/query (`requestQuery`)/body (`requestBody`, 64 KB)/auth |
 | TLS | `protocolProfileBehavior.strictSSL` inherited collection → folder → request (`tlsVerificationDisabled`) |
+| Environments | `environment.ts`: `parseEnvironment` reads `values[]` of `*.postman_environment.json` / `*.postman_globals.json` (kind from `_postman_variable_scope` or the file name). `attachEnvironments` adds `ParsedCollection.environments` and `activeEnvironment` (unreadable files become parse warnings). `lookupVariableValue` resolves a key by selected environment, then collection, then globals |
 | Descriptions | Collection `info.description`, folder and request descriptions (string or `{ content }`, 64 KB each) in `ParsedCollection.descriptions` with owner, item path and request id |
 | Scoped variables | Folder and request `variable[]` in `ParsedCollection.scopedVariables` (scope, owner, item path) |
 | Path variables | `url.variable[]` in `ParsedRequest.pathVariables` |
@@ -136,6 +138,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 - `sanitizeAuditOptions` normalizes untrusted policy input (localStorage, server env).
 - `KNOWN_SECRET_PATTERN` only reports requests no keyword rule already flagged, to avoid double counting.
 - **Disabled entries** (Postman keeps them in the export) go through the same secret rules as active ones; evidence locations end with ` (disabled)`. `MISSING_AUTH`, `EMPTY_HEADERS` and the other hygiene checks only look at active entries, so a disabled `Authorization` header never counts as protection.
+- **`SECRET_IN_ENVIRONMENT`** (`findLeakedEnvironmentVariables`, critical): same credential test as collection variables (credential-like name, `type: secret`, provider token) for every loaded environment and globals file, including disabled entries (labelled `(disabled)`). Evidence `environment "X" variable key` / `globals "X" variable key`; requests referencing the variable are listed as affected. `resolveLeadingVariable` now goes through `lookupVariableValue`, so `INSECURE_HTTP` follows the selected environment. There is no automatic repair (the secret is not in the collection JSON): the fix is manual and points to the sanitized environment export.
 - **Basic tokens** (`checkHeaderList`): an `Authorization: Basic` value is decoded. A variable or placeholder password (for example the base64 of `svc:{{password}}`) is not a leak and raises nothing; a literal password reports `HARDCODED_TOKEN` with `basic credentials for user s••••••` (and `(Mailgun API key)` for `api:key-<32 hex>`). Values that do not decode keep the old behavior. `X-Vault-Token` is now treated like the other token headers.
 - **`HIGH_ENTROPY_LITERAL`** (`checkHighEntropy`, runs last): literal values in credential positions (sensitive header names except `Cookie`, sensitive query params, form fields and JSON body fields) that qualify as `isHighEntropyLiteral` and were not already reported at the same location by a secret rule, and that are not provider tokens. Readable Basic tokens are skipped. No repair exists for it (manual review).
 - **URL and auth rules** (`urlHostname`, `hasCredentialsOutsideAuthHelper`): `HARDCODED_BASEURL` fires for `http(s)://` URLs whose authority has no `{{variable}}` (a variable later in the URL does not count; any leading variable name counts). `HARDCODED_ENV_URL` tests the hostname only, split on `.` and `-` labels (`prod`, `production`, `stg`, `staging`, `stage`, `dev`, `develop`, `qa`, `uat`, `preprod`, `sandbox`, `test`, `int`) plus `localhost`; path segments such as `/v1/prod/items` are ignored, variables in the path do not suppress it, and the evidence shows the host. `MISSING_AUTH` (mutation method, effective auth `noauth`) is suppressed by an enabled sensitive header (not CSRF/XSRF), a cookie, a credential-like query parameter (literal or variable) or a request, folder or collection pre-request script that sets `Authorization` (`pm.request.headers.add|upsert`, `pm.request.auth =`); its evidence is the route (`POST /v1/users`).
@@ -148,7 +151,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 | Category | Rules |
 |---|---|
-| secrets (critical) | `HARDCODED_PASSWORD`, `HARDCODED_TOKEN`, `HARDCODED_API_KEY`, `HARDCODED_SECRET`, `HARDCODED_AUTH_CREDENTIAL`, `SECRET_IN_QUERY`, `CREDENTIALS_IN_URL`, `SECRET_IN_SCRIPT`, `SECRET_IN_COLLECTION_VARIABLE`, `SECRET_IN_SAVED_RESPONSE`, `KNOWN_SECRET_PATTERN` |
+| secrets (critical) | `SECRET_IN_ENVIRONMENT`, `HARDCODED_PASSWORD`, `HARDCODED_TOKEN`, `HARDCODED_API_KEY`, `HARDCODED_SECRET`, `HARDCODED_AUTH_CREDENTIAL`, `SECRET_IN_QUERY`, `CREDENTIALS_IN_URL`, `SECRET_IN_SCRIPT`, `SECRET_IN_COLLECTION_VARIABLE`, `SECRET_IN_SAVED_RESPONSE`, `KNOWN_SECRET_PATTERN` |
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL` (warning), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
@@ -192,7 +195,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 ### 2.6 Redaction (`redaction.ts`)
 
-`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. `redactedCount` counts each removed secret once (query array entries and their raw URL copy are not double counted; a string URL counts every credential pair). Script literals are replaced in place with `{{REDACTED}}` (the exec lines are scanned as one source so multi-line objects are covered; line count is preserved). Raw bodies are edited structurally when they are JSON (indentation and unquoted variables preserved) and field by field otherwise (XML elements, `key=value` pairs). Descriptions (collection, folder, request, URL path variable docs) get `{{REDACTED}}` in place of credentials, folder and request `variable[]` values are emptied like collection variables, and path variable values with credential-like names become `{{name}}`. It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
+`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. `redactedCount` counts each removed secret once (query array entries and their raw URL copy are not double counted; a string URL counts every credential pair). `redactEnvironment` empties credential values in an environment or globals export (names, keys, types and `enabled` flags are kept). Script literals are replaced in place with `{{REDACTED}}` (the exec lines are scanned as one source so multi-line objects are covered; line count is preserved). Raw bodies are edited structurally when they are JSON (indentation and unquoted variables preserved) and field by field otherwise (XML elements, `key=value` pairs). Descriptions (collection, folder, request, URL path variable docs) get `{{REDACTED}}` in place of credentials, folder and request `variable[]` values are emptied like collection variables, and path variable values with credential-like names become `{{name}}`. It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
 
 ### 2.7 Reports (`reportExport.ts`)
 
@@ -216,6 +219,10 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | Library, search, nav, consent, storage mode | As before |
 
 Imports: size guard (50 MB), `File.text()`, `analyzeCollectionText` (worker with main-thread fallback, 120 s timeout that recycles the worker), errors mapped by `describeAnalysisError` into toasts.
+
+### 3.2.1 Environments in the browser
+
+`DropZone` accepts several files; `AnalyzeApp.handleFiles` reads them, classifies each with `detectEnvironmentKind` / `isCollectionJson` and imports exactly one collection with the raw environment texts (`environmentTexts`). The worker receives `environments: string[]` and calls `attachEnvironments`. `handleSelectEnvironment` swaps `activeEnvironment` with `withActiveEnvironment` and re-runs only the audit. The header shows the environment name or a selector (`AppHeader` `environments` prop); Export gains "Sanitized environments" when files are loaded. `CollectionSession` stores the raw environment texts and the selected index (included in the 4.5 MB limit). Library saves and library opens deal with collections only.
 
 ### 3.3 Components added in the hardening pass
 
@@ -319,7 +326,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | Typecheck | `npm run typecheck` | `tsconfig.json` (browser) + `tsconfig.server.json` (server, CLI, tests, Vite config) |
 | Build | `npm run build` | Typecheck + Vite build; vendor chunks `react`, `charts`, `motion`; worker emitted separately |
 | Tests | `npm test` | `scripts/run-tests.mjs` → `node --import tsx --test tests/*.test.ts` |
-| CLI | `npm run scan -- file.json` | See the functional mindmap. `--version` reads `package.json` relative to the module (works from any directory), then `APP_VERSION` |
+| CLI | `npm run scan -- file.json` | See the functional mindmap (`-e/--environment`, `--globals` for environment files). `--version` reads `package.json` relative to the module (works from any directory), then `APP_VERSION` |
 | Release check | `npm run release:check` | `scripts/release-check.mjs` fails when `package.json`, `package-lock.json`, `Dockerfile` `ARG APP_VERSION`, `compose.yaml` default and the newest `CHANGELOG.md` heading disagree |
 | Dependency audit | `npm run audit:deps` | Runtime dependencies, high severity |
 | CI | `.github/workflows/ci.yml` | Node 20 and 22: install, release check, test, build, CLI smoke scan, audit |
@@ -340,7 +347,9 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `security.test.ts` | Client IP resolution (hops, spoofed headers, IPv4-mapped, ports), failure tracker eviction and global back-off |
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
-| `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors |
+| `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors, environment and globals flags, sanitized environment files |
+| `environment.test.ts` | Environment parsing and detection, `SECRET_IN_ENVIRONMENT`, URL resolution through the selected environment, variable precedence, `redactEnvironment`, report sections |
+| `collectionSession.test.ts` | Session restore with environments, backward compatibility, size limit |
 | `release.test.ts` | Version agreement across release files, drift detection, CLI version from another directory |
 
 ## 8. Extension guide
@@ -386,3 +395,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.31 | Client IP from trusted proxy hops only (`TRUST_PROXY_HOPS`), lockout table can no longer be flushed, global sign-in back-off, `HEALTH_EXPOSE_VERSION` |
 | V0.1.32 | Base URL repair maps each host to its own variable, keeps path variables and ports clean; sanitized export counts query secrets; Markdown report without emoji |
 | V0.1.33 | 16 more provider token patterns, `Authorization: Basic` decoding (no false positives on variables), `X-Vault-Token`, new rule `HIGH_ENTROPY_LITERAL` (28 rules) |
+| V0.1.34 | Environment and globals support: `environment.ts`, `SECRET_IN_ENVIRONMENT` (29 rules), URL resolution through the selected environment, multi-file import with environment selector and session restore, CLI `--environment`/`--globals`, sanitized environment exports |
