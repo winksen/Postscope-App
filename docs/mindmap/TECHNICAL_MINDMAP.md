@@ -2,7 +2,7 @@
 
 > **Audience:** engineers changing PostScope's code, deployment, or security posture.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) describes *what* the product does. [../ARCHITECTURE.md](../ARCHITECTURE.md) is the shorter architecture reference; [../SECURITY.md](../SECURITY.md) is the threat model.
-> **Scope:** reflects the code on 2026-10-07 (after release V0.1.23 plus the core/security hardening pass).
+> **Scope:** reflects the code after release V0.1.25. Each release updates the sections it touches and adds a line to section 10.
 
 ---
 
@@ -52,6 +52,8 @@ mindmap
       node:test suite
       GitHub Actions CI
       Docker non-root image
+      release:check (version sync)
+      CHANGELOG + release tags
 ```
 
 ```mermaid
@@ -89,9 +91,11 @@ flowchart LR
 | `server/` | Node HTTP server and Vite dev/preview middleware |
 | `cli/postscope.ts` | CI scanner |
 | `tests/` | `node:test` suites run through `tsx` (`npm test`) |
-| `scripts/` | Demo collection generator, test runner |
+| `scripts/` | Demo collection generator, test runner, `release-check.mjs` |
 | `public/samples/` | Bundled sample collections |
 | `docs/` | Architecture, deployment, security, design system, mindmaps |
+| `mindmap/ROADMAP.md` | Release plan and conventions (one commit per version) |
+| `CHANGELOG.md` | Shipped changes per version, newest first |
 
 ## 2. Analysis engine (`src/lib`)
 
@@ -221,7 +225,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 4. Optional Basic auth (`checkBasicAuth`, constant-time compare, 15-minute lockout per IP)
 5. API: read rate limit → `/api/config` → `/api/collections` → JSON 404
 6. Static: `serveStatic` (production) or `next()` (dev)
-7. Optional access log (`ACCESS_LOG=true`; method, path, status, duration, IP — never bodies)
+7. Optional access log (`ACCESS_LOG=true`; method, path, status, duration, IP; never bodies)
 
 ### 4.2 Endpoints
 
@@ -275,7 +279,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `LOGGING_MODE` | `off` | `off`, `hybrid`, `on` |
 | `PUBLIC_LANDING_PAGE` | `false` | Marketing page at `/` |
 | `SHOW_GITHUB_LINK`, `SHOW_FEEDBACK_LINK`, `FEEDBACK_URL` | `true`, `true`, GitHub issues | Sidebar links (http(s) only) |
-| `APP_VERSION` | package version | Reported by config/health |
+| `APP_VERSION` | `package.json` next to the server | Reported by config/health; the env value wins, otherwise the version is read relative to the module, never from the working directory |
 | `DATA_DIR` | `./data` | Library root |
 | `MAX_COLLECTION_MB` | `15` | Largest stored collection (≤ 100) |
 | `LIBRARY_MAX_ITEMS`, `LIBRARY_RETENTION_DAYS`, `LIBRARY_MAX_TOTAL_MB` | `0` (unlimited) | Retention and quotas |
@@ -295,9 +299,10 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | Typecheck | `npm run typecheck` | `tsconfig.json` (browser) + `tsconfig.server.json` (server, CLI, tests, Vite config) |
 | Build | `npm run build` | Typecheck + Vite build; vendor chunks `react`, `charts`, `motion`; worker emitted separately |
 | Tests | `npm test` | `scripts/run-tests.mjs` → `node --import tsx --test tests/*.test.ts` |
-| CLI | `npm run scan -- file.json` | See the functional mindmap |
+| CLI | `npm run scan -- file.json` | See the functional mindmap. `--version` reads `package.json` relative to the module (works from any directory), then `APP_VERSION` |
+| Release check | `npm run release:check` | `scripts/release-check.mjs` fails when `package.json`, `package-lock.json`, `Dockerfile` `ARG APP_VERSION`, `compose.yaml` default and the newest `CHANGELOG.md` heading disagree |
 | Dependency audit | `npm run audit:deps` | Runtime dependencies, high severity |
-| CI | `.github/workflows/ci.yml` | Node 20 and 22: install, test, build, CLI smoke scan, audit |
+| CI | `.github/workflows/ci.yml` | Node 20 and 22: install, release check, test, build, CLI smoke scan, audit |
 | Docker | `docker build` / `compose.yaml` | Non-root, healthcheck, `no-new-privileges`, all capabilities dropped |
 
 ### Test suites
@@ -312,6 +317,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
 | `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors |
+| `release.test.ts` | Version agreement across release files, drift detection, CLI version from another directory |
 
 ## 8. Extension guide
 
@@ -332,3 +338,19 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 - Basic auth is a single shared credential; per-user identity needs a proxy/SSO in front.
 - Tailwind CSS 3 build tooling carries upstream advisories (build-time only, not shipped); clearing them requires a Tailwind 4 migration.
 - The main JS chunk is still large (Recharts, Radix, framer-motion); route-level code splitting would further reduce first load.
+
+## 10. Versioning and releases
+
+| Topic | Rule |
+|---|---|
+| Source of truth | `package.json` `version`. `package-lock.json`, `Dockerfile` (`ARG APP_VERSION`), `compose.yaml` (`POSTSCOPE_VERSION` default) and the newest `CHANGELOG.md` heading must match; `npm run release:check` enforces it locally and in CI |
+| Runtime version | Server: `APP_VERSION` env, else `server/appVersion.ts` `readPackageVersion()`. CLI: `readPackageVersion()`, else `APP_VERSION`, else `unknown` |
+| Commit | One commit per release: `Update V<version>` plus short past-tense bullets, identical to the `CHANGELOG.md` entry |
+| Tag | Annotated tag `v<version>` on the release commit (starts at `v0.1.25`) |
+| Plan | `mindmap/ROADMAP.md` section 2 records the commit hash of each shipped release |
+
+### Release log
+
+| Version | Change |
+|---|---|
+| V0.1.25 | Version alignment (`0.1.25`), changelog, `release:check`, module-relative version lookup, README and architecture refresh |

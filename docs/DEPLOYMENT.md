@@ -33,7 +33,7 @@ Set these variables on the container or host process:
 | Variable | Default | Values | Purpose |
 |----------|---------|--------|---------|
 | `PORT` | `3010` | Any available TCP port inside the container/process | Port the Node server listens on. |
-| `APP_VERSION` | Package version or image build arg | Release or build identifier, for example `0.0.2` or `2026.06.11-security.1` | Exposed by `/api/config` so operators can confirm which build is running. |
+| `APP_VERSION` | Package version or image build arg | Release or build identifier, for example `0.1.25` or `2026.06.11-security.1` | Exposed by `/api/config` so operators can confirm which build is running. |
 | `LOGGING_MODE` | `off` | `off`, `hybrid`, `on` | Controls whether uploaded collections are stored in app filesystem storage. |
 | `PUBLIC_LANDING_PAGE` | `false` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows marketing landing page at `/` when true; for internal deployments, keep false so users land on the analyzer. |
 | `SHOW_GITHUB_LINK` | `true` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows or hides the analyzer sidebar GitHub link. Set to `false` for closed internal networks. |
@@ -54,7 +54,7 @@ Use this for development or a simple internal host that already has Node.js.
 
 Prerequisites:
 
-- Node.js 18+ or 20+.
+- Node.js 20.6 or newer.
 - npm.
 
 Steps:
@@ -81,15 +81,15 @@ Open `http://localhost:3010`.
 Build the image:
 
 ```bash
-docker build -t postscope:0.0.1 .
+docker build -t postscope:<version> .
 ```
 
 Or build with an explicit version label:
 
 ```bash
 docker build \
-  --build-arg APP_VERSION=0.0.1 \
-  -t postscope:0.0.1 .
+  --build-arg APP_VERSION=<version> \
+  -t postscope:<version> .
 ```
 
 Run without shared server-side history:
@@ -100,7 +100,7 @@ docker run --rm \
   -p 3010:3010 \
   -e LOGGING_MODE=off \
   -e PUBLIC_LANDING_PAGE=false \
-  postscope:0.0.1
+  postscope:<version>
 ```
 
 Run for an internal team with optional shared history:
@@ -115,7 +115,7 @@ docker run -d \
   -e LOGGING_MODE=hybrid \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
-  postscope:0.0.1
+  postscope:<version>
 ```
 
 Run with forced shared history:
@@ -128,7 +128,7 @@ docker run -d \
   -e LOGGING_MODE=on \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
-  postscope:0.0.1
+  postscope:<version>
 ```
 
 Use an env file if operators prefer to keep runtime settings outside the command:
@@ -140,7 +140,7 @@ docker run -d \
   -p 3010:3010 \
   --env-file postscope.env \
   -v postscope-data:/app/data \
-  postscope:0.0.1
+  postscope:<version>
 ```
 
 Example `postscope.env`:
@@ -160,7 +160,7 @@ Do not put secrets in this file. The stock app does not require API keys.
 Create a local Compose env file:
 
 ```env
-POSTSCOPE_VERSION=0.0.1
+POSTSCOPE_VERSION=<version>
 POSTSCOPE_HOST=127.0.0.1
 POSTSCOPE_PORT=3010
 LOGGING_MODE=hybrid
@@ -186,19 +186,19 @@ Yes, PostScope can be shipped as a single offline-runnable Docker image.
 Build the image on a connected machine:
 
 ```bash
-docker build -t postscope:0.0.1 .
+docker build -t postscope:<version> .
 ```
 
 Export the image to a portable tar file:
 
 ```bash
-docker save postscope:0.0.1 -o postscope-0.0.1.tar
+docker save postscope:<version> -o postscope-<version>.tar
 ```
 
-Transfer `postscope-0.0.1.tar` to the offline host, then load it:
+Transfer `postscope-<version>.tar` to the offline host, then load it:
 
 ```bash
-docker load -i postscope-0.0.1.tar
+docker load -i postscope-<version>.tar
 ```
 
 Run it offline:
@@ -211,7 +211,7 @@ docker run -d \
   -e LOGGING_MODE=hybrid \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
-  postscope:0.0.1
+  postscope:<version>
 ```
 
 Artifacts needed on the offline host:
@@ -248,41 +248,41 @@ Connected build machine:
 ```bash
 git pull
 docker build \
-  --build-arg APP_VERSION=0.0.2 \
-  -t postscope:0.0.2 .
-docker save postscope:0.0.2 -o postscope-0.0.2.tar
-sha256sum postscope-0.0.2.tar > postscope-0.0.2.tar.sha256
+  --build-arg APP_VERSION=<new-version> \
+  -t postscope:<new-version> .
+docker save postscope:<new-version> -o postscope-<new-version>.tar
+sha256sum postscope-<new-version>.tar > postscope-<new-version>.tar.sha256
 ```
 
 Windows PowerShell checksum:
 
 ```powershell
-Get-FileHash .\postscope-0.0.2.tar -Algorithm SHA256
+Get-FileHash .\postscope-<new-version>.tar -Algorithm SHA256
 ```
 
 Offline host:
 
 ```bash
-sha256sum -c postscope-0.0.2.tar.sha256
-docker load -i postscope-0.0.2.tar
+sha256sum -c postscope-<new-version>.tar.sha256
+docker load -i postscope-<new-version>.tar
 docker stop postscope
 docker rm postscope
 docker run -d \
   --name postscope \
   --restart unless-stopped \
   -p 3010:3010 \
-  -e APP_VERSION=0.0.2 \
+  -e APP_VERSION=<new-version> \
   -e LOGGING_MODE=hybrid \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
-  postscope:0.0.2
+  postscope:<new-version>
 curl http://localhost:3010/api/config
 ```
 
 Expected version signal:
 
 ```json
-{"appVersion":"0.0.2","loggingMode":"hybrid","publicLandingPage":false}
+{"appVersion":"<new-version>","loggingMode":"hybrid","publicLandingPage":false}
 ```
 
 Compose update flow:
@@ -294,8 +294,8 @@ Compose update flow:
 Example:
 
 ```bash
-docker load -i postscope-0.0.2.tar
-sed -i 's/POSTSCOPE_VERSION=0.0.1/POSTSCOPE_VERSION=0.0.2/' postscope.env
+docker load -i postscope-<new-version>.tar
+sed -i 's/POSTSCOPE_VERSION=<old-version>/POSTSCOPE_VERSION=<new-version>/' postscope.env
 docker compose --env-file postscope.env up -d
 curl http://localhost:3010/api/config
 ```
@@ -307,14 +307,14 @@ If the offline host cannot run Docker, ship a full source release only when it a
 If your organization has an internal registry, build and push the image while connected to that registry:
 
 ```bash
-docker tag postscope:0.0.1 registry.internal.example.com/postscope:0.0.1
-docker push registry.internal.example.com/postscope:0.0.1
+docker tag postscope:<version> registry.internal.example.com/postscope:<version>
+docker push registry.internal.example.com/postscope:<version>
 ```
 
 Then internal hosts can pull once:
 
 ```bash
-docker pull registry.internal.example.com/postscope:0.0.1
+docker pull registry.internal.example.com/postscope:<version>
 ```
 
 After the image has been pulled, runtime does not need external network access. Browser clients only need network access to the internal PostScope host.
@@ -373,7 +373,7 @@ docker run -d \
   -e LOGGING_MODE=hybrid \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
-  postscope:0.0.1
+  postscope:<version>
 ```
 
 Proxy `https://postscope.internal.example.com` to `http://127.0.0.1:3010`.
@@ -391,7 +391,7 @@ curl http://localhost:3010/api/config
 Expected response for the recommended internal mode:
 
 ```json
-{"appVersion":"0.0.1","loggingMode":"hybrid","publicLandingPage":false}
+{"appVersion":"<version>","loggingMode":"hybrid","publicLandingPage":false}
 ```
 
 Then open:
@@ -413,7 +413,7 @@ Smoke-test the deployment:
 Build, pull, or load the new image:
 
 ```bash
-docker build -t postscope:0.0.2 .
+docker build -t postscope:<new-version> .
 ```
 
 Replace the container while keeping the same volume:
@@ -429,7 +429,7 @@ docker run -d \
   -e LOGGING_MODE=hybrid \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
-  postscope:0.0.2
+  postscope:<new-version>
 ```
 
 The image is immutable; shared history lives in the mounted volume.

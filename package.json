@@ -1,7 +1,7 @@
 {
   "name": "postscope",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.25",
   "type": "module",
   "scripts": {
     "dev": "vite --port 3010",
@@ -11,7 +11,8 @@
     "preview": "vite preview --port 3010",
     "test": "node scripts/run-tests.mjs",
     "scan": "tsx cli/postscope.ts",
-    "audit:deps": "npm audit --omit=dev --audit-level=high"
+    "audit:deps": "npm audit --omit=dev --audit-level=high",
+    "release:check": "node scripts/release-check.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

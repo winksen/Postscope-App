@@ -1,0 +1,138 @@
+# Changelog
+
+All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
+Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
+
+## V0.1.25
+
+- Aligned the app, Docker image and CLI version with the release number
+- Added a changelog and release tags
+- Fixed the CLI reporting the wrong version outside the project folder
+- Updated README and architecture docs to match the current app
+
+## V0.1.24
+
+- Added mindmap folder for functional and technical documentation
+- Security fixes and server hardening updates
+- Enhancements to detection logic processes
+- Added Roadmap file for future releases
+
+## V0.1.23
+
+- General UI fixes
+- Updated dependencies
+
+## V0.1.22
+
+- Minor enhancement to deployment
+- Added possibility to paste collection JSON without uploading
+
+## V0.1.21
+
+- Added configs for Docker deployment
+- Added deployment guide, supports offline mode
+
+## V0.1.20
+
+- Added a new page for Hygiene findings
+- Updated documentation
+- General UI fixes
+
+## V0.1.19
+
+- Adapted visual guidelines file
+- Adapted the Security and Repair pages with latest UI improvements
+- Removed storing privacy preferences, always default to Incognito
+
+## V0.1.18
+
+- General UI fixes
+
+## V0.1.17
+
+- Added request tree to better explore folder structure
+- General UI fixes
+
+## V0.1.16
+
+- General UI fixes
+
+## V0.1.15
+
+- General UI fixes
+- Unified scrollbar styling
+
+## V0.1.14
+
+- General UI fixes
+- Removed skeleton animation loading
+
+## V0.1.13
+
+- General UI fixes
+- Added skeleton loading
+- Removed em dashes from the project
+
+## V0.1.12
+
+- General UI fixes
+- Added first version of the repair engine
+
+## V0.1.11
+
+- Split the samples page for better UX
+- Small UI fixes
+
+## V0.1.10
+
+- Added routing and landing page for the public display
+- General UI fixes
+
+## V0.1.9
+
+- Added incognito mode and normal mode to handle storing the collections
+- Added history to enable teams to views past requests
+- Added deployment modes to force logging ON, OFF or HYBRID
+
+## V0.1.8
+
+- Enhanced sample collections with more requests
+- Added request protocol for managing requests other than HTTP
+- General UI fixes
+
+## V0.1.7
+
+- General UI fixes
+- Added a license
+- Updated packages and libraries
+- Minor security fixes
+- Added initial configurations for search capabilities
+
+## V0.1.6
+
+- Added other sample collections for better preview
+- Added new page for Request display
+
+## V0.1.5
+
+- General UI fixes
+- Updated app font
+
+## V0.1.4
+
+- Color enhancements
+- Switched to Phosphor icons
+
+## V0.1.3
+
+- Multiple UI fixes
+
+## V0.0.2
+
+- Added documentation files
+- General UI fixes
+
+## V0.0.1
+
+- Initialized project structure
+- Added first pages

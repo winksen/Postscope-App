@@ -116,6 +116,7 @@ test('config and health endpoints', async () => {
   const config = JSON.parse((await raw('/api/config')).body)
   assert.equal(config.loggingMode, 'hybrid')
   assert.equal(config.maxCollectionBytes, 1_000_000)
+  assert.match(config.appVersion, /^\d+\.\d+\.\d+/)
   assert.deepEqual(config.auditPolicy, { disabledRules: [], severityOverrides: {} })
 
   const health = await raw('/api/health')

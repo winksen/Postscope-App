@@ -15,6 +15,7 @@ import { calculateScore } from '../src/lib/scorer'
 import { buildJsonReport, buildMarkdownReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
 import { redactCollection } from '../src/lib/redaction'
 import { RULE_LIST } from '../src/lib/rules'
+import { readPackageVersion } from '../server/appVersion'
 import { isSeverity, severityRank, type Severity } from '../src/lib/severity'
 
 type Format = 'text' | 'json' | 'sarif' | 'markdown'
@@ -53,12 +54,7 @@ Options:
 class UsageError extends Error {}
 
 function readVersion(): string {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')) as { version?: string }
-    return pkg.version ?? 'unknown'
-  } catch {
-    return 'unknown'
-  }
+  return readPackageVersion() ?? process.env.APP_VERSION ?? 'unknown'
 }
 
 function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
