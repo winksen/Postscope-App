@@ -98,6 +98,7 @@ flowchart LR
 |---|---|
 | `src/lib/` | Framework-free analysis engine shared by the browser, the server, and the CLI |
 | `src/workers/analysis.worker.ts` | Web Worker entry: `JSON.parse` → `parseCollection` → `runAudit` |
+| `src/lib/compare.ts`, `compareReport.ts` | Comparison of two analyzed collections and its text, Markdown and JSON renderers (see 2.8) |
 | `src/pages/`, `src/components/` | React UI (pages, layout, shadcn-style primitives in `components/ui`) |
 | `server/` | Node HTTP server and Vite dev/preview middleware |
 | `cli/postscope.ts`, `cli/inputs.ts` | CI scanner; `inputs.ts` expands folders and globs and finds sibling environment files |
@@ -236,6 +237,22 @@ Reports receive `suppressed` and `baselined` in `ReportContext`: JSON adds `occu
 | SARIF 2.1.0 | Rule catalog with `security-severity`; one result per finding and affected request; `region.startLine/startColumn` when `sourceText` and a pointer are available; `columnKind: utf16CodeUnits`; `invocations[0].executionSuccessful`; `automationDetails.id` (`postscope/<collection>/<date>`); a `toolExecutionNotifications` warning when more than 5000 results were dropped; `partialFingerprints` `postscope/v1` and `postscope/v2`; `suppressions` on suppressed results |
 | HTML | One document (`renderHtmlReports` accepts several collections): inline CSS with light/dark and print styles, no scripts, no external requests, no event handlers. Every dynamic string goes through `escapeHtml`. Sections: summary cards, findings by severity with score impact, suppressed, environments, parse warnings |
 
+### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
+
+`compareCollections(before, after)` takes `{ parsed, findings, score? }` for each side and returns a `Comparison` (no secret values, deterministic order).
+
+| Piece | Behavior |
+|---|---|
+| Request matching | Pass 1 pairs requests with the same id (`folder/name`, `#n` for duplicates). Pass 2 pairs the rest by `METHOD + normalizeRequestUrl(url)` (query, fragment and trailing slash removed, scheme and host lower-cased, variables kept as written); several candidates with one key are paired in order of appearance. Unpaired requests are `added` or `removed`; paired ones with differing name, folder, method, url, auth, body, headers or scripts are `changed` with the list of fields, otherwise `unchanged` |
+| Finding matching | Every finding becomes occurrences (`findingOccurrences`, V0.1.37). The key of an occurrence is its fingerprint computed with the OLDER request id (`idMap` translates ids of matched requests), so a renamed request keeps its keys and its findings are `unchanged`, not new plus resolved. `added` = keys only in the new side, `resolved` = keys only in the old side. Sorted by severity, rule, request, location |
+| Score | `scoreDelta` is `after - before` for total, security and hygiene (positive is better), using each side's own findings and the active weights |
+| Hosts and auth | `newHosts`/`removedHosts` (via `urlHostname(resolveLeadingVariable(url))`) and `newAuthTypes`/`removedAuthTypes` (`parsed.authTypes`) |
+| Privacy | Requests are described by id, name, method, folder and the URL without query string. Evidence previews and bodies are never copied |
+| `newFindingsAtOrAbove(comparison, level)` | The CLI failure condition for `--fail-on-new` |
+| Reports | `buildComparisonText`, `buildComparisonMarkdown` (escaped, capped at 50 rows per list) and `buildComparisonJson` (`reportVersion: 1`, `kind: "comparison"`) |
+
+CLI: `postscope diff <old> <new>` (`runDiff` in `cli/postscope.ts`) reuses `analyzeFile`, so project config, severity overrides, library records and evidence handling behave as for `scan`. Exit codes 0, 1 (new findings at or above `--fail-on-new`, default critical) and 2.
+
 ## 3. Browser application
 
 ### 3.1 Bootstrap and routing
@@ -251,6 +268,7 @@ Reports receive `suppressed` and `baselined` in `ReportContext`: JSON adds `occu
 | `userAuditPrefs` / `auditOptions` | Browser rule policy over the server `auditPolicy`; changes re-run `runAudit` without re-parsing |
 | `restoreAttempted` (ref) | Session restore runs exactly once on mount |
 | `score`, `repairAutoFixCount` | `useMemo` (previously recomputed, including a full `JSON.parse`, on every render) |
+| `referenceRaw`, `reference`, `referenceLoading` | Older version for the Compare page (file, library entry or the first of two dropped files). Analyzed in the worker with the current `auditOptions` and re-analyzed when they change; never saved to the library or the session |
 | Library, search, nav, consent, storage mode | As before |
 
 Imports: size guard (50 MB), `File.text()`, `analyzeCollectionText` (worker with main-thread fallback, 120 s timeout that recycles the worker), errors mapped by `describeAnalysisError` into toasts.
@@ -391,6 +409,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `repairEngine.test.ts` | Plan defaults, applying fixes, inherited auth, body/query/variable/HTTPS/TLS patches |
 | `redactionAndReports.test.ts` | Sanitized copies, idempotence, SARIF/JSON/Markdown validity, no secret leakage |
 | `security.test.ts` | Client IP resolution (hops, spoofed headers, IPv4-mapped, ports), failure tracker eviction and global back-off |
+| `compare.test.ts` | Identical collections, new and resolved findings, rename matched by URL, request/host/auth changes, URL normalization, deterministic and secret-free output, CLI `diff` exit codes, formats and usage errors |
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `libraryEncryption.test.ts` | Key parsing and resolution, envelope round trip and tamper rejection, encrypted store behavior, keyed dedupe hash, migration and rotation, proxy user, audit entries |
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
@@ -457,3 +476,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.38 | `jsonPositions.ts`, evidence pointers and SARIF line/column regions; JSON report v2 with schema; self-contained HTML report (UI export and CLI `--format html`) |
 | V0.1.39 | Compiled server and CLI (`npm run build:node`, `bin.postscope`), folder/glob input, `--auto-env`, `--format junit`, GitHub composite action, `docs/CI.md`, Docker runtime image without node_modules; server no longer depends on Vite at run time |
 | V0.1.40 | Library encryption at rest (AES-256-GCM, keyed dedupe hash, migration and rotation tool `library.js`), append-only audit log, proxy user identity (`TRUSTED_USER_HEADER`, `savedBy`), `libraryEncrypted` in config |
+| V0.1.41 | `compare.ts` and `compareReport.ts` (request matching by id then method and URL, finding matching by occurrence fingerprint, score delta, hosts and auth types), Compare page (file or library, also two dropped files), `postscope diff` with `--fail-on-new` |

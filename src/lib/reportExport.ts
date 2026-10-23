@@ -276,7 +276,7 @@ export function buildSarifReport(ctx: ReportContext): string {
   )
 }
 
-function escapeMarkdown(text: string): string {
+export function escapeMarkdown(text: string): string {
   return text.replace(/([\\`*_{}[\]<>|#])/g, '\\$1')
 }
 

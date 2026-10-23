@@ -22,6 +22,8 @@ import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
+import { compareCollections, newFindingsAtOrAbove } from '../src/lib/compare'
+import { buildComparisonJson, buildComparisonMarkdown, buildComparisonText } from '../src/lib/compareReport'
 import { readPackageVersion } from '../server/appVersion'
 import { isSeverity, parseScoreWeights, severityRank, type ScoreWeights, type Severity } from '../src/lib/severity'
 
@@ -52,6 +54,7 @@ interface CliOptions {
 const HELP = `PostScope CLI: audit Postman collections for secrets, auth gaps, and hygiene.
 
 Usage: postscope [scan] [options] <collection.json | folder | glob ...>   (use "-" to read stdin)
+       postscope diff <old.json> <new.json> [options]   (compare two versions, see "postscope diff --help")
        npm run scan -- [options] <...>
 
 Folders are searched for *.postman_collection.json. Quote globs so the tool expands them on every shell:
@@ -371,8 +374,149 @@ function failingFindings(findings: Finding[], failOn: FailOn): Finding[] {
   return findings.filter((finding) => severityRank(finding.severity) <= severityRank(failOn))
 }
 
+const DIFF_HELP = `PostScope diff: compare two versions of a Postman collection.
+
+Usage: postscope diff <old.json> <new.json> [options]
+
+Requests are matched by id, then by method and URL (so a rename is not a change of request). Findings are matched by
+occurrence, so only findings that really appeared or disappeared are listed. Library records are accepted.
+
+Options:
+  -f, --format <text|json|markdown>        Output format (default: text)
+  -o, --output <file>                      Write the comparison to a file instead of stdout
+      --fail-on-new <critical|warning|info|none>
+                                           Exit 1 when a finding at or above this severity is new (default: critical)
+      --disable <RULE,RULE>                Disable rules for both collections
+      --severity <RULE=level,...>          Override rule severities for both collections
+      --config <file>                      Project config (default: the nearest .postscope.json above each file)
+      --no-config                          Ignore any .postscope.json
+  -q, --quiet                              Only print the comparison (no summary on stderr)
+  -h, --help                               Show this help
+
+Exit codes: 0 passed, 1 new findings at or above --fail-on-new, 2 usage or input error.
+`
+
+type DiffFormat = 'text' | 'json' | 'markdown'
+
+interface DiffOptions {
+  before: string
+  after: string
+  format: DiffFormat
+  output?: string
+  failOnNew: FailOn
+  audit: AuditOptions
+  config?: string
+  noConfig: boolean
+  quiet: boolean
+}
+
+function parseDiffArgs(argv: string[]): DiffOptions | 'help' {
+  const paths: string[] = []
+  const disabled: string[] = []
+  const overrides: Record<string, string> = {}
+  const options: Omit<DiffOptions, 'before' | 'after' | 'audit'> = { format: 'text', failOnNew: 'critical', noConfig: false, quiet: false }
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]
+    const value = () => {
+      const next = argv[++i]
+      if (next === undefined) throw new UsageError(`Missing value for ${arg}`)
+      return next
+    }
+    switch (arg) {
+      case '-h':
+      case '--help':
+        return 'help'
+      case '-f':
+      case '--format': {
+        const format = value()
+        if (!['text', 'json', 'markdown'].includes(format)) throw new UsageError(`Unknown diff format "${format}" (use text, json or markdown)`)
+        options.format = format as DiffFormat
+        break
+      }
+      case '-o':
+      case '--output':
+        options.output = value()
+        break
+      case '--fail-on-new': {
+        const level = value()
+        if (level !== 'none' && !isSeverity(level)) throw new UsageError(`Unknown --fail-on-new level "${level}"`)
+        options.failOnNew = level as FailOn
+        break
+      }
+      case '--disable':
+        disabled.push(...value().split(',').map((rule) => rule.trim().toUpperCase()).filter(Boolean))
+        break
+      case '--severity':
+        for (const pair of value().split(',')) {
+          const [rule, level] = pair.split('=').map((part) => part.trim())
+          if (!rule || !level || !isSeverity(level)) throw new UsageError(`Invalid --severity entry "${pair}"`)
+          overrides[rule.toUpperCase()] = level
+        }
+        break
+      case '--config':
+        options.config = value()
+        break
+      case '--no-config':
+        options.noConfig = true
+        break
+      case '-q':
+      case '--quiet':
+        options.quiet = true
+        break
+      default:
+        if (arg.startsWith('-')) throw new UsageError(`Unknown option "${arg}"`)
+        paths.push(arg)
+    }
+  }
+  const known = new Set<string>(RULE_LIST.map((rule) => rule.id))
+  const unknownRules = [...disabled, ...Object.keys(overrides)].filter((rule) => !known.has(rule))
+  if (unknownRules.length) throw new UsageError(`Unknown rule id(s): ${unknownRules.join(', ')}`)
+  if (paths.length !== 2) throw new UsageError('Provide exactly two collection files: the old one and the new one.')
+  if (options.config && options.noConfig) throw new UsageError('Use either --config or --no-config, not both.')
+  return { ...options, before: paths[0], after: paths[1], audit: sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides }) }
+}
+
+function runDiff(argv: string[], appVersion: string): number {
+  let options: DiffOptions | 'help'
+  try {
+    options = parseDiffArgs(argv)
+  } catch (error) {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n\n${DIFF_HELP}`)
+    return 2
+  }
+  if (options === 'help') {
+    process.stdout.write(DIFF_HELP)
+    return 0
+  }
+
+  let output: string
+  let newFindings: number
+  try {
+    // Reuses the scan pipeline, so config, suppressions, severity overrides and library records behave the same way.
+    const scanOptions: CliOptions = { inputs: [], format: 'json', failOn: 'none', audit: options.audit, environments: [], autoEnv: false, noConfig: options.noConfig, config: options.config, quiet: true }
+    const [older, newer] = [options.before, options.after].map((input) => analyzeFile(input, scanOptions, appVersion, []).result.ctx)
+    const comparison = compareCollections(older, newer)
+    output = options.format === 'json' ? buildComparisonJson(comparison, appVersion) : options.format === 'markdown' ? buildComparisonMarkdown(comparison) : buildComparisonText(comparison)
+    newFindings = newFindingsAtOrAbove(comparison, options.failOnNew).length
+    if (!options.quiet) {
+      const { scoreDelta, findings } = comparison
+      process.stderr.write(`PostScope diff: score ${comparison.before.score} -> ${comparison.after.score} (${scoreDelta.total > 0 ? '+' : ''}${scoreDelta.total}), ${findings.added.length} new and ${findings.resolved.length} resolved finding(s)\n`)
+    }
+  } catch (error) {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`)
+    return 2
+  }
+
+  if (options.output) fs.writeFileSync(options.output, output)
+  else process.stdout.write(output.endsWith('\n') ? output : `${output}\n`)
+  const passed = newFindings === 0
+  if (!options.quiet) process.stderr.write(passed ? 'PostScope: PASS\n' : `PostScope: FAIL (${newFindings} new finding(s) at or above "${options.failOnNew}")\n`)
+  return passed ? 0 : 1
+}
+
 export function main(argv: string[]): number {
   const appVersion = readVersion()
+  if (argv[0] === 'diff') return runDiff(argv.slice(1), appVersion)
   let options: ReturnType<typeof parseArgs>
   try {
     options = parseArgs(argv)

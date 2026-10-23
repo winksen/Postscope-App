@@ -70,7 +70,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.1.40
+        uses: winksen/Postscope-App@v0.1.41
         with:
           path: collections
           fail-on: critical
@@ -201,7 +201,42 @@ Environment and globals files are analyzed together with a collection (`--enviro
 
 ---
 
-## 7. Adopting PostScope on an existing project
+## 7. Comparing two versions (pull requests)
+
+`postscope diff` audits an older and a newer version of a collection and reports only what changed: new, resolved and unchanged findings, the score change, requests that were added, removed or edited, and new hosts or auth types. A request that was renamed or moved is still the same request (matched by id, then by method and URL), so its existing findings are not reported as new.
+
+```bash
+postscope diff old.postman_collection.json new.postman_collection.json --fail-on-new critical
+postscope diff old.json new.json --format markdown --output postscope-diff.md --fail-on-new warning
+```
+
+| Option | Purpose |
+|---|---|
+| `--fail-on-new critical\|warning\|info\|none` | Exit code 1 when a finding at or above this severity is new (default `critical`) |
+| `--format text\|json\|markdown` | `markdown` is meant for a pull request comment or job summary; `json` is versioned (`reportVersion`, `kind: "comparison"`) |
+| `--output file` | Write the comparison to a file |
+| `--config`, `--no-config`, `--disable`, `--severity` | Same rule policy as `scan`, applied to both versions |
+
+Comparison output never contains secret values or URL query strings. Exit codes: `0` passed, `1` new findings, `2` usage or input error (a missing file, not exactly two collections).
+
+On a pull request, compare the base branch with the head:
+
+```yaml
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare with the base branch
+        run: |
+          git show "origin/${{ github.base_ref }}:collections/api.postman_collection.json" > base.postman_collection.json
+          node dist-node/cli.js diff base.postman_collection.json collections/api.postman_collection.json \
+            --fail-on-new critical --format markdown --output postscope-diff.md
+          cat postscope-diff.md >> "$GITHUB_STEP_SUMMARY"
+```
+
+---
+
+## 8. Adopting PostScope on an existing project
 
 1. Run once locally: `postscope scan collections --fail-on none` and read the report.
 2. Fix what is cheap (secrets first), or accept the rest: `postscope scan collections --write-baseline postscope-baseline.json` records today's findings as a baseline. Commit it.

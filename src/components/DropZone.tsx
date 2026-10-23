@@ -34,7 +34,7 @@ import type { StorageMode } from '@/lib/storagePreferences'
 const fadeTransition = { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
 
 interface DropZoneProps {
-  /** One collection plus any number of Postman environment or globals files. */
+  /** One collection (or two, older first, to compare them) plus any number of Postman environment or globals files. */
   onFiles: (files: File[]) => void
   onJsonText: (rawJson: string) => void
   loading?: boolean
@@ -319,7 +319,7 @@ export function DropZone({
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
-              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them for secrets.
+              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them for secrets, or drop two collections (older first) to compare them.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
