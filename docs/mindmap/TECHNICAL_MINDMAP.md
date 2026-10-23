@@ -112,11 +112,11 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | Request IDs | Unchanged historical scheme: `folder/path/name`, duplicates suffixed `#2`, `#3`, … Findings and the repair engine key on these |
 | Auth inheritance | Effective auth = request auth → nearest folder auth → collection auth (`inherit` / missing = defer). Exposes `auth`, `authSource`, `authOwnerPath`, `authFields`, `basicAuth` |
 | Auth owners | Collection- and folder-level auth definitions in `authOwners` so leaks are found even when no request inherits them |
-| Headers | Array form or raw `Key: value` string block; disabled headers dropped; non-string values coerced |
-| URLs | String or object form; `path` segments may be strings or `{ value }` objects; query from `url.query` (disabled skipped) or parsed from raw |
-| Bodies | Mode-aware: raw, urlencoded and form-data fields (`bodyFields`, file fields skipped), GraphQL query + variables |
-| Scripts | Request `event[]` → `scripts.prerequest/test`; collection/folder events → `ParsedCollection.scripts` |
-| Saved responses | Up to 50 per request; headers, body (first 64 KB), original request headers/URL/auth |
+| Headers | Array form or raw `Key: value` string block; non-string values coerced. Disabled headers are kept separately in `disabledHeaders` (active `headers` is unchanged for existing consumers) |
+| URLs | String or object form; `path` segments may be strings or `{ value }` objects; query from `url.query` (disabled entries go to `disabledQueryParams`) or parsed from raw |
+| Bodies | Mode-aware: raw, urlencoded and form-data fields (`bodyFields`, file fields skipped; disabled fields in `disabledBodyFields`), GraphQL query + variables |
+| Scripts | Request `event[]` → `scripts.prerequest/test` (disabled events in `scripts.disabledPrerequest/disabledTest`); collection/folder events → `ParsedCollection.scripts` with `disabled: true` when switched off |
+| Saved responses | Up to 50 per request; headers, body (first 64 KB), original request headers (`disabledRequestHeaders` for disabled ones)/URL/auth |
 | TLS | `protocolProfileBehavior.strictSSL` inherited collection → folder → request (`tlsVerificationDisabled`) |
 | Variables | `variables.ts`: names may contain dashes/dots/spaces; `{{$dynamic}}` names excluded |
 
@@ -128,6 +128,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 - `Finding.id === Finding.ruleId`: stable and unique per run (the old `Date.now()` suffix was removed).
 - `sanitizeAuditOptions` normalizes untrusted policy input (localStorage, server env).
 - `KNOWN_SECRET_PATTERN` only reports requests no keyword rule already flagged, to avoid double counting.
+- **Disabled entries** (Postman keeps them in the export) go through the same secret rules as active ones; evidence locations end with ` (disabled)`. `MISSING_AUTH`, `EMPTY_HEADERS` and the other hygiene checks only look at active entries, so a disabled `Authorization` header never counts as protection.
 - Shared helpers exported for the repair and redaction engines: `classifyBodySecret`, `isQuerySecret`, `findLeakedCollectionVariables`, `AUTH_HEADER_SCHEME`, `TOKEN_HEADER`, `SESSION_COOKIE`, `plaintextOrigin`, `resolveLeadingVariable`.
 
 | Category | Rules |
@@ -161,11 +162,11 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | Kind | Patch |
 |---|---|
 | `hardcodedBaseUrl`, `environmentUrl` | URL origin → `{{baseUrl}}` |
-| `hardcodedAuthToken` | Authorization (any scheme), token headers, session cookies → variables |
+| `hardcodedAuthToken` | Authorization (any scheme), token headers, session cookies → variables (disabled headers included) |
 | `hardcodedApiKey` | API key headers → `{{apiKey}}` |
 | `basicAuthCredentials` | Finds the **effective** auth owner (request/folder/collection) and patches it once |
 | `authHelperSecrets` | Walks collection, folder, and request auth; secret fields → `{{token}}`, `{{clientSecret}}`, … |
-| `bodySecrets` | Password headers, JSON bodies (indentation preserved), urlencoded/form fields → `{{fieldName}}` |
+| `bodySecrets` | Password headers, JSON bodies (indentation preserved), urlencoded/form fields → `{{fieldName}}` (disabled entries included, they stay disabled) |
 | `querySecrets` | Raw URL and `query[]` kept in sync |
 | `secretVariables` | Clears leaked collection variable values |
 | `insecureHttp` (high risk) | `http`→`https`, `ws`→`wss`, including the collection variable behind a leading `{{baseUrl}}` |
@@ -174,7 +175,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 ### 2.6 Redaction (`redaction.ts`)
 
-`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. It is idempotent. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
+`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
 
 ### 2.7 Reports (`reportExport.ts`)
 
@@ -354,3 +355,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | Version | Change |
 |---|---|
 | V0.1.25 | Version alignment (`0.1.25`), changelog, `release:check`, module-relative version lookup, README and architecture refresh |
+| V0.1.26 | Disabled headers, query params, form fields, scripts and saved request headers are audited, repaired and sanitized; Requests page shows them with a Disabled badge |

@@ -123,6 +123,8 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Warning | Sensitive value logged by script | `console.log(pm.environment.get("token"))` |
 | Info | Hygiene and structure notes | Descriptions, duplicates, placeholders, nesting, few variables, many auth types, GET with body |
 
+Entries that are switched off in Postman (disabled headers, query params, form fields, scripts) are still checked for secrets, because they stay in the exported file. Their evidence is labelled `(disabled)` and the Requests page shows them greyed out with a **Disabled** badge. Repair and the sanitized copy cover them too.
+
 Values that are clearly placeholders (`<string>`, `changeme`, `your-api-key`, `demo-…`) or variables (`{{token}}`, `{{auth-token}}`) are not reported.
 
 ## 4. Acting on the results

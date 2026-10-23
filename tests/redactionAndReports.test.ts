@@ -86,3 +86,27 @@ test('report file names are filesystem safe', () => {
   assert.equal(reportFileName('My API / v2', 'sarif'), 'My_API_v2.postscope.sarif')
   assert.equal(reportFileName('../../etc', 'markdown'), 'etc.postscope.md')
 })
+
+test('sanitized copy scrubs credentials in disabled headers, query params, form fields and scripts', () => {
+  const original = {
+    info: { name: 'Disabled' },
+    item: [
+      {
+        name: 'R',
+        event: [{ listen: 'prerequest', disabled: true, script: { exec: [`pm.environment.set("accessToken", "${FAKE.refreshToken}")`] } }],
+        request: {
+          method: 'POST',
+          header: [{ key: 'Authorization', value: `Bearer ${FAKE.bearer}`, disabled: true }],
+          url: { raw: 'https://x.test/p', query: [{ key: 'api_key', value: FAKE.apiKey, disabled: true }] },
+          body: { mode: 'urlencoded', urlencoded: [{ key: 'password', value: FAKE.password, disabled: true }] },
+        },
+      },
+    ],
+  }
+  const { json, redactedCount } = redactCollection(original)
+  assert.ok(redactedCount >= 3)
+  const serialized = JSON.stringify(json)
+  for (const secret of [FAKE.bearer, FAKE.apiKey, FAKE.password, FAKE.refreshToken]) assert.ok(!serialized.includes(secret))
+  const findings = runAudit(parseCollection(json))
+  assert.deepEqual(findings.filter((finding) => SECRET_RULES.has(finding.ruleId)).map((finding) => finding.ruleId), [])
+})

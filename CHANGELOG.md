@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.26
+
+- Security fix: disabled headers, query params and form fields are now checked for secrets
+- Disabled entries are labelled in finding evidence and in the request explorer
+- Repair and sanitized exports now cover disabled entries
+
 ## V0.1.25
 
 - Aligned the app, Docker image and CLI version with the release number

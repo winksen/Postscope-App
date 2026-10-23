@@ -54,6 +54,7 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 | Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable |
 | Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization` in the original request |
 | Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords |
+| Disabled entries | Headers, query params, form fields and scripts switched off in Postman are still in the export, so they go through the same secret rules (evidence is labelled `(disabled)`) |
 | Transport | `http://` / `ws://` to non-local hosts (including a `{{baseUrl}}` that resolves to one), `strictSSL: false` |
 
 Placeholders (`<string>`, `changeme`, `your-api-key`, `demo-…`) and variable references (`{{token}}`, `{{auth-token}}`) are not reported.

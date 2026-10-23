@@ -19,6 +19,8 @@ export interface ParsedSavedResponse {
   /** Truncated body text, kept only for scanning. */
   body?: string
   requestHeaders: KeyValue[]
+  /** Disabled headers of the saved request. They still ship in the export, so they are audited. */
+  disabledRequestHeaders?: KeyValue[]
   requestUrl?: string
   requestAuthType?: string
   requestAuthFields?: AuthEntry[]
@@ -38,6 +40,8 @@ export interface ParsedRequest {
   /** Present when the effective Postman auth type is basic (username/password fields). */
   basicAuth?: { username: string; password: string };
   headers: Array<{ key: string; value: string }>;
+  /** Headers switched off in Postman. They are not sent but still ship in the export. */
+  disabledHeaders?: KeyValue[];
   bodyRaw?: string;
   hasDescription: boolean;
   authSource?: AuthSource;
@@ -46,10 +50,14 @@ export interface ParsedRequest {
   /** Entries of the effective auth helper (all types except basic). */
   authFields?: AuthEntry[];
   queryParams?: KeyValue[];
+  /** Query params switched off in Postman (kept in `url.query`, absent from `url.raw`). */
+  disabledQueryParams?: KeyValue[];
   bodyMode?: string;
   /** Text fields of urlencoded / form-data bodies. */
   bodyFields?: KeyValue[];
-  scripts?: { prerequest?: string; test?: string };
+  /** Disabled text fields of urlencoded / form-data bodies. */
+  disabledBodyFields?: KeyValue[];
+  scripts?: { prerequest?: string; test?: string; disabledPrerequest?: string; disabledTest?: string };
   savedResponses?: ParsedSavedResponse[];
   /** True when Postman SSL certificate verification is disabled for this request (directly or inherited). */
   tlsVerificationDisabled?: boolean;
@@ -68,6 +76,8 @@ export interface ParsedScript {
   ownerPath: number[]
   listen: string
   source: string
+  /** True when the event is switched off in Postman. It still ships in the export. */
+  disabled?: boolean
 }
 
 /** A collection or folder that defines its own auth (requests may inherit it). */
@@ -173,14 +183,18 @@ function safeDecode(value: string): string {
   }
 }
 
-function getQueryParams(url: unknown, urlString: string): KeyValue[] {
+function getQueryParams(url: unknown, urlString: string): { active: KeyValue[]; disabled: KeyValue[] } {
   if (isRecord(url) && Array.isArray(url.query)) {
-    return url.query
-      .filter((entry): entry is UnknownRecord => isRecord(entry) && entry.disabled !== true)
-      .map((entry) => ({ key: asText(entry.key), value: asText(entry.value) }))
+    const entries = url.query
+      .filter((entry): entry is UnknownRecord => isRecord(entry))
+      .map((entry) => ({ key: asText(entry.key), value: asText(entry.value), disabled: entry.disabled === true }))
       .filter((entry) => entry.key)
+    return {
+      active: entries.filter((entry) => !entry.disabled).map(({ key, value }) => ({ key, value })),
+      disabled: entries.filter((entry) => entry.disabled).map(({ key, value }) => ({ key, value })),
+    }
   }
-  return parseQueryFromRaw(urlString)
+  return { active: parseQueryFromRaw(urlString), disabled: [] }
 }
 
 interface NormalizedHeader {
@@ -208,10 +222,10 @@ function normalizeHeaders(headers: unknown): NormalizedHeader[] {
     .filter((header) => header.key)
 }
 
-function formFields(entries: unknown): KeyValue[] {
+function formFields(entries: unknown, disabled = false): KeyValue[] {
   if (!Array.isArray(entries)) return []
   return entries
-    .filter((entry): entry is UnknownRecord => isRecord(entry) && entry.disabled !== true && entry.type !== 'file')
+    .filter((entry): entry is UnknownRecord => isRecord(entry) && (entry.disabled === true) === disabled && entry.type !== 'file')
     .map((entry) => ({ key: asText(entry.key), value: asText(entry.value) }))
     .filter((entry) => entry.key)
 }
@@ -220,6 +234,7 @@ interface BodyInfo {
   mode?: string
   raw?: string
   fields?: KeyValue[]
+  disabledFields?: KeyValue[]
   graphqlQuery?: string
 }
 
@@ -230,10 +245,12 @@ function readBody(body: unknown): BodyInfo {
   const graphqlQuery = graphql ? asText(graphql.query) || undefined : undefined
   const urlencoded = formFields(body.urlencoded)
   const formdata = formFields(body.formdata)
+  const disabledUrlencoded = formFields(body.urlencoded, true)
+  const disabledFormdata = formFields(body.formdata, true)
   const pairs = (fields: KeyValue[]) => fields.map((entry) => `${entry.key}=${entry.value}`).join('&')
 
-  if (mode === 'urlencoded') return { mode, fields: urlencoded, raw: pairs(urlencoded) || undefined }
-  if (mode === 'formdata') return { mode, fields: formdata, raw: pairs(formdata) || undefined }
+  if (mode === 'urlencoded') return { mode, fields: urlencoded, disabledFields: disabledUrlencoded, raw: pairs(urlencoded) || undefined }
+  if (mode === 'formdata') return { mode, fields: formdata, disabledFields: disabledFormdata, raw: pairs(formdata) || undefined }
   if (mode === 'graphql') {
     const variables = graphql ? asText(graphql.variables) : ''
     return { mode, graphqlQuery, raw: graphqlQuery ? [graphqlQuery, variables].filter(Boolean).join('\n') : undefined }
@@ -243,7 +260,13 @@ function readBody(body: unknown): BodyInfo {
 
   // Unknown or missing mode: keep the historical behavior (raw first, then urlencoded).
   const raw = typeof body.raw === 'string' ? body.raw : urlencoded.length ? pairs(urlencoded) : undefined
-  return { mode, raw: raw || undefined, fields: urlencoded.length ? urlencoded : undefined, graphqlQuery }
+  return {
+    mode,
+    raw: raw || undefined,
+    fields: urlencoded.length ? urlencoded : undefined,
+    disabledFields: disabledUrlencoded.length ? disabledUrlencoded : undefined,
+    graphqlQuery,
+  }
 }
 
 function scriptSource(script: unknown): string {
@@ -253,11 +276,11 @@ function scriptSource(script: unknown): string {
   return asText(exec)
 }
 
-function readEvents(events: unknown): Array<{ listen: string; source: string }> {
+function readEvents(events: unknown): Array<{ listen: string; source: string; disabled: boolean }> {
   if (!Array.isArray(events)) return []
   return events
-    .filter((event): event is UnknownRecord => isRecord(event) && event.disabled !== true)
-    .map((event) => ({ listen: asText(event.listen) || 'script', source: scriptSource(event.script) }))
+    .filter((event): event is UnknownRecord => isRecord(event))
+    .map((event) => ({ listen: asText(event.listen) || 'script', source: scriptSource(event.script), disabled: event.disabled === true }))
     .filter((event) => event.source.trim())
 }
 
@@ -270,15 +293,14 @@ function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
       const original = isRecord(response.originalRequest) ? response.originalRequest : undefined
       const originalAuth = original && isRecord(original.auth) ? (original.auth as PostmanAuth) : undefined
       const body = asText(response.body)
+      const originalHeaders = original ? normalizeHeaders(original.header) : []
+      const disabledRequestHeaders = originalHeaders.filter((header) => header.disabled).map(({ key, value }) => ({ key, value }))
       return {
         name: asText(response.name) || 'Example',
         headers: normalizeHeaders(response.header).map(({ key, value }) => ({ key, value })),
         body: body ? body.slice(0, MAX_RESPONSE_BODY_SCAN) : undefined,
-        requestHeaders: original
-          ? normalizeHeaders(original.header)
-              .filter((header) => !header.disabled)
-              .map(({ key, value }) => ({ key, value }))
-          : [],
+        requestHeaders: originalHeaders.filter((header) => !header.disabled).map(({ key, value }) => ({ key, value })),
+        disabledRequestHeaders: disabledRequestHeaders.length ? disabledRequestHeaders : undefined,
         requestUrl: original ? getUrlString(original.url) || undefined : undefined,
         requestAuthType: originalAuth && !isInheritedAuth(originalAuth) ? normalizeAuthType(originalAuth.type) : undefined,
         requestAuthFields: originalAuth && !isInheritedAuth(originalAuth) ? getAuthEntries(originalAuth) : undefined,
@@ -348,6 +370,7 @@ function parseItem(
     const url = getUrlString(req.url)
     const allHeaders = normalizeHeaders(req.header)
     const headers = allHeaders.filter((h) => !h.disabled).map((h) => ({ key: h.key, value: h.value }))
+    const disabledHeaders = allHeaders.filter((h) => h.disabled).map((h) => ({ key: h.key, value: h.value }))
     const body = readBody(req.body)
     const bodyRaw = body.raw
 
@@ -370,10 +393,14 @@ function parseItem(
 
     const queryParams = getQueryParams(req.url, url)
     const events = readEvents(rawItem.event)
+    const joinSources = (listen: string, disabled: boolean) =>
+      events.filter((e) => e.listen === listen && e.disabled === disabled).map((e) => e.source).join('\n') || undefined
     const scripts = events.length
       ? {
-          prerequest: events.filter((e) => e.listen === 'prerequest').map((e) => e.source).join('\n') || undefined,
-          test: events.filter((e) => e.listen === 'test').map((e) => e.source).join('\n') || undefined,
+          prerequest: joinSources('prerequest', false),
+          test: joinSources('test', false),
+          disabledPrerequest: joinSources('prerequest', true),
+          disabledTest: joinSources('test', true),
         }
       : undefined
 
@@ -407,14 +434,17 @@ function parseItem(
       auth,
       basicAuth,
       headers,
+      disabledHeaders: disabledHeaders.length ? disabledHeaders : undefined,
       bodyRaw: bodyRaw || undefined,
       hasDescription: !!(descriptionText(req.description).trim() || descriptionText(rawItem.description).trim()),
       authSource,
       authOwnerPath: usesOwnAuth ? itemPath : effectiveAuth ? inherited.authOwnerPath : undefined,
       authFields: authFields?.length ? authFields : undefined,
-      queryParams: queryParams.length ? queryParams : undefined,
+      queryParams: queryParams.active.length ? queryParams.active : undefined,
+      disabledQueryParams: queryParams.disabled.length ? queryParams.disabled : undefined,
       bodyMode: body.mode,
       bodyFields: body.fields?.length ? body.fields : undefined,
+      disabledBodyFields: body.disabledFields?.length ? body.disabledFields : undefined,
       scripts,
       savedResponses: savedResponses.length ? savedResponses : undefined,
       tlsVerificationDisabled: strictSSL === false ? true : undefined,
@@ -442,7 +472,7 @@ function parseItem(
     }
 
     for (const event of readEvents(rawItem.event)) {
-      acc.scripts.push({ owner: newPath.join(' / '), ownerPath: itemPath, listen: event.listen, source: event.source })
+      acc.scripts.push({ owner: newPath.join(' / '), ownerPath: itemPath, listen: event.listen, source: event.source, disabled: event.disabled || undefined })
     }
 
     rawItem.item.forEach((child, index) => parseItem(child, newPath, [...itemPath, index], childContext, acc))
@@ -495,7 +525,7 @@ export function parseCollection(json: unknown): ParsedCollection {
   }
 
   for (const event of readEvents(col.event)) {
-    acc.scripts.push({ owner: 'collection', ownerPath: [], listen: event.listen, source: event.source })
+    acc.scripts.push({ owner: 'collection', ownerPath: [], listen: event.listen, source: event.source, disabled: event.disabled || undefined })
   }
 
   col.item.forEach((item, index) => parseItem(item, [], [index], rootContext, acc))
