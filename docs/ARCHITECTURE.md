@@ -24,7 +24,7 @@ No network calls are required for core functionality; collection data is only se
 |--------|--------|----------------|
 | Parse Postman JSON → domain model | `src/lib/parser.ts` | Walk `item[]` tree, flatten requests, aggregate methods/auth/variables/folders |
 | Rule engine | `src/lib/auditor.ts` | Critical / warning / info checks; each rule emits `Finding` objects |
-| Scoring | `src/lib/scorer.ts` | Penalties per severity; overall grade + per-category scores |
+| Scoring | `src/lib/scorer.ts` | Scoring model v2: weighted, request-scaled penalties; separate security and hygiene scores, headline grade and per-finding breakdown |
 | Per-request rollups | `src/lib/requestFindings.ts` | Map findings to requests by stable id; per-request health score |
 
 The **UI layer** (`App.tsx`, pages, components) is largely presentational: it renders parsed data and findings passed as props.
@@ -206,7 +206,7 @@ Derived data: `score` is memoized from `parsed` and `findings` inside `AnalyzeAp
 
 5. **Rule-based auditor vs. ML:** Deterministic rules give explainable results for compliance-minded users. Trade-off: false positives/negatives depend on rule quality only.
 
-6. **One penalty function:** `severity.ts` holds the penalty table used by both the global scorer and the per-request health score.
+6. **One set of weights:** `severity.ts` holds the weights and penalty functions used by both the global scorer and the per-request health score; deployments can override the weights (`SCORE_WEIGHTS`).
 
 ---
 
@@ -216,7 +216,7 @@ Derived data: `score` is memoized from `parsed` and `findings` inside `AnalyzeAp
 - **Audit coverage** is heuristic (regex, JSON body shape); non-JSON bodies and edge-case Postman features may be missed.
 - **`BASIC_AUTH_PLAINTEXT`** fires when Postman basic auth uses literal `username` / `password` fields (not `{{variables}}`).
 - **Session-only restore:** a refresh keeps the collection in the tab, closing it clears the session. Reports can be exported as Markdown, JSON and SARIF.
-- **Scoring model** is a capped penalty sum (one penalty per rule); it may not match every team's risk model.
+- **Scoring model** is a weighted, capped penalty sum (see the technical mindmap section 2.4); it may not match every team's risk model, which is why the weights are configurable.
 - The full and current list is in the technical mindmap section 9, and the planned fixes are in [../mindmap/ROADMAP.md](../mindmap/ROADMAP.md).
 
 ---
@@ -228,7 +228,7 @@ Derived data: `score` is memoized from `parsed` and `findings` inside `AnalyzeAp
 1. Open `src/lib/auditor.ts`.
 2. Add the check to the rule engine and emit it through the shared finding helpers.
 3. Push a `Finding` with stable *meaning* for `category` and `severity`.
-4. Register the rule in `src/lib/rules.ts` (title, category, severity, CWE) and add tests in `tests/auditor.test.ts`. If scoring should change, adjust the penalties in `src/lib/severity.ts`.
+4. Register the rule in `src/lib/rules.ts` (title, category, severity, CWE) and add tests in `tests/auditor.test.ts`. If scoring should change, adjust the weights or caps in `src/lib/severity.ts`.
 
 ### 9.2 Add a new top-level page
 

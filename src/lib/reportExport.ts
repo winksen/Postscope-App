@@ -204,6 +204,8 @@ export function buildMarkdownReport(ctx: ReportContext): string {
   lines.push(`Generated ${(ctx.generatedAt ?? new Date()).toISOString()} by ${TOOL_NAME} ${ctx.appVersion ?? ''}`.trim(), '')
   lines.push('| Metric | Value |', '|---|---|')
   lines.push(`| Score | **${ctx.score.total}/100** (grade ${ctx.score.grade}) |`)
+  lines.push(`| Security score | ${ctx.score.security}/100 |`)
+  lines.push(`| Hygiene score | ${ctx.score.hygiene}/100 |`)
   lines.push(`| Requests | ${ctx.parsed.totalRequests} in ${ctx.parsed.totalFolders} folder(s) |`)
   lines.push(`| Findings | ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info |`)
   if (ctx.parsed.environments?.length) {

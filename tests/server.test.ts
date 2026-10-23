@@ -306,3 +306,15 @@ test('distributed sign-in failures trigger a global back-off without locking out
     delete process.env.TRUST_PROXY
   }
 })
+
+test('score weights are shared through /api/config and ignore invalid entries', async () => {
+  assert.deepEqual(JSON.parse((await raw('/api/config')).body).scoreWeights, { critical: 20, warning: 8, info: 2 })
+  process.env.SCORE_WEIGHTS = 'critical=30,warning=5,info=1'
+  try {
+    assert.deepEqual(JSON.parse((await raw('/api/config')).body).scoreWeights, { critical: 30, warning: 5, info: 1 })
+    process.env.SCORE_WEIGHTS = 'critical=oops,bogus=1'
+    assert.deepEqual(JSON.parse((await raw('/api/config')).body).scoreWeights, { critical: 20, warning: 8, info: 2 })
+  } finally {
+    delete process.env.SCORE_WEIGHTS
+  }
+})

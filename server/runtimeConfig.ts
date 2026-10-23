@@ -2,7 +2,7 @@ import path from 'node:path'
 import { ensureAppEnv } from './loadEnv'
 import { log } from './logger'
 import { sanitizeAuditOptions, type AuditOptions } from '../src/lib/auditor'
-import { isSeverity } from '../src/lib/severity'
+import { isSeverity, parseScoreWeights, type ScoreWeights } from '../src/lib/severity'
 
 /**
  * Optional hardening and operations settings. Every value is read lazily from the environment
@@ -162,6 +162,16 @@ export function getAuditPolicy(): AuditOptions {
   const unknown = disabledRules.filter((rule) => !sanitized.disabledRules?.includes(rule as never))
   if (unknown.length) warnOnce('AUDIT_DISABLED_RULES', `Unknown rule ids in AUDIT_DISABLED_RULES: ${unknown.join(', ')}`)
   return sanitized
+}
+
+/**
+ * Score weights shared with every browser: SCORE_WEIGHTS=critical=20,warning=8,info=2 (any subset, 0 to 100).
+ * Invalid entries are ignored with a warning.
+ */
+export function getScoreWeights(): ScoreWeights {
+  const { weights, errors } = parseScoreWeights(env('SCORE_WEIGHTS'))
+  if (errors.length) warnOnce('SCORE_WEIGHTS', `Ignoring invalid SCORE_WEIGHTS entries: ${errors.join('; ')}.`)
+  return weights
 }
 
 /** Only http(s) URLs are allowed for outbound links so a misconfiguration cannot inject `javascript:` URLs. */

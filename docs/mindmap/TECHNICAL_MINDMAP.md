@@ -174,7 +174,21 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 ### 2.4 Scoring (`scorer.ts`, `requestFindings.ts`)
 
-`penaltyScore` in `severity.ts` is the single penalty table (critical 20, warning 8, info 2, clamped 0–100), used by both the collection score and per-request health (previously duplicated). Grades: A ≥ 90, B ≥ 75, C ≥ 55, D ≥ 35, else F.
+**Scoring model v2** (`scoreModel: 2` in reports; `SCORE_MODEL` in `scorer.ts`):
+
+| Piece | Rule |
+|---|---|
+| Weights | `critical=20, warning=8, info=2` by default; override with `SCORE_WEIGHTS` (server, sent through `/api/config` and applied with `setActiveScoreWeights`) or CLI `--weights`; each value 0 to 100, invalid entries ignored |
+| Penalty per finding | `weight * (1 + log2(affectedCount))`, capped per rule at `weight * 1.75` (critical, 35 by default), `weight * 1.875` (warning, 15) and `weight * 2` (info, 4). `affectedCount` is the number of affected requests; collection-level findings use their evidence count, at least 1 and at most 8 |
+| Security score | `100 - sum(penalties)` over the secrets, variables and auth categories, clamped to 0 to 100 |
+| Hygiene score | Same formula over the hygiene category only, so hygiene notes can no longer lower the security score |
+| Headline `total` | `round(0.85 * security + 0.15 * hygiene)`; grade A at 90, B 75, C 55, D 35, else F |
+| Categories | Each category score is `100 - sum(penalties of that category)` |
+| `penalties[]` | Every finding with rule id, severity, category, affected count and points, largest first; shown on the Score page and included in the JSON report |
+| Per-request health | `requestHealthScore` keeps the flat table (one request is one affected request, each finding costs its weight once) |
+| `--min-score` | Compares against the headline `total`; scores differ from model 1, so CI thresholds set before V0.1.36 may need adjusting |
+
+Properties covered by tests: more affected requests never raise the score, scores stay within 0 to 100, weights override the defaults, and hygiene never affects `security`.
 
 ### 2.5 Repair engine (`repairEngine.ts`)
 
@@ -319,6 +333,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `TRUST_PROXY_HOPS` | `1` | Trusted proxies in front of the app; the client IP is `X-Forwarded-For[length - hops]` (1 to 10). Fewer entries than hops, or an invalid entry, fall back to the socket address |
 | `HEALTH_EXPOSE_VERSION` | `true` | `false` removes `version` from `/api/health` (public endpoint) |
 | `AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES` | empty | Team rule policy |
+| `SCORE_WEIGHTS` | `critical=20,warning=8,info=2` | Points per severity for the score (any subset, 0 to 100 each) |
 | `LOG_LEVEL`, `LOG_FORMAT`, `ACCESS_LOG` | `info`, `text`, `false` | Logging |
 
 ## 7. Tooling
@@ -348,6 +363,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `repairEngine.test.ts` | Plan defaults, applying fixes, inherited auth, body/query/variable/HTTPS/TLS patches |
 | `redactionAndReports.test.ts` | Sanitized copies, idempotence, SARIF/JSON/Markdown validity, no secret leakage |
 | `security.test.ts` | Client IP resolution (hops, spoofed headers, IPv4-mapped, ports), failure tracker eviction and global back-off |
+| `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
 | `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors, environment and globals flags, sanitized environment files |
@@ -401,3 +417,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.33 | 16 more provider token patterns, `Authorization: Basic` decoding (no false positives on variables), `X-Vault-Token`, new rule `HIGH_ENTROPY_LITERAL` (28 rules) |
 | V0.1.34 | Environment and globals support: `environment.ts`, `SECRET_IN_ENVIRONMENT` (29 rules), URL resolution through the selected environment, multi-file import with environment selector and session restore, CLI `--environment`/`--globals`, sanitized environment exports |
 | V0.1.35 | `variableUsage.ts`; rules `UNDEFINED_VARIABLE` and `UNUSED_COLLECTION_VARIABLE` (31 rules), placeholder repair, Overview variables card shows defined, referenced and undefined counts |
+| V0.1.36 | Scoring model v2: request-scaled capped penalties, separate security and hygiene scores (`total = 0.85 * security + 0.15 * hygiene`), `SCORE_WEIGHTS` and `--weights`, penalty breakdown on the Score page |
