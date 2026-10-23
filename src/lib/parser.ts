@@ -3,6 +3,7 @@ import { detectRequestProtocol, type RequestProtocol } from './requestProtocol'
 import { getAuthEntries, isInheritedAuth, normalizeAuthType, type AuthEntry } from './authSchemes'
 import { extractVariableNames } from './variables'
 import { MAX_DESCRIPTION_LENGTH } from './descriptions'
+import { itemPointer } from './jsonPositions'
 import type { ParsedEnvironment } from './environment'
 
 export type { RequestProtocol }
@@ -40,6 +41,8 @@ export interface ParsedRequest {
   url: string;
   /** Index path through nested Postman item arrays back to the raw collection item. */
   itemPath: number[];
+  /** JSON pointer of the raw item (`/item/0/item/3`), for locating evidence in the exported file. */
+  pointer: string;
   folderPath: string[];
   /** Effective auth type, including auth inherited from folders or the collection. */
   auth: string;
@@ -500,6 +503,7 @@ function parseItem(
       protocol,
       url,
       itemPath,
+      pointer: itemPointer(itemPath),
       folderPath,
       auth,
       basicAuth,

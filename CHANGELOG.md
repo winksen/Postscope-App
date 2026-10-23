@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.38
+
+- Enhanced SARIF output with line and column locations in the collection file
+- Added a versioned JSON report schema
+- Added a self-contained HTML report export
+
 ## V0.1.37
 
 - Added a project config file for rules, severities and weights

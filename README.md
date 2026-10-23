@@ -52,6 +52,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 - [docs/VISUAL_STYLE.md](docs/VISUAL_STYLE.md): voice, punctuation, colors, typography, and layout personality
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): component patterns and Tailwind conventions
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): architecture, threat model and operations
+- [docs/schemas/postscope-report.v2.schema.json](docs/schemas/postscope-report.v2.schema.json): JSON Schema of the JSON report
 - [docs/mindmap/](docs/mindmap): functional and technical mindmaps (the source of truth for how the code is organized)
 - [mindmap/ROADMAP.md](mindmap/ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md): planned and shipped releases
 
@@ -68,7 +69,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 - **Repair**: guided fixes (secrets to variables, base URL variables, auth cleanup and more) and a sanitized download
 - **Score**: headline score (85% security, 15% hygiene), letter grade, per-category subscores and a per-finding penalty breakdown; a finding costs more when it affects more requests, and teams can set `SCORE_WEIGHTS`
 - **Rule settings**: disable rules or override severities per browser, or set team defaults on the server
-- **Exports**: JSON, SARIF 2.1.0 and Markdown reports
+- **Exports**: JSON (versioned, with a published schema), SARIF 2.1.0 with line and column locations, Markdown, and a self-contained HTML report
 - **Team library** (server): shared history with quotas, retention and optional server-side redaction
 - **CLI**: `npm run scan` with `--fail-on`, `--min-score` and `--sanitize` for CI, a project config file (`.postscope.json`), baselines so CI fails only on new findings, and reviewed suppressions with a mandatory reason
 
@@ -129,7 +130,7 @@ None are required for local development or a static production build. The Node s
 | `npm run start` | Run the Node server (serves `dist/` and the `/api` endpoints) |
 | `npm run preview` | Serve the production build locally on **port 3010** |
 | `npm test` | Run every `tests/*.test.ts` suite with the Node test runner |
-| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`); supports `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
+| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
 | `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
 | `npm run release:check` | Verify that package, Docker and compose versions match the changelog |
 

@@ -164,8 +164,9 @@ The download icon in the header offers:
 | Export | Use |
 |---|---|
 | Markdown report | Pull requests, tickets, audit evidence |
-| JSON report | Dashboards and custom tooling |
-| SARIF report | GitHub code scanning, Azure DevOps, other CI security dashboards |
+| HTML report | One self-contained file (no scripts, no external requests) that opens offline, prints cleanly and can be attached to tickets or reviews |
+| JSON report | Dashboards and custom tooling. Versioned (`reportVersion: 2`) and described by `docs/schemas/postscope-report.v2.schema.json` |
+| SARIF report | GitHub code scanning, Azure DevOps, other CI security dashboards. Results carry the line and column of the offending value in the collection file |
 | Sanitized copy | A runnable collection with every detected credential replaced by `{{variables}}` / `{{REDACTED}}`, safe to share |
 
 Reports never include full secret values, only masked previews.
@@ -185,7 +186,7 @@ Available in `hybrid` and `on` modes.
 
 | Flag | Effect |
 |---|---|
-| `--format text|json|sarif|markdown` | Report format (multiple files merge into one JSON array or one SARIF log) |
+| `--format text|json|sarif|markdown|html` | Report format (multiple files merge into one JSON array, one SARIF log or one HTML document) |
 | `--fail-on critical|warning|info|none` | Exit code 1 when findings at or above this severity exist (default: critical) |
 | `--min-score N` | Exit code 1 when a collection scores below N (headline score; thresholds chosen before V0.1.36 may need adjusting) |
 | `--weights critical=N,warning=N,info=N` | Override the points deducted per finding severity |

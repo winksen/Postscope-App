@@ -36,6 +36,8 @@ mindmap
       environment (env + globals)
       variableUsage (defined / referenced)
       suppressions + baseline + occurrences
+      jsonPositions + evidencePointers (SARIF regions)
+      htmlReport
       projectConfig (.postscope.json)
       secretPatterns
       scorer
@@ -221,7 +223,15 @@ Properties covered by tests: more affected requests never raise the score, score
 
 Reports receive `suppressed` and `baselined` in `ReportContext`: JSON adds `occurrences` (fingerprints) per finding, a `suppressed` list and `baseline.hiddenOccurrences`; SARIF results carry `postscope/v1` (kept for existing alerts) and `postscope/v2` (occurrence) fingerprints and suppressed results get `suppressions` (`inSource` for inline, `external` for config); Markdown has a Suppressed section.
 
-`buildJsonReport`, `buildSarifReport` (SARIF 2.1.0: rule catalog with `security-severity`, one result per finding × affected request, stable `partialFingerprints`, capped at 5000 results), `buildMarkdownReport`. Only masked evidence is included. `safeFileStem` produces filesystem-safe names.
+`buildJsonReport`, `buildSarifReport`, `buildMarkdownReport` and `buildHtmlReport` (`htmlReport.ts`). Only masked evidence is included. `safeFileStem` produces filesystem-safe names.
+
+| Piece | Behavior |
+|---|---|
+| JSON | `reportVersion: 2` (`REPORT_VERSION`), `score` with `scoreModel` and `penalties`, `occurrences` per finding, `suppressed`, `baseline`. The contract is `docs/schemas/postscope-report.v2.schema.json` (draft-07); `tests/reportsV2.test.ts` validates generated reports with the small validator in `tests/schema.ts` and checks that drift is rejected. Add fields only with a version bump or as optional properties |
+| Evidence pointers | `ParsedRequest.pointer` is the JSON pointer of the raw item (`/item/0/item/3`). `attachEvidencePointers(rawJson, parsed, findings)` maps each evidence location (`header X`, `query k`, `body field k`, `... script`, `saved response "X"`, descriptions, auth owners, collection variables, ...) to a pointer such as `/item/0/item/3/request/header/1/value`, falling back to the request. It runs at report time on the raw file (CLI and export), not during the audit, and pointers never enter fingerprints |
+| `jsonPositions.ts` | `locatePointers(text, wanted)` maps pointers to `{ line, column }` in one pass over the original text. Memory is proportional to nesting depth (subtrees that cannot contain a wanted pointer are skipped), CRLF, LF and CR are handled, columns count UTF-16 code units, and malformed input never throws |
+| SARIF 2.1.0 | Rule catalog with `security-severity`; one result per finding and affected request; `region.startLine/startColumn` when `sourceText` and a pointer are available; `columnKind: utf16CodeUnits`; `invocations[0].executionSuccessful`; `automationDetails.id` (`postscope/<collection>/<date>`); a `toolExecutionNotifications` warning when more than 5000 results were dropped; `partialFingerprints` `postscope/v1` and `postscope/v2`; `suppressions` on suppressed results |
+| HTML | One document (`renderHtmlReports` accepts several collections): inline CSS with light/dark and print styles, no scripts, no external requests, no event handlers. Every dynamic string goes through `escapeHtml`. Sections: summary cards, findings by severity with score impact, suppressed, environments, parse warnings |
 
 ## 3. Browser application
 
@@ -371,6 +381,8 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
+| `jsonPositions.test.ts` | Pointer to line and column mapping (pretty, minified, tabs, CRLF, CR, unicode, escapes, large files, malformed input) |
+| `reportsV2.test.ts` | JSON schema validation, evidence pointers, SARIF regions, truncation note, HTML safety and escaping |
 | `suppressions.test.ts` | sha256, fingerprints, globs, config and inline suppressions, expiry, reports, baselines, project config validation |
 | `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors, environment and globals flags, sanitized environment files |
 | `environment.test.ts` | Environment parsing and detection, `SECRET_IN_ENVIRONMENT`, URL resolution through the selected environment, variable precedence, `redactEnvironment`, report sections |
@@ -425,3 +437,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.35 | `variableUsage.ts`; rules `UNDEFINED_VARIABLE` and `UNUSED_COLLECTION_VARIABLE` (31 rules), placeholder repair, Overview variables card shows defined, referenced and undefined counts |
 | V0.1.36 | Scoring model v2: request-scaled capped penalties, separate security and hygiene scores (`total = 0.85 * security + 0.15 * hygiene`), `SCORE_WEIGHTS` and `--weights`, penalty breakdown on the Score page |
 | V0.1.37 | `.postscope.json` project config, occurrence fingerprints, baselines (`--baseline`, `--write-baseline`), config and inline suppressions with mandatory reason and expiry (33 rules), Suppressed view |
+| V0.1.38 | `jsonPositions.ts`, evidence pointers and SARIF line/column regions; JSON report v2 with schema; self-contained HTML report (UI export and CLI `--format html`) |
