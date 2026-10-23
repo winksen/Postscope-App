@@ -45,7 +45,7 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
     <Dialog open={!!request} onOpenChange={(open) => !open && onClose()}>
       {request ? (
         <DialogContent className="max-h-[85vh] max-w-lg gap-0 overflow-hidden p-0 sm:max-w-lg border-l-4 border-l-primary">
-          <DialogHeader className="space-y-3 border-b border-border bg-gradient-to-r from-muted/50 to-transparent p-6 text-left">
+          <DialogHeader className="space-y-3 border-b border-border bg-linear-to-r from-muted/50 to-transparent p-6 text-left">
             <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Request analysis
             </DialogDescription>

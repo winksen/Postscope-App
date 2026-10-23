@@ -165,7 +165,7 @@ export function DropZone({
                 className={cn(
                   'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
                   storageMode === 'incognito'
-                    ? 'bg-secondary text-secondary-foreground shadow-sm dark:shadow-none'
+                    ? 'bg-secondary text-secondary-foreground shadow-xs dark:shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -178,7 +178,7 @@ export function DropZone({
                 className={cn(
                   'flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300',
                   storageMode === 'history'
-                    ? 'bg-secondary text-secondary-foreground shadow-sm dark:shadow-none'
+                    ? 'bg-secondary text-secondary-foreground shadow-xs dark:shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -202,7 +202,7 @@ export function DropZone({
             </div>
           )}
 
-          <div className="relative mt-2.5 min-h-[2.5rem]">
+          <div className="relative mt-2.5 min-h-10">
             <AnimatePresence mode="wait">
               <motion.p
                 key={`${loggingMode}-${storageMode}`}
@@ -298,9 +298,9 @@ export function DropZone({
         {/* Main drop card */}
         <Card
           className={cn(
-            'w-full max-w-3xl bg-card shadow-sm transition-all duration-300',
+            'w-full max-w-3xl bg-card shadow-xs transition-all duration-300',
             'animate-fade-in-scale',
-            drag ? 'bg-primary/[0.03] shadow-lg' : 'hover:bg-card/95'
+            drag ? 'bg-primary/3 shadow-lg' : 'hover:bg-card/95'
           )}
         >
           <CardHeader className="text-center">
@@ -318,7 +318,7 @@ export function DropZone({
           <CardContent className="space-y-6">
             <div className="relative mx-auto grid w-full max-w-md grid-cols-2 gap-1 rounded-full bg-muted/50 p-1">
               <motion.span
-                className="absolute bottom-1 top-1 rounded-full bg-secondary shadow-sm"
+                className="absolute bottom-1 top-1 rounded-full bg-secondary shadow-xs"
                 animate={{ left: mode === 'file' ? '0.25rem' : 'calc(50% + 0.125rem)' }}
                 transition={fadeTransition}
                 style={{ width: 'calc(50% - 0.375rem)' }}
@@ -367,7 +367,7 @@ export function DropZone({
                   onDragLeave={importBlocked ? undefined : handleDragLeave}
                   className={cn(
                     'flex flex-col items-center justify-center gap-4 rounded-xl border border-border bg-muted/30 px-8 py-12 transition-all duration-300',
-                    drag && !importBlocked && 'border-primary/20 bg-primary/[0.06]',
+                    drag && !importBlocked && 'border-primary/20 bg-primary/6',
                     importBlocked && 'opacity-60'
                   )}
                 >
@@ -401,7 +401,7 @@ export function DropZone({
                         )}
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button asChild variant="default" className="shadow-sm" disabled={importBlocked}>
+                        <Button asChild variant="default" className="shadow-xs" disabled={importBlocked}>
                           <label className={cn('cursor-pointer', importBlocked && 'pointer-events-none opacity-50')}>
                             Browse files
                             <input
@@ -444,7 +444,7 @@ export function DropZone({
                     }}
                     disabled={importBlocked || loading}
                     placeholder='{"info":{"name":"My collection"},"item":[...]}'
-                    className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-none transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
+                    className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-hidden transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-muted-foreground">Requires a valid Postman collection with `info` and `item`.</p>
@@ -475,7 +475,7 @@ export function DropZone({
         <div className="mt-6 animate-fade-in">
           <Button
             variant="secondary"
-            className="bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background"
+            className="bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background"
             asChild
           >
             <Link to={samplesPath}>

@@ -18,7 +18,7 @@ function RevealToggle({ revealed, onToggle }: { revealed: boolean; onToggle: () 
         event.stopPropagation()
         onToggle()
       }}
-      className="inline-flex shrink-0 items-center rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex shrink-0 items-center rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={revealed ? 'Hide value' : 'Reveal value'}
       title={revealed ? 'Hide value' : 'Reveal value'}
     >

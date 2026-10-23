@@ -1,54 +1,332 @@
-@font-face {
-  font-family: 'Elms Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url('/fonts/elms-sans-300.ttf') format('truetype');
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: Elms Sans, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: Elms Sans, ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * Line heights as lengths, as in Tailwind 3. Tailwind 4 uses unitless ratios, which makes smaller text nested in a
+   * text-xs or text-sm parent (a text-[11px] line inside a text-xs card) shrink with its own font size.
+   */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-text: hsl(var(--destructive-text));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.5s ease-out forwards;
+  --animate-fade-in-scale: fade-in-scale 0.4s ease-out forwards;
+  --animate-slide-in-right: slide-in-right 0.4s ease-out forwards;
+  --animate-slide-in-left: slide-in-left 0.4s ease-out forwards;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-blob: blob 7s infinite;
+  --animate-march: march 1s linear infinite;
+  --animate-count-up: count-up 0.3s ease-out forwards;
+  --animate-gauge-fill: gauge-fill 1s ease-out forwards;
+  --animate-spin-slow: spin-slow 20s linear infinite;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in-scale {
+    0% {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes slide-in-right {
+    0% {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-in-left {
+    0% {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 20px hsl(var(--primary) / 0.1);
+    }
+    50% {
+      box-shadow: 0 0 40px hsl(var(--primary) / 0.2);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+  @keyframes march {
+    0% {
+      stroke-dashoffset: 0;
+    }
+    100% {
+      stroke-dashoffset: 24;
+    }
+  }
+  @keyframes count-up {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes gauge-fill {
+    0% {
+      stroke-dashoffset: var(--circumference);
+    }
+    100% {
+      stroke-dashoffset: var(--offset);
+    }
+  }
+  @keyframes spin-slow {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
 }
 
-@font-face {
-  font-family: 'Elms Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/elms-sans-400.ttf') format('truetype');
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
 }
 
-@font-face {
-  font-family: 'Elms Sans';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/elms-sans-500.ttf') format('truetype');
+@utility animate-delay-100 {
+  animation-delay: 100ms;
 }
 
-@font-face {
-  font-family: 'Elms Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/elms-sans-600.ttf') format('truetype');
+@utility animate-delay-200 {
+  animation-delay: 200ms;
 }
 
-@font-face {
-  font-family: 'Elms Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/elms-sans-700.ttf') format('truetype');
+@utility animate-delay-300 {
+  animation-delay: 300ms;
 }
 
-@font-face {
-  font-family: 'Elms Sans';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('/fonts/elms-sans-800.ttf') format('truetype');
+@utility animate-delay-400 {
+  animation-delay: 400ms;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@utility animate-delay-500 {
+  animation-delay: 500ms;
+}
+
+@utility animate-delay-600 {
+  animation-delay: 600ms;
+}
+
+@utility animate-delay-700 {
+  animation-delay: 700ms;
+}
+
+@utility animate-delay-800 {
+  animation-delay: 800ms;
+}
+
+@utility shimmer-bg {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted) / 0.5) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+}
+
+@utility glass {
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  .dark & {
+    background: hsl(var(--card) / 0.6);
+  }
+}
+
+@utility dark {
+  & .glass {
+    background: hsl(var(--card) / 0.6);
+  }
+}
+
+@layer base {
+  @font-face {
+    font-family: 'Elms Sans';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('/fonts/elms-sans-300.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Elms Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/elms-sans-400.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Elms Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/fonts/elms-sans-500.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Elms Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/fonts/elms-sans-600.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Elms Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/elms-sans-700.ttf') format('truetype');
+  }
+
+  @font-face {
+    font-family: 'Elms Sans';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url('/fonts/elms-sans-800.ttf') format('truetype');
+  }
+}
 
 @layer base {
   :root {
@@ -173,47 +451,5 @@
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
-  }
-}
-
-@layer utilities {
-  .animate-delay-100 {
-    animation-delay: 100ms;
-  }
-  .animate-delay-200 {
-    animation-delay: 200ms;
-  }
-  .animate-delay-300 {
-    animation-delay: 300ms;
-  }
-  .animate-delay-400 {
-    animation-delay: 400ms;
-  }
-  .animate-delay-500 {
-    animation-delay: 500ms;
-  }
-  .animate-delay-600 {
-    animation-delay: 600ms;
-  }
-  .animate-delay-700 {
-    animation-delay: 700ms;
-  }
-  .animate-delay-800 {
-    animation-delay: 800ms;
-  }
-
-  .shimmer-bg {
-    background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted) / 0.5) 50%, hsl(var(--muted)) 75%);
-    background-size: 200% 100%;
-  }
-
-  .glass {
-    background: hsl(var(--card) / 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .dark .glass {
-    background: hsl(var(--card) / 0.6);
   }
 }

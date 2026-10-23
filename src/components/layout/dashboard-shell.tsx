@@ -98,7 +98,7 @@ export function DashboardShell({
         id="main-content"
         tabIndex={-1}
         className={cn(
-          'pt-14 outline-none transition-[padding] duration-200',
+          'pt-14 outline-hidden transition-[padding] duration-200',
           active === 'requests' ? 'h-screen overflow-hidden' : 'min-h-screen'
         )}
         style={{ paddingLeft: sidebarW }}

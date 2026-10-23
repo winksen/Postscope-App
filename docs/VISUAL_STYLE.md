@@ -5,7 +5,7 @@ Guidelines for how PostScope should look and read in the UI, marketing pages, an
 **Source of truth**
 
 - Color and radius tokens: `src/index.css`
-- Tailwind theme: `tailwind.config.ts`
+- Tailwind theme: the `@theme` block in `src/index.css`
 - Marketing shell: `src/components/marketing/marketing-shell.tsx`
 - App shell: `src/components/layout/*`
 
@@ -42,7 +42,7 @@ PostScope is a **SaaS-style dashboard** with a **light-first** palette and optio
 - **Data-forward:** Metrics, charts, and findings should dominate; decoration stays subtle.
 - **Separated review lanes:** Security pages show security-impact categories (`secrets`, `auth`, `variables`). Hygiene pages show maintainability notes (`hygiene`) such as missing descriptions.
 - **Two surfaces:**
-  - **Marketing** (`LandingPage`, samples entry): centered hero, soft blobs, frosted cards (`bg-card/60`, `backdrop-blur-sm`).
+  - **Marketing** (`LandingPage`, samples entry): centered hero, soft blobs, frosted cards (`bg-card/60`, `backdrop-blur-xs`).
   - **Dashboard** (`DashboardShell`): fixed sidebar + header, darker light-mode `background` page wash, `p-6 lg:p-8` content padding.
 
 ### Postman relationship

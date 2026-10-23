@@ -115,7 +115,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift | `1df0a2c` |
 | V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | `6a2acfa` |
 | V0.1.43 | `v0.1.43` | A5 | Enhancement | Performance: code splitting, virtualization, budgets | `1f86c00` |
-| V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests | |
+| V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests | `0f6e5b8` |
 | V0.1.45 | `v0.1.45` | A6 | Security, Chore | Tailwind CSS 4 migration and dependency refresh | |
 | V0.2.0 | `v0.2.0` | B0 | Feature | Rule packs, identity category, compliance metadata | |
 | V0.2.1 | `v0.2.1` | B0 | Feature | Identity context extraction and platform fingerprinting | |

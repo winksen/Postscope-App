@@ -139,7 +139,7 @@ function StructureBranch({ node, depth = 0, isLast = true }: { node: StructureNo
             aria-hidden
           />
           <span className="absolute left-1 top-6 h-px w-5" style={{ backgroundColor: levelColor }} aria-hidden />
-          <span className="absolute left-[0.0625rem] top-5 h-2 w-2 rounded-full" style={{ backgroundColor: levelColor }} aria-hidden />
+          <span className="absolute left-0.25 top-5 h-2 w-2 rounded-full" style={{ backgroundColor: levelColor }} aria-hidden />
         </>
       )}
       <div className="relative flex min-w-0 items-center gap-3 rounded-lg px-2 py-2">
@@ -509,8 +509,8 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
               ))}
             </div>
           )}
-          <ScrollArea className="h-[26rem]" focusable label="Collection structure">
-            <div className="min-w-[42rem] py-2">
+          <ScrollArea className="h-104" focusable label="Collection structure">
+            <div className="min-w-2xl py-2">
               <StructureBranch node={structureTree} />
             </div>
           </ScrollArea>

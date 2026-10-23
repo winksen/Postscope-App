@@ -80,7 +80,7 @@ export function AppHeader({
           onClick={onOpenSearch}
           aria-label="Search requests"
           aria-keyshortcuts="/ Control+K Meta+K"
-          className="flex h-9 w-full items-center rounded-xl bg-card pl-9 pr-9 text-left text-sm shadow-[0_8px_22px_hsl(var(--background)/0.28)] transition-colors duration-200 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 dark:bg-muted/70 dark:hover:bg-muted"
+          className="flex h-9 w-full items-center rounded-xl bg-card pl-9 pr-9 text-left text-sm shadow-[0_8px_22px_hsl(var(--background)/0.28)] transition-colors duration-200 hover:bg-card/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-400/50 dark:bg-muted/70 dark:hover:bg-muted"
         >
           <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <span className={search ? 'truncate text-foreground' : 'truncate text-muted-foreground'}>{search || 'Search requests…'}</span>
@@ -99,7 +99,7 @@ export function AppHeader({
       <div className="flex items-center gap-1">
         {environments.length === 1 && (
           <span
-            className="hidden max-w-[10rem] truncate rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground lg:inline"
+            className="hidden max-w-40 truncate rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground lg:inline"
             title={`Environment: ${environments[0].name}`}
           >
             Environment: {environments[0].name}
@@ -199,7 +199,7 @@ export function AppHeader({
         <Button
           variant="secondary"
           size="sm"
-          className="gap-2 bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background dark:bg-foreground dark:text-background dark:hover:bg-foreground/90"
+          className="gap-2 bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background dark:bg-foreground dark:text-background dark:hover:bg-foreground/90"
           onClick={onAnalyzeAnother}
         >
           <SignOut className="h-4 w-4" />

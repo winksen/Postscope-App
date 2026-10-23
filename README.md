@@ -35,7 +35,7 @@ Collection analysis never leaves the browser. An optional Node server hosts the 
 | Runtime / UI | React 18, React Router 7 |
 | Language | TypeScript |
 | Build / dev server | Vite 6 |
-| Styling | Tailwind CSS 3, tailwindcss-animate |
+| Styling | Tailwind CSS 4 (CSS-first `@theme` in `src/index.css`, `@tailwindcss/vite`), tw-animate-css |
 | Components | Radix UI primitives, shadcn-style UI (`src/components/ui`) |
 | Charts and motion | Recharts, framer-motion |
 | Icons | Phosphor Icons (`@phosphor-icons/react`) |
@@ -138,6 +138,7 @@ None are required for local development or a static production build. The Node s
 | `npm run lint` | ESLint (typescript-eslint, react-hooks, jsx-a11y) with zero warnings allowed |
 | `npm run format` / `npm run format:check` | Write or check Prettier formatting (no semicolons, single quotes, 140 columns) |
 | `npm run check:style` | Fail when the em dash character appears anywhere in the project (docs/VISUAL_STYLE.md) |
+| `npm run test:visual` | Screenshot comparison of every page and dialog in both themes against snapshots taken on another commit (for styling changes; snapshots are not committed, see `playwright.visual.config.ts`) |
 | `npm run test:e2e` | Browser smoke, navigation, accessibility (axe) and large-collection tests with Playwright against the compiled server; run `npm run build && npm run build:node` first and `npx playwright install chromium` once (or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chromium) |
 | `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports folders and globs, `postscope diff <old> <new>` to compare two versions, `--format junit`, `--auto-env`, `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
 | `npm run bench` | Parse and audit time on a 6000-request collection plus bundle sizes; `-- --check` fails when a number is more than 20 percent worse than `scripts/bench-baseline.json`, `-- --update` records a new baseline, `-- --report file` writes JSON |
@@ -152,7 +153,8 @@ None are required for local development or a static production build. The Node s
 Postscope-App/
 ├── index.html              # HTML shell, app title, font preconnect
 ├── vite.config.ts          # Vite + React plugin, @ alias
-├── tailwind.config.ts, postcss.config.js
+├── playwright.config.ts    # browser tests (e2e/), playwright.visual.config.ts for screenshot comparison (visual/)
+├── eslint.config.js, .prettierrc.json
 ├── Dockerfile, compose.yaml
 ├── cli/                    # postscope.ts (CLI entry) and inputs.ts (folders, globs, sibling environments)
 ├── action.yml              # GitHub composite action

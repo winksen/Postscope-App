@@ -157,7 +157,7 @@ export function RequestTreeView({
               aria-expanded={row.open}
               {...common}
               onClick={() => activate(index)}
-              className="group mx-2 flex h-9 cursor-pointer items-center gap-2 rounded-xl pr-2 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group mx-2 flex h-9 cursor-pointer items-center gap-2 rounded-xl pr-2 text-left text-sm transition-colors duration-200 hover:bg-muted/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', row.open && 'rotate-90')} aria-hidden />
               {row.open ? (
@@ -180,7 +180,7 @@ export function RequestTreeView({
             onClick={() => activate(index)}
             className={cn(
               'group mx-2 flex h-9 cursor-pointer items-center justify-start gap-2 overflow-hidden rounded-2xl pr-2.5 text-left font-normal transition-colors duration-200',
-              'hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'hover:bg-muted/55 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
               active && 'bg-muted/65 text-foreground hover:bg-muted/65'
             )}
           >
