@@ -50,7 +50,7 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 | Auth helpers (request, folder, collection; inheritance-aware) | Bearer token, API key value, OAuth1/OAuth2 secrets and tokens, AWS secret key, Digest/NTLM passwords, Hawk, Akamai, JWT, ASAP |
 | Bodies | JSON (nested objects and arrays, including unquoted `{{variables}}`), XML/SOAP elements, `key=value` text, urlencoded, form-data, GraphQL variables |
 | URLs | Credential query parameters (`api_key`, `token`, `sig`, …), `user:password@host` |
-| Scripts | `pm.*.set("token", "literal")`, literal assignments, provider tokens, `console.log` of credentials |
+| Scripts | `pm.*.set("token", "literal")`, literal assignments and properties, `Authorization` literals added with `pm.request.headers` or `pm.sendRequest`, bearer literals in `pm.request.auth`, `btoa('user:password')`, provider tokens, `console.log` of credentials |
 | Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable; the same for folder and request variables |
 | Descriptions | Provider tokens and `key: value` credential fragments in collection, folder and request descriptions (replaced with `{{REDACTED}}` in sanitized copies) |
 | Path variables | Credential-like `url.variable` entries such as `:token` |

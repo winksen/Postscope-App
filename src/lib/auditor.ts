@@ -5,8 +5,12 @@ import { secretFieldsFor } from './authSchemes'
 import { parseTemplatedJson } from './jsonBody'
 import { scanRawBodyFields } from './rawBody'
 import { findDescriptionSecrets } from './descriptions'
+import { findScriptSecrets } from './scriptSecrets'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
+  AUTH_HEADER_SCHEME,
+  SESSION_COOKIE,
+  TOKEN_HEADER,
   evidencePreview,
   findSecretPatterns,
   isLikelySecretValue,
@@ -53,15 +57,10 @@ const HEADER_PASSWORD_KEY = /passw|password|passwd/i
 const API_KEY_HEADER = /api.?key|x-api-key|apikey/i
 const PASSWORD_FIELD = /passw/i
 const BODY_SECRET_FIELD = /secret|access_?token|refresh_?token|id_?token|api_?key|apikey|private_?key|client_?assertion/i
-export const AUTH_HEADER_SCHEME = /^(Bearer|Basic|Token|Digest|Hawk|ApiKey|Api-Key|JWT|AWS4-HMAC-SHA256|SharedKey|OAuth)\s+\S+/i
-export const TOKEN_HEADER = /^(x-(auth|access|session|refresh)-token|x-amz-security-token|private-token)$/i
-export const SESSION_COOKIE = /(?:^|;\s*)([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i
+export { AUTH_HEADER_SCHEME, SESSION_COOKIE, TOKEN_HEADER }
 const QUERY_SECRET_KEY =
   /^(access_?token|auth_?token|id_?token|refresh_?token|token|api_?key|apikey|x-api-key|secret|client_?secret|password|passwd|pwd|session_?id|sessionid|sid|sig|signature|private_?key|x-amz-(signature|security-token|credential))$/i
 const URL_CREDENTIALS = /^[a-z][a-z0-9+.-]*:\/\/([^\s/@:{}]+):([^\s/@]+)@/i
-const SCRIPT_SET_CALL = /pm\.(?:environment|collectionVariables|globals|variables|iterationData)\.set\(\s*(['"`])([^'"`]+)\1\s*,\s*(['"`])([^'"`]*)\3/g
-const SCRIPT_LITERAL_ASSIGNMENT = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])([^'"`\n]{6,})\2/g
-const SCRIPT_LITERAL_PROPERTY = /['"]?([A-Za-z_$][\w$-]*)['"]?\s*:\s*(['"`])([^'"`\n]{6,})\2/g
 const SCRIPT_CONSOLE_CALL = /console\.(?:log|info|debug|warn|error|trace)\s*\(([^)\n]*)\)/g
 const SENSITIVE_IDENTIFIER = /(token|password|passwd|secret|api_?key|apikey|authorization|credential|cookie|bearer)/i
 const RESPONSE_JSON_SECRET =
@@ -351,24 +350,8 @@ function checkQueryAndUrl(req: ParsedRequest, out: FindingCollector): void {
 function scanScript(source: string, location: string, requestId: string | undefined, out: FindingCollector): void {
   if (!source) return
 
-  for (const match of source.matchAll(SCRIPT_SET_CALL)) {
-    const key = match[2]
-    const value = match[4]
-    if (isSensitiveKey(key) && isLikelySecretValue(value)) {
-      out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: sets ${key}`, preview: evidencePreview(value) })
-    }
-  }
-  for (const pattern of [SCRIPT_LITERAL_ASSIGNMENT, SCRIPT_LITERAL_PROPERTY]) {
-    for (const match of source.matchAll(pattern)) {
-      const name = match[1]
-      const value = match[3]
-      if (isSensitiveKey(name) && isLikelySecretValue(value) && !/^https?:\/\//i.test(value)) {
-        out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${name}`, preview: evidencePreview(value) })
-      }
-    }
-  }
-  for (const secret of findSecretPatterns(source, 5)) {
-    out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${secret.label}`, preview: evidencePreview(secret.match) })
+  for (const secret of findScriptSecrets(source)) {
+    out.add('SECRET_IN_SCRIPT', requestId, { location: `${location}: ${secret.label}`, preview: evidencePreview(secret.value) })
   }
 
   for (const match of source.matchAll(SCRIPT_CONSOLE_CALL)) {

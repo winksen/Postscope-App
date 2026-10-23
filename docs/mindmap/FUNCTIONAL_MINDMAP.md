@@ -111,7 +111,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Hardcoded credential in auth settings | Postman Bearer/API key/OAuth/AWS helper with a literal token, at request, folder, or collection level |
 | Critical | Secret passed in query string | `?api_key=…`, `?sig=…` |
 | Critical | Credentials embedded in URL | `https://admin:pass@host` |
-| Critical | Hardcoded secret in script | `pm.environment.set("token", "abc…")` |
+| Critical | Hardcoded secret in script | `pm.environment.set("token", "abc…")`, `pm.request.headers.add({ key: 'Authorization', value: 'Bearer abc…' })`, `pm.sendRequest` headers, `btoa('user:password')` |
 | Critical | Secret stored in collection variable | `clientSecret = cs-0a1b…` exported with the collection, or defined on a folder or request |
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |

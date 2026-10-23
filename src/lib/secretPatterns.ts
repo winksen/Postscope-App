@@ -42,6 +42,12 @@ export const SECRET_PATTERNS: SecretPattern[] = [
   },
 ]
 
+/** `Authorization` values that start with a known scheme followed by a credential. */
+export const AUTH_HEADER_SCHEME = /^(Bearer|Basic|Token|Digest|Hawk|ApiKey|Api-Key|JWT|AWS4-HMAC-SHA256|SharedKey|OAuth)\s+\S+/i
+export const TOKEN_HEADER = /^(x-(auth|access|session|refresh)-token|x-amz-security-token|private-token)$/i
+/** A session-like cookie inside a `Cookie` header value: `[1]` is the name, `[2]` the value. */
+export const SESSION_COOKIE = /(?:^|;\s*)([^=;\s]*(?:session|sess|sid|token|auth|jwt)[^=;\s]*)=([^;]+)/i
+
 /** Above this size only the first chunk is scanned so pathological inputs cannot stall the UI. */
 const MAX_SCAN_LENGTH = 512_000
 
