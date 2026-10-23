@@ -27,6 +27,16 @@ jobs:
         run: npm test
       - name: Typecheck and build
         run: npm run build
+      - name: Performance budgets
+        if: matrix.node == 20
+        run: npm run bench -- --check --report bench-report.json
+      - name: Upload performance report
+        if: matrix.node == 20 && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-report
+          path: bench-report.json
+          if-no-files-found: ignore
       - name: Scan sample collections with the CLI
         run: npm run scan -- public/samples/default.postman_collection.json --fail-on none --format markdown
       - name: Compile the CLI and server

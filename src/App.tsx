@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { DEFAULT_APP_CONFIG, fetchAppConfig, type AppConfig } from '@/lib/deploymentConfig'
 import { setActiveScoreWeights } from '@/lib/scorer'
 import { LandingPage } from '@/pages/LandingPage'
-import { AnalyzeApp } from '@/pages/AnalyzeApp'
-import { SamplesApp } from '@/pages/SamplesApp'
+
+// The analyzer and the samples are loaded on demand: the landing page does not download the parser, the audit
+// engine or the dashboard.
+const AnalyzeApp = lazy(() => import('@/pages/AnalyzeApp').then((module) => ({ default: module.AnalyzeApp })))
+const SamplesApp = lazy(() => import('@/pages/SamplesApp').then((module) => ({ default: module.SamplesApp })))
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen bg-background" role="status" aria-live="polite">
+      <span className="sr-only">Loading...</span>
+    </div>
+  )
+}
 
 export default function App() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG)
@@ -52,6 +63,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {config.publicLandingPage ? (
           <>
@@ -68,6 +80,7 @@ export default function App() {
           </>
         )}
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

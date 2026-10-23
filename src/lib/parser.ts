@@ -52,6 +52,10 @@ export interface ParsedRequest {
   /** Headers switched off in Postman. They are not sent but still ship in the export. */
   disabledHeaders?: KeyValue[];
   bodyRaw?: string;
+  /** True when `bodyRaw` was cut to the first 64 KB for display (see `compactResult.ts`); findings used the full text. */
+  bodyTruncated?: boolean;
+  /** Length of the full body in characters, set together with `bodyTruncated`. */
+  bodySize?: number;
   hasDescription: boolean;
   authSource?: AuthSource;
   /** Item path of the request or folder that owns the effective auth; `[]` means collection level. */

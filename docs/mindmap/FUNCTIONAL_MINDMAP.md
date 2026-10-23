@@ -34,6 +34,7 @@ mindmap
       Score and grade
       Deep links and back button
       Keyboard and screen reader use
+      Large collections stay fast
       Compare versions
         New and resolved findings
         Score change
@@ -261,6 +262,7 @@ Full details: [../SECURITY.md](../SECURITY.md).
 
 ## 8. Limitations
 
+- Large collections: pages load on demand, the request tree only draws the rows near the screen, and analysis (including changing rules or the environment) runs in the background, so a collection with thousands of requests opens in about a second. A request body over 64 KB is shown up to its first 64 KB with a notice; findings always use the whole body.
 - Detection is heuristic: expect some false positives and false negatives. Tune with Rules.
 - PostScope does not check whether a found credential is still valid. Rotate anything it reports.
 - Collections larger than 50 MB are refused in the browser; the library stores up to `MAX_COLLECTION_MB` (15 MB default).

@@ -157,7 +157,8 @@ function StructureBranch({
   const requestCount = totalRequests(node)
   const directRequests = node.requests.length
   const hasChildren = node.children.length > 0
-  const shownChildren = depth >= 4 ? node.children.slice(0, 8) : node.children
+  // Very wide collections would put thousands of branches in the page; the rest is summarized.
+  const shownChildren = node.children.slice(0, depth >= 4 ? 8 : 100)
   const hiddenChildren = node.children.length - shownChildren.length
   const levelColor = fillForTreeLevel(depth)
 

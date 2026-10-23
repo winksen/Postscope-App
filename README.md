@@ -70,6 +70,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 - **Score**: headline score (85% security, 15% hygiene), letter grade, per-category subscores and a per-finding penalty breakdown; a finding costs more when it affects more requests, and teams can set `SCORE_WEIGHTS`
 - **Rule settings**: disable rules or override severities per browser, or set team defaults on the server
 - **Exports**: JSON (versioned, with a published schema), SARIF 2.1.0 with line and column locations, Markdown, and a self-contained HTML report
+- **Performance**: pages load on demand (the landing page ships about 120 KB of gzipped JavaScript, the analyzer about 250 KB, Recharts only with the Dashboard), the request tree is virtualized above 300 rows, analysis and re-audits run in a Web Worker, and CI enforces size and speed budgets (`npm run bench`)
 - **Deep links and keyboard use**: every page, filter, open finding and selected request has its own address (`/analyze/security?severity=critical&rule=HARDCODED_TOKEN`, `/analyze/requests/<id>`), so links and the back button work within a session; arrow-key navigation in the request tree, `/` or `Ctrl+K` to search, and a checked accessibility baseline (axe: no serious violations)
 - **Compare versions**: new, resolved and unchanged findings, the score change and added, removed or edited requests between two versions of a collection (two files, or the open collection and a library entry), also as `postscope diff old.json new.json` for pull request checks
 - **Team library** (server): shared history with quotas, retention and optional server-side redaction
@@ -135,6 +136,7 @@ None are required for local development or a static production build. The Node s
 | `npm run preview` | Serve the production build locally on **port 3010** |
 | `npm test` | Run every `tests/*.test.ts` suite with the Node test runner |
 | `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports folders and globs, `postscope diff <old> <new>` to compare two versions, `--format junit`, `--auto-env`, `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
+| `npm run bench` | Parse and audit time on a 6000-request collection plus bundle sizes; `-- --check` fails when a number is more than 20 percent worse than `scripts/bench-baseline.json`, `-- --update` records a new baseline, `-- --report file` writes JSON |
 | `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
 | `npm run release:check` | Verify that package, Docker and compose versions match the changelog |
 

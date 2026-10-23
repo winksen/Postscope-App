@@ -122,7 +122,7 @@ function changedFields(before: ParsedRequest, after: ParsedRequest): RequestChan
   if (before.method !== after.method) fields.push('method')
   if (before.url !== after.url) fields.push('url')
   if (before.auth !== after.auth) fields.push('auth')
-  if ((before.bodyMode ?? '') !== (after.bodyMode ?? '') || (before.bodyRaw ?? '') !== (after.bodyRaw ?? '')) fields.push('body')
+  if ((before.bodyMode ?? '') !== (after.bodyMode ?? '') || (before.bodyRaw ?? '') !== (after.bodyRaw ?? '') || (before.bodySize ?? 0) !== (after.bodySize ?? 0)) fields.push('body')
   if (headerSignature(before) !== headerSignature(after)) fields.push('headers')
   if (scriptSignature(before) !== scriptSignature(after)) fields.push('scripts')
   return fields

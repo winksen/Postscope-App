@@ -1,7 +1,7 @@
 import { parseCollection } from './parser'
 import { runAuditDetailed, type AuditOptions } from './auditor'
 import type { SuppressedFinding } from './suppressions'
-import { attachEnvironments } from './environment'
+import { attachEnvironments, withActiveEnvironment } from './environment'
 import type { ParsedCollection } from './parser'
 import type { Finding } from './auditor'
 
@@ -47,13 +47,25 @@ export function describeAnalysisError(error: unknown): string {
 // Web Worker pipeline
 // ---------------------------------------------------------------------------
 
+/** The collection an analysis belongs to: the one on screen, or the older version on the Compare page. */
+export type AnalysisSlot = 'main' | 'reference'
+
 interface WorkerResponse {
   id: number
   ok: boolean
+  /** The worker has no analysis to audit again (it was restarted). */
+  cacheMiss?: boolean
   parsed?: ParsedCollection
   findings?: Finding[]
   suppressed?: SuppressedFinding[]
   error?: string
+}
+
+class CacheMissError extends Error {
+  constructor() {
+    super('No analysis to audit again')
+    this.name = 'CacheMissError'
+  }
 }
 
 interface PendingJob {
@@ -103,6 +115,8 @@ function getWorker(): Worker | null {
     clearTimeout(job.timer)
     if (event.data.ok && event.data.parsed && event.data.findings) {
       job.resolve({ parsed: event.data.parsed, findings: event.data.findings, suppressed: event.data.suppressed ?? [] })
+    } else if (event.data.cacheMiss) {
+      job.reject(new CacheMissError())
     } else {
       job.reject(new Error(event.data.error || 'Analysis failed'))
     }
@@ -117,7 +131,11 @@ function getWorker(): Worker | null {
   return worker
 }
 
-function runInWorker(raw: string, options: AuditOptions | undefined, timeoutMs: number, environments?: readonly string[]): Promise<AnalysisResult> {
+type WorkerJob =
+  | { type: 'analyze'; slot: AnalysisSlot; raw: string; options?: AuditOptions; environments?: readonly string[]; activeEnvironment?: number }
+  | { type: 'audit'; slot: AnalysisSlot; options?: AuditOptions; activeEnvironment?: number }
+
+function runInWorker(job: WorkerJob, timeoutMs: number): Promise<AnalysisResult> {
   const instance = getWorker()
   if (!instance) return Promise.reject(new WorkerUnavailableError())
   const id = nextJobId++
@@ -130,25 +148,63 @@ function runInWorker(raw: string, options: AuditOptions | undefined, timeoutMs: 
       reject(new Error(`Analysis timed out after ${Math.round(timeoutMs / 1000)} seconds.`))
     }, timeoutMs)
     pending.set(id, { resolve, reject, timer })
-    instance.postMessage({ id, raw, options, environments })
+    instance.postMessage({ id, ...job })
   })
+}
+
+/** Full parsed collections kept when there is no worker, so audits can start from them like the worker's cache. */
+const fallbackFull = new Map<AnalysisSlot, ParsedCollection>()
+
+export interface AnalyzeTextOptions {
+  timeoutMs?: number
+  environments?: readonly string[]
+  /** Index of the environment to select instead of the first one. */
+  activeEnvironment?: number
+  slot?: AnalysisSlot
 }
 
 /**
  * Parses and audits raw collection JSON, optionally with Postman environment and globals exports. Runs in a Web Worker when available so even
- * very large files never block the UI; falls back to the main thread otherwise.
+ * very large files never block the UI; falls back to the main thread otherwise. The worker keeps the full parsed
+ * collection and returns a compact copy (see `compactResult.ts`), so later audits go through `auditAgain`.
  */
 export async function analyzeCollectionText(
   raw: string,
   options?: AuditOptions,
-  { timeoutMs = DEFAULT_TIMEOUT_MS, environments }: { timeoutMs?: number; environments?: readonly string[] } = {}
+  { timeoutMs = DEFAULT_TIMEOUT_MS, environments, activeEnvironment, slot = 'main' }: AnalyzeTextOptions = {}
 ): Promise<AnalysisResult> {
   try {
-    return await runInWorker(raw, options, timeoutMs, environments)
+    return await runInWorker({ type: 'analyze', slot, raw, options, environments, activeEnvironment }, timeoutMs)
   } catch (error) {
     if (!(error instanceof WorkerUnavailableError)) throw error
   }
   await yieldToMain()
   const json = JSON.parse(raw) as unknown
-  return analyzeCollection(json, options, environments)
+  let parsed = attachEnvironments(parseCollection(json), environments)
+  if (activeEnvironment !== undefined) parsed = withActiveEnvironment(parsed, activeEnvironment)
+  fallbackFull.set(slot, parsed)
+  const { findings, suppressed } = runAuditDetailed(parsed, options)
+  return { parsed, findings, suppressed }
+}
+
+/**
+ * Audits the last analyzed collection again with other rule settings or another selected environment, without
+ * parsing it again. Resolves to null when there is nothing to audit (the worker was restarted): analyze the text again.
+ */
+export async function auditAgain(
+  options?: AuditOptions,
+  { timeoutMs = DEFAULT_TIMEOUT_MS, activeEnvironment, slot = 'main' }: Pick<AnalyzeTextOptions, 'timeoutMs' | 'activeEnvironment' | 'slot'> = {}
+): Promise<AnalysisResult | null> {
+  try {
+    return await runInWorker({ type: 'audit', slot, options, activeEnvironment }, timeoutMs)
+  } catch (error) {
+    if (error instanceof CacheMissError) return null
+    if (!(error instanceof WorkerUnavailableError)) throw error
+  }
+  const cached = fallbackFull.get(slot)
+  if (!cached) return null
+  const parsed = activeEnvironment === undefined ? cached : withActiveEnvironment(cached, activeEnvironment)
+  fallbackFull.set(slot, parsed)
+  const { findings, suppressed } = runAuditDetailed(parsed, options)
+  return { parsed, findings, suppressed }
 }

@@ -85,7 +85,7 @@ flowchart LR
 ```
 
 1. **Landing:** `App` renders `DropZone` until `parsed` is non-null.
-2. **Import:** User drops, selects or pastes JSON → `AnalyzeApp` posts the text to `analysis.worker.ts` → `JSON.parse` → `parseCollection` → `runAudit` → `calculateScore` → state is set from the worker result.
+2. **Import:** User drops, selects or pastes JSON → `AnalyzeApp` posts the text to `analysis.worker.ts` → `JSON.parse` → `parseCollection` → `runAudit` → a compact copy of the result (bodies over 64 KB cut for display) → `calculateScore` → state is set from the worker result. The worker keeps the full parsed collection, so a rule or environment change sends only a small `audit` message.
 3. **Dashboard:** `calculateScore(parsed, findings)` is derived on each render (cheap; memoization optional).
 4. **Child views** receive `parsed`, `findings`, `score` (where needed), and `search` from `App`.
 
