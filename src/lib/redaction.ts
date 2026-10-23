@@ -105,10 +105,17 @@ class Redactor {
 
   url(request: UnknownRecord): void {
     const url = request.url
-    const scrub = (raw: string) => {
-      let next = raw.replace(URL_CREDENTIALS, (match, scheme: string, user: string, password: string) =>
-        password.includes('{{') ? match : `${scheme}${user}:{{password}}@`
-      )
+    /**
+     * Scrubs a raw URL and returns how many secrets were removed. When the query is also kept as a `query[]`
+     * array, those entries are counted on their own, so the raw copy of the same pairs is not counted twice.
+     */
+    const scrub = (raw: string, countQueryPairs: boolean) => {
+      let changes = 0
+      let next = raw.replace(URL_CREDENTIALS, (match, scheme: string, user: string, password: string) => {
+        if (password.includes('{{')) return match
+        changes += 1
+        return `${scheme}${user}:{{password}}@`
+      })
       next = next.replace(/([?&])([^=&#]+)=([^&#]*)/g, (pair, sep: string, key: string, value: string) => {
         let decoded = value
         try {
@@ -116,18 +123,27 @@ class Redactor {
         } catch {
           /* keep raw */
         }
-        return isQuerySecret(key, decoded) ? `${sep}${key}={{${toVariableName(key)}}}` : pair
+        if (!isQuerySecret(key, decoded)) return pair
+        if (countQueryPairs) changes += 1
+        return `${sep}${key}={{${toVariableName(key)}}}`
       })
-      next = redactSecretsInText(next, () => REDACTED)
-      if (next !== raw) this.count += 1
-      return next
+      const patterned = redactSecretsInText(next, () => REDACTED)
+      if (patterned !== next) changes += 1
+      return { text: patterned, changes }
     }
     if (typeof url === 'string') {
-      request.url = scrub(url)
+      const result = scrub(url, true)
+      request.url = result.text
+      this.count += result.changes
       return
     }
     if (!isRecord(url)) return
-    if (typeof url.raw === 'string') url.raw = scrub(url.raw)
+    const hasQueryArray = Array.isArray(url.query)
+    if (typeof url.raw === 'string') {
+      const result = scrub(url.raw, !hasQueryArray)
+      url.raw = result.text
+      this.count += result.changes
+    }
     if (Array.isArray(url.variable)) {
       for (const variable of url.variable) {
         if (isRecord(variable) && typeof variable.key === 'string' && typeof variable.value === 'string' && isQuerySecret(variable.key, variable.value)) {
@@ -143,6 +159,7 @@ class Redactor {
       for (const param of url.query) {
         if (isRecord(param) && typeof param.key === 'string' && typeof param.value === 'string' && isQuerySecret(param.key, param.value)) {
           param.value = `{{${toVariableName(param.key)}}}`
+          this.count += 1
         }
       }
     }

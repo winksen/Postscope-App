@@ -3,6 +3,13 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.32
+
+- Fixed base URL repair merging different hosts into one variable
+- Fixed repaired object URLs keeping a stale port
+- Fixed sanitized export counts and kept original JSON indentation
+- Removed emoji from the Markdown report
+
 ## V0.1.31
 
 - Security fixes: client IP is now taken from trusted proxy hops only
