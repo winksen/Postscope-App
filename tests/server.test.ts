@@ -252,3 +252,57 @@ test('optional Basic auth protects everything except health, with lockout', asyn
     resetLibraryCache()
   }
 })
+
+test('health hides the version when HEALTH_EXPOSE_VERSION is false', async () => {
+  assert.ok(JSON.parse((await raw('/api/health')).body).version)
+  process.env.HEALTH_EXPOSE_VERSION = 'false'
+  try {
+    const body = JSON.parse((await raw('/api/health')).body)
+    assert.equal(body.status, 'ok')
+    assert.equal('version' in body, false)
+    assert.ok(JSON.parse((await raw('/api/config')).body).appVersion)
+  } finally {
+    delete process.env.HEALTH_EXPOSE_VERSION
+  }
+})
+
+test('rotating X-Forwarded-For does not dodge the sign-in lockout behind a trusted proxy', async () => {
+  process.env.BASIC_AUTH_USER = 'admin'
+  process.env.BASIC_AUTH_PASSWORD = 'a-long-test-password'
+  process.env.RATE_LIMIT_AUTH_FAILURES = '3'
+  process.env.TRUST_PROXY = 'true'
+  const bad = `Basic ${Buffer.from('admin:wrong').toString('base64')}`
+  try {
+    const statuses: number[] = []
+    for (let i = 0; i < 4; i += 1) statuses.push((await raw('/', { headers: { Authorization: bad, 'X-Forwarded-For': `10.9.8.${i}, 198.51.100.7` } })).status)
+    assert.deepEqual(statuses, [401, 401, 401, 429])
+  } finally {
+    delete process.env.BASIC_AUTH_USER
+    delete process.env.BASIC_AUTH_PASSWORD
+    delete process.env.RATE_LIMIT_AUTH_FAILURES
+    delete process.env.TRUST_PROXY
+  }
+})
+
+test('distributed sign-in failures trigger a global back-off without locking out plain requests', async () => {
+  process.env.BASIC_AUTH_USER = 'admin'
+  process.env.BASIC_AUTH_PASSWORD = 'a-long-test-password'
+  process.env.RATE_LIMIT_AUTH_FAILURES = '2'
+  process.env.TRUST_PROXY = 'true'
+  const good = `Basic ${Buffer.from('admin:a-long-test-password').toString('base64')}`
+  const bad = `Basic ${Buffer.from('admin:wrong').toString('base64')}`
+  try {
+    for (let i = 0; i <= 20; i += 1) await raw('/', { headers: { Authorization: bad, 'X-Forwarded-For': `203.0.113.${i + 1}` } })
+    const blocked = await raw('/', { headers: { Authorization: good, 'X-Forwarded-For': '203.0.113.200' } })
+    assert.equal(blocked.status, 429)
+    assert.equal(blocked.headers['retry-after'], '60')
+    assert.equal((await raw('/', { headers: { 'X-Forwarded-For': '203.0.113.201' } })).status, 401)
+    sweepAuthFailures(Date.now() + 3_600_000)
+    assert.equal((await raw('/', { headers: { Authorization: good, 'X-Forwarded-For': '203.0.113.202' } })).status, 200)
+  } finally {
+    delete process.env.BASIC_AUTH_USER
+    delete process.env.BASIC_AUTH_PASSWORD
+    delete process.env.RATE_LIMIT_AUTH_FAILURES
+    delete process.env.TRUST_PROXY
+  }
+})

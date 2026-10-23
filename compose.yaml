@@ -1,16 +1,16 @@
 services:
   postscope:
-    image: postscope:${POSTSCOPE_VERSION:-0.1.30}
+    image: postscope:${POSTSCOPE_VERSION:-0.1.31}
     build:
       context: .
       args:
-        APP_VERSION: ${POSTSCOPE_VERSION:-0.1.30}
+        APP_VERSION: ${POSTSCOPE_VERSION:-0.1.31}
     container_name: postscope
     restart: unless-stopped
     ports:
       - "${POSTSCOPE_HOST:-127.0.0.1}:${POSTSCOPE_PORT:-3010}:3010"
     environment:
-      APP_VERSION: ${POSTSCOPE_VERSION:-0.1.30}
+      APP_VERSION: ${POSTSCOPE_VERSION:-0.1.31}
       LOGGING_MODE: ${LOGGING_MODE:-hybrid}
       PUBLIC_LANDING_PAGE: ${PUBLIC_LANDING_PAGE:-false}
       PORT: 3010
@@ -22,6 +22,8 @@ services:
       LIBRARY_MAX_ITEMS: ${LIBRARY_MAX_ITEMS:-0}
       LIBRARY_RETENTION_DAYS: ${LIBRARY_RETENTION_DAYS:-0}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      HEALTH_EXPOSE_VERSION: ${HEALTH_EXPOSE_VERSION:-true}
     volumes:
       - postscope-data:/app/data
     security_opt:

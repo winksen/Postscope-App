@@ -109,6 +109,19 @@ export function isTrustProxyEnabled(): boolean {
   return parseFlag(env('TRUST_PROXY'), false)
 }
 
+/**
+ * Number of trusted reverse proxies in front of the app (only used with TRUST_PROXY=true). The client address
+ * is taken that many entries from the right of X-Forwarded-For; entries further left are client-controlled.
+ */
+export function getTrustProxyHops(): number {
+  return Math.floor(parseNumber('TRUST_PROXY_HOPS', 1, { min: 1, max: 10 }))
+}
+
+/** When false, the unauthenticated /api/health endpoint omits the application version. */
+export function isHealthVersionExposed(): boolean {
+  return parseFlag(env('HEALTH_EXPOSE_VERSION'), true)
+}
+
 export function isHstsEnabled(): boolean {
   return parseFlag(env('ENABLE_HSTS'), false)
 }

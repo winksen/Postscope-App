@@ -24,6 +24,9 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 | Slowloris / header floods | HTTP server | `headersTimeout` 20s, `requestTimeout` 120s, `keepAliveTimeout` 5s, `maxHeadersCount` 100 |
 | API abuse / scraping | API | Per-IP fixed-window rate limits for reads and writes (429 + `Retry-After`) |
 | Unauthorized access to a shared library | Whole app | Optional HTTP Basic auth (`BASIC_AUTH_USER`/`BASIC_AUTH_PASSWORD`), constant-time comparison, lockout after repeated failures |
+| Spoofed client IP to dodge rate limits or the sign-in lockout | Whole app | With `TRUST_PROXY=true` the client IP is taken `TRUST_PROXY_HOPS` entries from the right of `X-Forwarded-For`, validated as an IP, and falls back to the socket address; client-supplied left-hand entries are ignored |
+| Flooding the failure table to erase lockouts, or distributed password guessing | Whole app | Expired entries are swept first, then the oldest unlocked entries are evicted; locked addresses are never evicted. More than 10x the per-IP limit of failures in 15 minutes triggers a 60 second global back-off during which credentials are not evaluated (429, plain requests still get the 401 challenge) and a warning is logged |
+| Version fingerprinting on the public health endpoint | API | `HEALTH_EXPOSE_VERSION=false` removes `version` from `/api/health` |
 | XSS / clickjacking / MIME sniffing | Browser | CSP (`script-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, COOP/CORP |
 | Misconfigured outbound links (`FEEDBACK_URL=javascript:…`) | Config | Server and client accept only `http(s)` URLs |
 | Spoofed collection names (bidi overrides, control characters) | Library | Names are stripped of control, zero-width, and bidi characters and capped at 200 chars |
@@ -67,7 +70,8 @@ For any deployment with `LOGGING_MODE=hybrid` or `on`:
 
 - [ ] Put PostScope behind HTTPS (reverse proxy) and set `ENABLE_HSTS=true` once HTTPS-only.
 - [ ] Set `BASIC_AUTH_USER` and a long random `BASIC_AUTH_PASSWORD`, or restrict network access to trusted users. The server logs a warning at startup when the library is enabled without authentication.
-- [ ] If behind a proxy, set `TRUST_PROXY=true` so rate limits use the real client IP, and add the public origin to `ALLOWED_ORIGINS` if the proxy rewrites `Host`.
+- [ ] If behind a proxy, set `TRUST_PROXY=true` so rate limits use the real client IP, set `TRUST_PROXY_HOPS` to the number of proxies you control, make sure PostScope is not reachable around the proxy, and add the public origin to `ALLOWED_ORIGINS` if the proxy rewrites `Host`.
+- [ ] Set `HEALTH_EXPOSE_VERSION=false` if the health endpoint is reachable from untrusted networks.
 - [ ] Choose a retention policy: `LIBRARY_RETENTION_DAYS`, `LIBRARY_MAX_ITEMS`, `LIBRARY_MAX_TOTAL_MB`.
 - [ ] Consider `LIBRARY_REDACT_SECRETS=true` so stored copies never contain usable credentials.
 - [ ] Consider `LIBRARY_ALLOW_DELETE=false` when the library is an audit record.

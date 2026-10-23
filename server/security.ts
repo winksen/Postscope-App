@@ -1,9 +1,12 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import net from 'node:net'
+import { log } from './logger'
 import {
   getAllowedOrigins,
   getBasicAuthConfig,
   getRateLimits,
+  getTrustProxyHops,
   isHstsEnabled,
   isTrustProxyEnabled,
 } from './runtimeConfig'
@@ -39,13 +42,34 @@ export function applySecurityHeaders(res: ServerResponse, { csp }: { csp: boolea
   if (isHstsEnabled()) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
 }
 
+/** Canonical form of a client address: no port, no brackets, IPv4-mapped IPv6 as plain IPv4. Null when invalid. */
+export function normalizeIp(value: string | undefined): string | null {
+  if (!value) return null
+  let candidate = value.trim()
+  const bracketed = candidate.match(/^\[([^\]]+)\](?::\d+)?$/)
+  if (bracketed) candidate = bracketed[1]
+  else if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(candidate)) candidate = candidate.slice(0, candidate.lastIndexOf(':'))
+  const mapped = candidate.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i)
+  if (mapped) candidate = mapped[1]
+  return net.isIP(candidate) ? candidate.toLowerCase() : null
+}
+
+/**
+ * The client address used for rate limits and lockouts. Without TRUST_PROXY it is the socket address.
+ * With TRUST_PROXY=true only the trusted proxy hops are believed: every proxy appends the address it saw
+ * to X-Forwarded-For, so the real client is the entry `TRUST_PROXY_HOPS` positions from the right. Entries to
+ * the left of it are client-controlled and are ignored, so rotating the header cannot dodge a limit.
+ */
 export function getClientIp(req: IncomingMessage): string {
-  if (isTrustProxyEnabled()) {
-    const forwarded = req.headers['x-forwarded-for']
-    const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim()
-    if (first) return first
-  }
-  return req.socket.remoteAddress ?? 'unknown'
+  const socketIp = normalizeIp(req.socket.remoteAddress) ?? req.socket.remoteAddress ?? 'unknown'
+  if (!isTrustProxyEnabled()) return socketIp
+  const header = req.headers['x-forwarded-for']
+  const entries = (Array.isArray(header) ? header.join(',') : (header ?? ''))
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+  const trusted = entries[entries.length - getTrustProxyHops()]
+  return normalizeIp(trusted) ?? socketIp
 }
 
 // ---------------------------------------------------------------------------
@@ -110,26 +134,86 @@ export function checkRateLimit(req: IncomingMessage, bucket: RateBucket): number
   return rateLimiter.hit(`r:${ip}`, limits.readsPerMinute, 60_000)
 }
 
-const authFailures = new Map<string, Window>()
+const AUTH_WINDOW_MS = 15 * 60_000
+/** A flood of failures from many addresses (distributed guessing) triggers a short global back-off. */
+const GLOBAL_FAILURE_FACTOR = 10
+const GLOBAL_BACKOFF_MS = 60_000
 
-function peekAuthFailures(ip: string, now = Date.now()): number {
-  const window = authFailures.get(ip)
-  if (!window || window.resetAt <= now) return 0
-  return window.count
-}
+/**
+ * Failed Basic auth attempts per client address. Memory is bounded, and flooding it with spoofed or
+ * distributed addresses can never evict an address that is currently locked out.
+ */
+export class AuthFailureTracker {
+  private windows = new Map<string, Window>()
+  private globalWindow: Window = { count: 0, resetAt: 0 }
+  private backoffUntil = 0
 
-function recordAuthFailure(ip: string, now = Date.now()): void {
-  const window = authFailures.get(ip)
-  if (!window || window.resetAt <= now) {
-    if (authFailures.size > 50_000) authFailures.clear()
-    authFailures.set(ip, { count: 1, resetAt: now + 15 * 60_000 })
-  } else {
-    window.count += 1
+  constructor(private readonly maxEntries = 50_000) {}
+
+  /** Failures recorded for an address in its current window. */
+  peek(ip: string, now = Date.now()): number {
+    const window = this.windows.get(ip)
+    return !window || window.resetAt <= now ? 0 : window.count
+  }
+
+  /** True while the global back-off is active. */
+  inBackoff(now = Date.now()): boolean {
+    return this.backoffUntil > now
+  }
+
+  record(ip: string, limit: number, now = Date.now()): void {
+    this.recordGlobal(limit, now)
+    const window = this.windows.get(ip)
+    if (window && window.resetAt > now) {
+      window.count += 1
+      return
+    }
+    if (this.windows.size >= this.maxEntries) {
+      this.sweep(now)
+      if (this.windows.size >= this.maxEntries) this.evictUnlocked(limit, now)
+    }
+    // Everything left is locked: keep the lockouts and rely on the global ceiling for the newcomer.
+    if (this.windows.size < this.maxEntries) this.windows.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS })
+  }
+
+  private recordGlobal(limit: number, now: number): void {
+    if (this.globalWindow.resetAt <= now) this.globalWindow = { count: 0, resetAt: now + AUTH_WINDOW_MS }
+    this.globalWindow.count += 1
+    if (this.globalWindow.count > limit * GLOBAL_FAILURE_FACTOR && !this.inBackoff(now)) {
+      this.backoffUntil = now + GLOBAL_BACKOFF_MS
+      this.globalWindow = { count: 0, resetAt: now + AUTH_WINDOW_MS }
+      log.warn('Many failed sign-in attempts from different addresses; refusing credentials for one minute.', {
+        failuresInWindow: limit * GLOBAL_FAILURE_FACTOR,
+        trustProxy: isTrustProxyEnabled(),
+      })
+    }
+  }
+
+  /** Drops expired windows and an expired back-off. */
+  sweep(now = Date.now()): void {
+    for (const [ip, window] of this.windows) if (window.resetAt <= now) this.windows.delete(ip)
+    if (this.globalWindow.resetAt <= now) this.globalWindow = { count: 0, resetAt: 0 }
+    if (this.backoffUntil <= now) this.backoffUntil = 0
+  }
+
+  /** Removes the oldest entries that are not locked out until a tenth of the capacity is free again. */
+  private evictUnlocked(limit: number, now: number): void {
+    const target = Math.floor(this.maxEntries * 0.9)
+    for (const [ip, window] of this.windows) {
+      if (this.windows.size <= target) break
+      if (window.count < limit || window.resetAt <= now) this.windows.delete(ip)
+    }
+  }
+
+  get size(): number {
+    return this.windows.size
   }
 }
 
+export const authFailures = new AuthFailureTracker()
+
 export function sweepAuthFailures(now = Date.now()): void {
-  for (const [ip, window] of authFailures) if (window.resetAt <= now) authFailures.delete(ip)
+  authFailures.sweep(now)
 }
 
 // ---------------------------------------------------------------------------
@@ -145,16 +229,19 @@ export function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(digest(a), digest(b))
 }
 
-export type AuthResult = 'disabled' | 'ok' | 'challenge' | 'locked'
+export type AuthResult = 'disabled' | 'ok' | 'challenge' | 'locked' | 'backoff'
 
 /** Verifies Basic auth when BASIC_AUTH_USER/BASIC_AUTH_PASSWORD are configured. */
 export function checkBasicAuth(req: IncomingMessage): AuthResult {
   const config = getBasicAuthConfig()
   if (!config) return 'disabled'
   const ip = getClientIp(req)
-  if (peekAuthFailures(ip) >= getRateLimits().authFailuresPer15Min) return 'locked'
+  const limit = getRateLimits().authFailuresPer15Min
+  if (authFailures.peek(ip) >= limit) return 'locked'
 
   const header = req.headers.authorization ?? ''
+  // During a global back-off no credentials are evaluated; plain requests still get the normal challenge.
+  if (header && authFailures.inBackoff()) return 'backoff'
   const match = header.match(/^Basic\s+([A-Za-z0-9+/=]+)\s*$/i)
   if (match) {
     const decoded = Buffer.from(match[1], 'base64').toString('utf8')
@@ -164,16 +251,16 @@ export function checkBasicAuth(req: IncomingMessage): AuthResult {
       const passOk = safeEqual(decoded.slice(separator + 1), config.password)
       if (userOk && passOk) return 'ok'
     }
-    recordAuthFailure(ip)
+    authFailures.record(ip, limit)
   }
   return 'challenge'
 }
 
-export function sendAuthChallenge(res: ServerResponse, locked: boolean): void {
+export function sendAuthChallenge(res: ServerResponse, locked: boolean, retryAfterSeconds = 900): void {
   res.statusCode = locked ? 429 : 401
   res.setHeader('Content-Type', 'text/plain; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
-  if (locked) res.setHeader('Retry-After', '900')
+  if (locked) res.setHeader('Retry-After', String(retryAfterSeconds))
   else res.setHeader('WWW-Authenticate', 'Basic realm="PostScope", charset="UTF-8"')
   res.end(locked ? 'Too many failed sign-in attempts. Try again later.' : 'Authentication required.')
 }

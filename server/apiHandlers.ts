@@ -14,7 +14,7 @@ import { isPublicLandingEnabled } from './landingConfig'
 import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConfig'
 import { HttpError, readJsonBody, sendJson } from './http'
 import { checkRateLimit, isSameOriginRequest } from './security'
-import { getAuditPolicy, getMaxCollectionBytes, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
+import { getAuditPolicy, getMaxCollectionBytes, isHealthVersionExposed, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
 import { errorFields, log } from './logger'
 import { redactCollection } from '../src/lib/redaction'
 
@@ -71,7 +71,7 @@ export async function handleHealthApi(req: IncomingMessage, res: ServerResponse,
   const healthy = storageWritable !== false
   sendJson(res, healthy ? 200 : 503, {
     status: healthy ? 'ok' : 'degraded',
-    version: getAppVersion(),
+    ...(isHealthVersionExposed() ? { version: getAppVersion() } : {}),
     uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
     storage: storageEnabled ? (storageWritable ? 'writable' : 'unwritable') : 'disabled',
   })
