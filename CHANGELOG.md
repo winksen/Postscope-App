@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.31
+
+- Security fixes: client IP is now taken from trusted proxy hops only
+- Security fixes: failed sign-in lockouts can no longer be flushed by flooding
+- Added an option to hide the version from the public health endpoint
+
 ## V0.1.30
 
 - Enhanced script scanning for headers added with pm.request.headers and pm.sendRequest

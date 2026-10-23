@@ -49,8 +49,8 @@ export function createRequestHandler(options: PipelineOptions) {
       if (await handleHealthApi(req, res, url)) return
 
       const auth = checkBasicAuth(req)
-      if (auth === 'challenge' || auth === 'locked') {
-        sendAuthChallenge(res, auth === 'locked')
+      if (auth === 'challenge' || auth === 'locked' || auth === 'backoff') {
+        sendAuthChallenge(res, auth !== 'challenge', auth === 'backoff' ? 60 : 900)
         return
       }
 
