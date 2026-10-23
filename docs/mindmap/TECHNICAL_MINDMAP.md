@@ -27,13 +27,14 @@ mindmap
         scripts, responses
         malformed-input guards
       auditor
-        29 rules
+        31 rules
         evidence + policy
       jsonBody (templated JSON)
       rawBody (XML / pair scanners)
       descriptions (docs scanner)
       scriptSecrets (script literals)
       environment (env + globals)
+      variableUsage (defined / referenced)
       secretPatterns
       scorer
       repairEngine
@@ -138,6 +139,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 - `sanitizeAuditOptions` normalizes untrusted policy input (localStorage, server env).
 - `KNOWN_SECRET_PATTERN` only reports requests no keyword rule already flagged, to avoid double counting.
 - **Disabled entries** (Postman keeps them in the export) go through the same secret rules as active ones; evidence locations end with ` (disabled)`. `MISSING_AUTH`, `EMPTY_HEADERS` and the other hygiene checks only look at active entries, so a disabled `Authorization` header never counts as protection.
+- **Variable integrity** (`variableUsage.ts`, `checkVariableIntegrity`): `analyzeVariableUsage` collects references per request and place (URL, headers, path variables, body, auth, `pm.*.get('x')` and `pm.variables.replaceIn('{{x}}')` in request, folder and collection scripts), the definitions (enabled collection variables, folder and request variables visible to the request, the selected environment, globals, `pm.*.set('x', ...)` in any script, `pm.iterationData.get` names) and the unused collection variables. `{{$dynamic}}` names are ignored and disabled entries only count as usage. `UNDEFINED_VARIABLE` (warning) is downgraded to info for the run when no environment is loaded or a script sets variables with computed names, and its description says why; a user severity override still wins (`FindingCollector.setSeverity`). `UNUSED_COLLECTION_VARIABLE` (info, hygiene) skips empty `baseUrl`/`apiKey`/`token` starter placeholders. The Overview variables card uses the same function, so counts match the findings.
 - **`SECRET_IN_ENVIRONMENT`** (`findLeakedEnvironmentVariables`, critical): same credential test as collection variables (credential-like name, `type: secret`, provider token) for every loaded environment and globals file, including disabled entries (labelled `(disabled)`). Evidence `environment "X" variable key` / `globals "X" variable key`; requests referencing the variable are listed as affected. `resolveLeadingVariable` now goes through `lookupVariableValue`, so `INSECURE_HTTP` follows the selected environment. There is no automatic repair (the secret is not in the collection JSON): the fix is manual and points to the sanitized environment export.
 - **Basic tokens** (`checkHeaderList`): an `Authorization: Basic` value is decoded. A variable or placeholder password (for example the base64 of `svc:{{password}}`) is not a leak and raises nothing; a literal password reports `HARDCODED_TOKEN` with `basic credentials for user s••••••` (and `(Mailgun API key)` for `api:key-<32 hex>`). Values that do not decode keep the old behavior. `X-Vault-Token` is now treated like the other token headers.
 - **`HIGH_ENTROPY_LITERAL`** (`checkHighEntropy`, runs last): literal values in credential positions (sensitive header names except `Cookie`, sensitive query params, form fields and JSON body fields) that qualify as `isHighEntropyLiteral` and were not already reported at the same location by a secret rule, and that are not provider tokens. Readable Basic tokens are skipped. No repair exists for it (manual review).
@@ -153,9 +155,9 @@ All modules are pure TypeScript with relative imports only, so the same code run
 |---|---|
 | secrets (critical) | `SECRET_IN_ENVIRONMENT`, `HARDCODED_PASSWORD`, `HARDCODED_TOKEN`, `HARDCODED_API_KEY`, `HARDCODED_SECRET`, `HARDCODED_AUTH_CREDENTIAL`, `SECRET_IN_QUERY`, `CREDENTIALS_IN_URL`, `SECRET_IN_SCRIPT`, `SECRET_IN_COLLECTION_VARIABLE`, `SECRET_IN_SAVED_RESPONSE`, `KNOWN_SECRET_PATTERN` |
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
-| variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL` (warning), `NO_COLLECTION_VARIABLES` (info) |
+| variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
-| hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY` |
+| hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY`, `UNUSED_COLLECTION_VARIABLE` |
 
 ### 2.3 Secret detection (`secretPatterns.ts`, `authSchemes.ts`)
 
@@ -192,6 +194,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | `insecureHttp` (high risk) | `http`→`https`, `ws`→`wss`, including the collection variable behind a leading `{{baseUrl}}` |
 | `tlsVerification` | Removes `strictSSL: false` along the item chain |
 | `emptyHeaders`, `collectionVariables`, `missingDescription` | As before |
+| `undefinedVariables` (low risk, not selected) | Adds an empty collection variable for every referenced but undefined name |
 
 ### 2.6 Redaction (`redaction.ts`)
 
@@ -349,6 +352,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
 | `cli.test.ts` | Exit codes, flags, SARIF/sanitize output, multi-file JSON, usage errors, environment and globals flags, sanitized environment files |
 | `environment.test.ts` | Environment parsing and detection, `SECRET_IN_ENVIRONMENT`, URL resolution through the selected environment, variable precedence, `redactEnvironment`, report sections |
+| `variableUsage.test.ts` | Reference and definition scopes, script gets/sets, environments, severity downgrade, unused variables, repair |
 | `collectionSession.test.ts` | Session restore with environments, backward compatibility, size limit |
 | `release.test.ts` | Version agreement across release files, drift detection, CLI version from another directory |
 
@@ -396,3 +400,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.32 | Base URL repair maps each host to its own variable, keeps path variables and ports clean; sanitized export counts query secrets; Markdown report without emoji |
 | V0.1.33 | 16 more provider token patterns, `Authorization: Basic` decoding (no false positives on variables), `X-Vault-Token`, new rule `HIGH_ENTROPY_LITERAL` (28 rules) |
 | V0.1.34 | Environment and globals support: `environment.ts`, `SECRET_IN_ENVIRONMENT` (29 rules), URL resolution through the selected environment, multi-file import with environment selector and session restore, CLI `--environment`/`--globals`, sanitized environment exports |
+| V0.1.35 | `variableUsage.ts`; rules `UNDEFINED_VARIABLE` and `UNUSED_COLLECTION_VARIABLE` (31 rules), placeholder repair, Overview variables card shows defined, referenced and undefined counts |

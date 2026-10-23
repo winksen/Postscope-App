@@ -136,6 +136,8 @@ export function cleanCollection(): Record<string, unknown> {
       { key: 'baseUrl', value: 'https://api.example.com' },
       { key: 'token', value: '' },
       { key: 'apiKey', value: '' },
+      { key: 'name', value: '' },
+      { key: 'user-password', value: '' },
     ],
     item: [
       {

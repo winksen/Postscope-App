@@ -7,6 +7,7 @@ import { scanRawBodyFields } from './rawBody'
 import { findDescriptionSecrets } from './descriptions'
 import { findScriptSecrets } from './scriptSecrets'
 import { lookupVariableValue } from './environment'
+import { analyzeVariableUsage } from './variableUsage'
 import { extractVariableNames, isVariableOrEmpty } from './variables'
 import {
   AUTH_HEADER_SCHEME,
@@ -77,6 +78,8 @@ interface RuleHits {
   evidence: FindingEvidence[]
   evidenceKeys: Set<string>
   description?: string
+  /** Severity to use instead of the registry default (a user override still wins). */
+  severity?: Severity
 }
 
 class FindingCollector {
@@ -105,6 +108,11 @@ class FindingCollector {
         hits.evidence.push(requestId ? { requestId, ...evidence } : { ...evidence })
       }
     }
+  }
+
+  /** Lowers or raises a rule's severity for this run because the evidence is less certain. */
+  setSeverity(ruleId: RuleId, severity: Severity): void {
+    this.entry(ruleId).severity = severity
   }
 
   /** Ensures a finding exists even without affected requests (collection-level findings). */
@@ -144,7 +152,7 @@ class FindingCollector {
       findings.push({
         id: rule.id,
         ruleId: rule.id,
-        severity: isSeverity(override) ? override : rule.severity,
+        severity: isSeverity(override) ? override : hits.severity ?? rule.severity,
         category: rule.category,
         title: rule.title,
         description: hits.description ?? rule.description,
@@ -781,6 +789,39 @@ function requestRoute(req: ParsedRequest): string {
   return `${req.method} ${path.startsWith('/') ? path : `/${path}`}`
 }
 
+/** Variables that are referenced but never defined, and collection variables nobody references. */
+function checkVariableIntegrity(parsed: ParsedCollection, out: FindingCollector): void {
+  const usage = analyzeVariableUsage(parsed)
+
+  if (usage.undefinedNames.size > 0) {
+    const uncertain = !usage.environmentLoaded || usage.hasDynamicSets
+    const hint = !usage.environmentLoaded
+      ? ' They may be defined in an environment that was not loaded.'
+      : usage.hasDynamicSets
+        ? ' Scripts also set variables with computed names, so some of these may be defined at runtime.'
+        : ''
+    out.touch('UNDEFINED_VARIABLE', `${plural(usage.undefinedNames.size, 'variable')} ${usage.undefinedNames.size === 1 ? 'is' : 'are'} referenced but not defined anywhere in the export.${hint}`)
+    for (const [name, references] of usage.undefinedNames) {
+      for (const reference of references) {
+        out.add('UNDEFINED_VARIABLE', reference.requestId || undefined, { location: `{{${name}}} in ${reference.place}` })
+      }
+    }
+    if (uncertain) out.setSeverity('UNDEFINED_VARIABLE', 'info')
+  }
+
+  // Empty starter placeholders (added by the repair engine) are intentional and not reported.
+  const unused = usage.unusedCollectionVariables.filter((key) => {
+    const variable = parsed.collectionVariables?.find((candidate) => candidate.key === key)
+    return !(STARTER_VARIABLES.has(key) && !variable?.value)
+  })
+  if (unused.length > 0) {
+    out.touch('UNUSED_COLLECTION_VARIABLE', `${plural(unused.length, 'collection variable')} ${unused.length === 1 ? 'is' : 'are'} defined but never referenced.`)
+    for (const key of unused) out.add('UNUSED_COLLECTION_VARIABLE', undefined, { location: `collection variable ${key}` })
+  }
+}
+
+const STARTER_VARIABLES = new Set(['baseUrl', 'apiKey', 'token'])
+
 function runWarningChecks(parsed: ParsedCollection, out: FindingCollector): void {
   const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
 
@@ -931,6 +972,7 @@ export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): 
   checkHighEntropy(parsed, out)
 
   runWarningChecks(parsed, out)
+  checkVariableIntegrity(parsed, out)
   runInfoChecks(parsed, out)
 
   return out.build(options)

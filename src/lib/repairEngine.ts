@@ -13,6 +13,7 @@ import type { PostmanAuth, PostmanCollection, PostmanHeader, PostmanItem, Postma
 import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsFor } from './authSchemes'
 import { isLikelySecretValue } from './secretPatterns'
 import { toVariableName } from './variables'
+import { analyzeVariableUsage } from './variableUsage'
 import { detectIndent, parseTemplatedJson } from './jsonBody'
 import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
 import { scrubDescription } from './descriptions'
@@ -25,6 +26,7 @@ export type RepairFixKind =
   | 'basicAuthCredentials'
   | 'emptyHeaders'
   | 'collectionVariables'
+  | 'undefinedVariables'
   | 'missingDescription'
   | 'authHelperSecrets'
   | 'bodySecrets'
@@ -324,6 +326,7 @@ const KIND_BY_RULE: Partial<Record<string, RepairFixKind>> = {
   BASIC_AUTH_PLAINTEXT: 'basicAuthCredentials',
   EMPTY_HEADERS: 'emptyHeaders',
   NO_COLLECTION_VARIABLES: 'collectionVariables',
+  UNDEFINED_VARIABLE: 'undefinedVariables',
   MISSING_DESCRIPTION: 'missingDescription',
   HARDCODED_AUTH_CREDENTIAL: 'authHelperSecrets',
   HARDCODED_PASSWORD: 'bodySecrets',
@@ -493,6 +496,21 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       selectedByDefault: true,
       beforeSnippet: headerSnippet(affectedRequest, (header) => !header.value?.trim()),
       afterSnippet: 'Header disabled',
+    }
+  }
+
+  if (kind === 'undefinedVariables') {
+    const names = [...analyzeVariableUsage(parsed).undefinedNames.keys()]
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Add placeholders for undefined variables',
+      description: `Adds empty collection variables for ${names.length} referenced name(s) so every {{variable}} resolves. Fill them in, or define them in an environment instead, and remove any that are typos.`,
+      risk: 'low',
+      selectedByDefault: false,
+      variablesToEnsure: names.map((key) => ({ key, value: '' })),
+      beforeSnippet: names[0] ? `{{${names[0]}}} is not defined` : undefined,
+      afterSnippet: names[0] ? `${names[0]} = ""` : undefined,
     }
   }
 
@@ -1251,6 +1269,8 @@ export function applyRepairPlan(rawJson: unknown, selectedFixIds: string[], plan
       action = `Replaced ${changed} Basic auth credential field(s) with variables.`
     } else if (fix.kind === 'collectionVariables') {
       action = 'Added missing starter collection variables.'
+    } else if (fix.kind === 'undefinedVariables') {
+      action = 'Added placeholders for undefined variables.'
     } else if (fix.kind === 'missingDescription') {
       const result = patchDescriptions(fixedJson, fix)
       changed = result.changed
