@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DropZone } from '../components/DropZone'
 import { DashboardShell } from '../components/layout/dashboard-shell'
@@ -7,15 +7,18 @@ import { RequestSearchModal } from '../components/RequestSearchModal'
 import { CollectionLibraryModal } from '../components/CollectionLibraryModal'
 import { RuleSettingsDialog } from '../components/RuleSettingsDialog'
 import { useToast } from '../components/ui/toaster'
-import { OverviewPage } from './OverviewPage'
-import { RequestsPage } from './RequestsPage'
-import { SecurityPage } from './SecurityPage'
-import { HygienePage } from './HygienePage'
-import { ScorePage } from './ScorePage'
-import { ComparePage } from './ComparePage'
-import { RepairPage } from './RepairPage'
-import { analyzeCollectionText, describeAnalysisError } from '../lib/analyzeCollection'
-import { detectEnvironmentKind, isCollectionJson, parseEnvironment, withActiveEnvironment } from '../lib/environment'
+import { PageFallback, lazyPage } from '../components/lazyPage'
+
+// Pages are separate chunks: Recharts only loads with the Dashboard, and a page nobody opens is never downloaded.
+const OverviewPage = lazyPage(() => import('./OverviewPage'), 'OverviewPage')
+const RequestsPage = lazyPage(() => import('./RequestsPage'), 'RequestsPage')
+const SecurityPage = lazyPage(() => import('./SecurityPage'), 'SecurityPage')
+const HygienePage = lazyPage(() => import('./HygienePage'), 'HygienePage')
+const ScorePage = lazyPage(() => import('./ScorePage'), 'ScorePage')
+const RepairPage = lazyPage(() => import('./RepairPage'), 'RepairPage')
+const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
+import { analyzeCollectionText, auditAgain, describeAnalysisError } from '../lib/analyzeCollection'
+import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
 import {
   clearCollectionSession,
   loadCollectionSession,
@@ -51,7 +54,7 @@ import {
 } from '../lib/auditPreferences'
 import { calculateScore } from '../lib/scorer'
 import { createRepairPlan } from '../lib/repairEngine'
-import { runAuditDetailed, type AuditOptions, type Finding } from '../lib/auditor'
+import type { AuditOptions, Finding } from '../lib/auditor'
 import type { SuppressedFinding } from '../lib/suppressions'
 import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
 import { redactCollection, redactEnvironment } from '../lib/redaction'
@@ -144,6 +147,8 @@ export function AnalyzeApp({
   environmentTextsRef.current = environmentTexts
   const parsedRef = useRef<ParsedCollection | null>(null)
   parsedRef.current = parsed
+  const rawJsonRef = useRef<string | null>(null)
+  rawJsonRef.current = rawJson
   /** Incremented for every analysis; results from superseded analyses are discarded. */
   const analysisSeq = useRef(0)
   const restoreAttempted = useRef(false)
@@ -157,17 +162,35 @@ export function AnalyzeApp({
     }
   }, [loggingMode])
 
-  // Re-run the (cheap) audit step when rule settings change; parsing is not repeated.
+  /**
+   * Audits the collection on screen again in the analysis worker (rule settings or the selected environment changed).
+   * The worker keeps the full parsed collection, so nothing is parsed again; if it was restarted the text is analyzed again.
+   */
+  const reaudit = useCallback(async (options: AuditOptions, activeEnvironment?: number) => {
+    const result = await auditAgain(options, { activeEnvironment })
+    if (result) return result
+    const raw = rawJsonRef.current
+    if (raw === null) return null
+    return analyzeCollectionText(raw, options, { environments: environmentTextsRef.current, activeEnvironment })
+  }, [])
+
   const lastAuditOptions = useRef(auditOptions)
   useEffect(() => {
     if (lastAuditOptions.current === auditOptions) return
     lastAuditOptions.current = auditOptions
-    if (parsed) {
-      const result = runAuditDetailed(parsed, auditOptions)
-      setFindings(result.findings)
-      setSuppressed(result.suppressed)
-    }
-  }, [auditOptions, parsed])
+    const current = parsedRef.current
+    if (!current) return
+    const seq = analysisSeq.current
+    reaudit(auditOptions, current.activeEnvironment)
+      .then((result) => {
+        // A newer import or repair replaced the collection while the audit ran.
+        if (!result || seq !== analysisSeq.current) return
+        setParsed(result.parsed)
+        setFindings(result.findings)
+        setSuppressed(result.suppressed)
+      })
+      .catch((e) => console.error(e))
+  }, [auditOptions, reaudit])
 
   useEffect(() => {
     if (referenceRaw === null) {
@@ -176,7 +199,7 @@ export function AnalyzeApp({
     }
     let cancelled = false
     setReferenceLoading(true)
-    analyzeCollectionText(referenceRaw, auditOptions)
+    analyzeCollectionText(referenceRaw, auditOptions, { slot: 'reference' })
       .then((result) => {
         if (!cancelled) setReference({ parsed: result.parsed, findings: result.findings })
       })
@@ -252,20 +275,11 @@ export function AnalyzeApp({
   const applyCollectionJson = useCallback(
     async (raw: string, libraryId?: string | null, environments: string[] = [], activeEnvironment?: number, restoring = false): Promise<boolean> => {
       const seq = ++analysisSeq.current
-      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments })
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments, activeEnvironment })
       if (seq !== analysisSeq.current) return false
-      let p = analysis.parsed
-      let f = analysis.findings
-      let s = analysis.suppressed
-      if (activeEnvironment !== undefined && activeEnvironment !== p.activeEnvironment) {
-        const selected = withActiveEnvironment(p, activeEnvironment)
-        if (selected !== p) {
-          p = selected
-          const result = runAuditDetailed(p, auditOptionsRef.current)
-          f = result.findings
-          s = result.suppressed
-        }
-      }
+      const p = analysis.parsed
+      const f = analysis.findings
+      const s = analysis.suppressed
 
       setParsed(p)
       setFindings(f)
@@ -550,20 +564,11 @@ export function AnalyzeApp({
     async (raw: string) => {
       const seq = ++analysisSeq.current
       const environments = environmentTextsRef.current
-      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments })
-      let p = analysis.parsed
-      let f = analysis.findings
-      let s = analysis.suppressed
-      const selectedBefore = parsedRef.current?.activeEnvironment
-      if (selectedBefore !== undefined && selectedBefore !== p.activeEnvironment) {
-        const selected = withActiveEnvironment(p, selectedBefore)
-        if (selected !== p) {
-          p = selected
-          const result = runAuditDetailed(p, auditOptionsRef.current)
-          f = result.findings
-          s = result.suppressed
-        }
-      }
+      // The environment the user selected stays selected after a repair.
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments, activeEnvironment: parsedRef.current?.activeEnvironment })
+      const p = analysis.parsed
+      const f = analysis.findings
+      const s = analysis.suppressed
       if (seq === analysisSeq.current) {
         setParsed(p)
         setFindings(f)
@@ -655,16 +660,24 @@ export function AnalyzeApp({
 
   const handleSelectEnvironment = useCallback(
     (index: number) => {
-      if (!parsed) return
-      const next = withActiveEnvironment(parsed, index)
-      if (next === parsed) return
-      const result = runAuditDetailed(next, auditOptionsRef.current)
-      setParsed(next)
-      setFindings(result.findings)
-      setSuppressed(result.suppressed)
-      if (rawJson && shouldPersistSession(loggingMode, storageMode)) saveCollectionSession(rawJson, next.name, environmentTexts, index)
+      const current = parsedRef.current
+      if (!current || current.environments?.[index]?.kind !== 'environment' || current.activeEnvironment === index) return
+      const seq = analysisSeq.current
+      reaudit(auditOptionsRef.current, index)
+        .then((result) => {
+          if (!result || seq !== analysisSeq.current) return
+          setParsed(result.parsed)
+          setFindings(result.findings)
+          setSuppressed(result.suppressed)
+          const raw = rawJsonRef.current
+          if (raw && shouldPersistSession(loggingMode, storageMode)) saveCollectionSession(raw, result.parsed.name, environmentTextsRef.current, index)
+        })
+        .catch((e) => {
+          console.error(e)
+          notify({ variant: 'error', title: 'Could not switch environment', description: describeAnalysisError(e) })
+        })
     },
-    [parsed, rawJson, environmentTexts, loggingMode, storageMode]
+    [reaudit, loggingMode, storageMode, notify]
   )
 
   const environmentOptions = useMemo<EnvironmentOption[]>(
@@ -755,6 +768,7 @@ export function AnalyzeApp({
         onEnvironmentChange={handleSelectEnvironment}
         hasEnvironmentFiles={environmentTexts.length > 0}
       >
+        <Suspense fallback={<PageFallback />}>
         {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}
         {active === 'requests' && (
           <RequestsPage
@@ -795,6 +809,7 @@ export function AnalyzeApp({
             onClear={() => setReferenceRaw(null)}
           />
         )}
+        </Suspense>
       </DashboardShell>
 
       <RequestSearchModal

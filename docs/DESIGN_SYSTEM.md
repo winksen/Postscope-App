@@ -367,6 +367,12 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 - Icon-only buttons need an `aria-label`; progress bars need a name (`aria-label` on `Progress`); charts are hidden from assistive technology with `aria-hidden` and a `sr-only` sentence with the same data.
 - Pages have one `h1`; `CardTitle` renders an `h2` (use `as` for another level). A scrolling region without focusable content takes `focusable` on `ScrollArea`.
 
+### Long lists
+
+- Lists that can grow with the collection (the request tree) use `VirtualList`: equal-height rows (36px), rendered completely up to 300 rows and as a window around the viewport above that. Give rows `aria-posinset` and `aria-setsize`, use a roving `tabindex`, and keep keyboard handling in terms of row indexes, because off-screen rows are not in the page.
+- Lists bounded by the rule catalog (findings, repair fixes) and capped lists (search results, comparison tables) stay plain.
+- Page-level components are loaded with `lazyPage` inside a `Suspense` boundary; do not import a page, Recharts or framer-motion from the app shell.
+
 ### Transitions
 
 - Default interaction duration: **`duration-200`** on colors, shadows, padding (shell uses `transition-[padding] duration-200`).

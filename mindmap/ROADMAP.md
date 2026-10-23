@@ -113,7 +113,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server | `a5c4b6f` |
 | V0.1.40 | `v0.1.40` | A4 | Security, Feature | Library encryption at rest, audit log, proxy identity | `9d6f5d0` |
 | V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift | `1df0a2c` |
-| V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | |
+| V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | `6a2acfa` |
 | V0.1.43 | `v0.1.43` | A5 | Enhancement | Performance: code splitting, virtualization, budgets | |
 | V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests | |
 | V0.1.45 | `v0.1.45` | A6 | Security, Chore | Tailwind CSS 4 migration and dependency refresh | |

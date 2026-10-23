@@ -97,7 +97,7 @@ flowchart LR
 | Path | Contents |
 |---|---|
 | `src/lib/` | Framework-free analysis engine shared by the browser, the server, and the CLI |
-| `src/workers/analysis.worker.ts` | Web Worker entry: `JSON.parse` → `parseCollection` → `runAudit` |
+| `src/workers/analysis.worker.ts` | Web Worker entry: `analyze` (`JSON.parse` → `parseCollection` → `runAuditDetailed`) and `audit` messages; keeps the full parsed collection per slot and returns a compact copy |
 | `src/lib/compare.ts`, `compareReport.ts` | Comparison of two analyzed collections and its text, Markdown and JSON renderers (see 2.8) |
 | `src/pages/`, `src/components/` | React UI (pages, layout, shadcn-style primitives in `components/ui`) |
 | `server/` | Node HTTP server and Vite dev/preview middleware |
@@ -105,7 +105,7 @@ flowchart LR
 | `action.yml` | Composite GitHub Action (builds the CLI with esbuild, scans, writes SARIF and a job summary) |
 | `dist-node/` | Build output of `npm run build:node` (gitignored): `cli.js` and `server.js` |
 | `tests/` | `node:test` suites run through `tsx` (`npm test`) |
-| `scripts/` | Demo collection generator, test runner, `release-check.mjs` |
+| `scripts/` | Demo collection generator, test runner, `release-check.mjs`, `bench.mjs` and `bench-baseline.json` (performance budgets) |
 | `public/samples/` | Bundled sample collections |
 | `docs/` | Architecture, deployment, security, design system, mindmaps |
 | `mindmap/ROADMAP.md` | Release plan and conventions (one commit per version) |
@@ -302,6 +302,16 @@ Imports: size guard (50 MB), `File.text()`, `analyzeCollectionText` (worker with
 | Tokens | `--success-text`, `--warning-text`, `--destructive-text` (text on tints) and a base `:focus-visible` outline in `index.css`; method and protocol badges use the 700 shades; `CardTitle` is an `h2` (`as` prop); `ScrollArea` takes `focusable`; charts are `aria-hidden` with a `sr-only` summary |
 | Verification | Manual axe-core 4.10 pass (light and dark) on the import page, Dashboard, Requests (with a selection), Security, Hygiene, Repair, Score and Compare, and on the search, finding and rules dialogs: zero serious or critical violations. V0.1.44 automates it |
 
+### 3.3.2 Performance
+
+| Piece | Behavior |
+|---|---|
+| Code splitting | `App.tsx` lazy-loads `AnalyzeApp` and `SamplesApp`; `AnalyzeApp` lazy-loads every page with `lazyPage` inside one `Suspense` (`PageFallback`). `vite.config.ts` has a single manual chunk (`react`); Recharts and framer-motion land in the chunks that import them, so the landing page downloads neither the parser, the audit engine nor the dashboard. Measured gzip: landing about 123 KB, analyzer about 257 KB, first dashboard view about 377 KB (before: one 697 KB entry plus preloaded charts and motion chunks) |
+| Worker protocol | `analyze` (raw text, options, environments, optional `activeEnvironment`, `slot`) parses, audits, caches the full parsed collection per slot (`main`, `reference` for the Compare page) and replies with a compact copy; `audit` (options, optional `activeEnvironment`, `slot`) re-audits the cached collection. A restarted worker answers `cacheMiss` and `auditAgain` resolves to null, so `AnalyzeApp.reaudit` analyzes the text again. Without Worker support the same contract runs on the main thread (`fallbackFull`). The page no longer runs the audit itself: rule changes, environment selection, imports and repairs all go through the worker |
+| Compact result (`compactResult.ts`) | Request bodies over 64 KB (`MAX_DISPLAY_BODY`) are cut to 64 KB in the copy sent to the page and flagged (`bodyTruncated`, `bodySize`); folders are rebuilt to reference the compact requests so large strings are not cloned twice. Findings always come from the full text. Main-thread statistics that read bodies (the Dashboard variable counts, the repair plan's undefined-variable suggestions) see the 64 KB prefix; comparison treats a size change as a body change |
+| `VirtualList` and the request tree | `virtualWindow.ts` (`computeWindow`, `scrollTopForRow`, threshold 300) and `VirtualList.tsx` (absolute rows in a full-height spacer, `ResizeObserver`, rAF-throttled scroll, `scrollToIndex`). `requestTree.ts` builds, filters and flattens the tree (`TreeRow` with `level`, `posInSet`, `setSize`, `parentIndex`, stable keys `f:<path>` and `r:<id>`); `RequestTreeView` renders an ARIA `tree` with a roving tabindex and index-based arrow-key handling; `RequestsPage` owns the set of open folders, opens the ancestors of a request chosen from the address and scrolls it into view. 6400 rows render about 30 DOM rows |
+| Other lists | Finding and repair lists are bounded by the rule catalog, search results are capped at 50, comparison tables at 200 and the Dashboard structure tree at 100 branches per level, so they are not virtualized |
+
 ### 3.4 Browser storage
 
 `safeStorage.ts` wraps `localStorage`/`sessionStorage` so private modes and quota errors never crash the app. Keys: `postscope-theme`, `postscope:storage-mode`, `postscope:upload-risk-accepted`, `postscope:audit-rules`, and session key `postscope:collection-session`.
@@ -402,13 +412,14 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 |---|---|---|
 | Dev server | `npm run dev` | Vite on 3010 with the same API pipeline (no CSP) |
 | Typecheck | `npm run typecheck` | `tsconfig.json` (browser) + `tsconfig.server.json` (server, CLI, tests, Vite config) |
-| Build | `npm run build` | Typecheck + Vite build; vendor chunks `react`, `charts`, `motion`; worker emitted separately |
+| Build | `npm run build` | Typecheck + Vite build; one vendor chunk `react`, everything else split by dynamic imports (analyzer, samples, one chunk per page, Recharts with the Dashboard); worker emitted separately |
+| Performance budgets | `npm run bench` | `scripts/bench.mjs`: fastest of 9 runs of parse and audit on the sample `messy-large` collection repeated to about 6000 requests, divided by a fixed CPU calibration loop (so the ratio holds across machines), plus gzip sizes of the JavaScript the landing page, the analyzer and the first dashboard view download (static import closure from `dist/index.html`), the worker and the CSS. `--check` fails above +20 percent of `scripts/bench-baseline.json`; `--update` rewrites it (slowest of three passes); `--report` writes JSON. CI runs it on Node 20 and uploads `bench-report.json` |
 | Tests | `npm test` | `scripts/run-tests.mjs` → `node --import tsx --test tests/*.test.ts` |
 | Compile | `npm run build:node` | `scripts/build-node.mjs` bundles `cli/postscope.ts` (shebang, executable) and `server/index.ts` with esbuild to ESM for Node 20. Both bundles import only `node:` modules, so they run with no `node_modules`, no tsx and no sources; `bin.postscope` points at `dist-node/cli.js`. The version comes from `../package.json` next to `dist-node/`, then `APP_VERSION`. `server/loadEnv.ts` parses `.env` files itself (it used Vite's `loadEnv`, which dragged a dev tool into the runtime) |
 | CLI | `npm run scan -- file.json` | See the functional mindmap (`-e/--environment`, `--globals` for environment files). `--version` reads `package.json` relative to the module (works from any directory), then `APP_VERSION` |
 | Release check | `npm run release:check` | `scripts/release-check.mjs` fails when `package.json`, `package-lock.json`, `Dockerfile` `ARG APP_VERSION`, `compose.yaml` default and the newest `CHANGELOG.md` heading disagree |
 | Dependency audit | `npm run audit:deps` | Runtime dependencies, high severity |
-| CI | `.github/workflows/ci.yml` | Node 20 and 22: install, release check, test, build, CLI smoke scan, compile (`build:node`), compiled folder scan with JUnit output, audit |
+| CI | `.github/workflows/ci.yml` | Node 20 and 22: install, release check, test, build, performance budgets (Node 20) with report artifact, CLI smoke scan, compile (`build:node`), compiled folder scan with JUnit output, audit |
 | Docker | `docker build` / `compose.yaml` | Multi-stage: build installs dependencies, builds `dist/` and `dist-node/`; runtime copies only those and `package.json`, runs `node dist-node/server.js` as the `node` user. Healthcheck, `no-new-privileges`, all capabilities dropped |
 
 ### Test suites
@@ -426,6 +437,10 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `security.test.ts` | Client IP resolution (hops, spoofed headers, IPv4-mapped, ports), failure tracker eviction and global back-off |
 | `compare.test.ts` | Identical collections, new and resolved findings, rename matched by URL, request/host/auth changes, URL normalization, deterministic and secret-free output, CLI `diff` exit codes, formats and usage errors |
 | `appRoutes.test.ts` | Page and filter parsing with and without a base path, rejection of foreign addresses, request id round trips (slashes, spaces, dots, percent signs), build/parse inverse, search shortcut rules |
+| `requestTree.test.ts` | Window math and scroll targets, tree flattening with ARIA numbering, folder keys, search filtering, 6000-request flattening speed |
+| `compactResult.test.ts` | Body truncation and flags, shared request objects, findings from the full body, size reduction, comparison of truncated bodies |
+| `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
+| `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `libraryEncryption.test.ts` | Key parsing and resolution, envelope round trip and tamper rejection, encrypted store behavior, keyed dedupe hash, migration and rotation, proxy user, audit entries |
 | `server.test.ts` | Traversal, deep-link navigations get the app shell, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
@@ -494,3 +509,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.40 | Library encryption at rest (AES-256-GCM, keyed dedupe hash, migration and rotation tool `library.js`), append-only audit log, proxy user identity (`TRUSTED_USER_HEADER`, `savedBy`), `libraryEncrypted` in config |
 | V0.1.41 | `compare.ts` and `compareReport.ts` (request matching by id then method and URL, finding matching by occurrence fingerprint, score delta, hosts and auth types), Compare page (file or library, also two dropped files), `postscope diff` with `--fail-on-new` |
 | V0.1.42 | `appRoutes.ts` (pages, request ids and filters in the address, back and forward), `keyboard.ts` and request tree arrow keys, `/` search shortcut, server SPA fallback for navigations, accessibility pass (text color tokens, labels, landmarks, inert collapsed folders, live regions, axe zero serious violations) |
+| V0.1.43 | Page-level code splitting (`lazyPage`, one `react` vendor chunk), `VirtualList` and a flat ARIA request tree (`requestTree.ts`, `RequestTreeView`), worker `audit` messages with a per-slot cache and compact results (`compactResult.ts`), `scripts/bench.mjs` with `bench-baseline.json` and a CI budget step |
