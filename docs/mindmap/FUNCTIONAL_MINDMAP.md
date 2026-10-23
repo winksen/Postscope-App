@@ -98,7 +98,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | **Dashboard** | Request, folder, and variable counts; method and auth distribution charts; collection structure tree. |
 | **Requests** | Postman-like explorer: folder tree, request details (URL, query params, headers, body), and per-request findings with a health score. Credential values are **masked** until the user clicks the eye icon. |
 | **Security** | All security-impact findings with severity/category filters and search. The detail dialog shows the recommendation, affected requests, **masked evidence** (where each issue was found), and **CWE / OWASP API Top 10** references. |
-| **Hygiene** | Maintainability notes: missing descriptions, duplicate or placeholder names, loose root requests, deep nesting, empty headers, GET requests with bodies. |
+| **Hygiene** | Maintainability notes: missing descriptions, unused collection variables, duplicate or placeholder names, loose root requests, deep nesting, empty headers, GET requests with bodies. |
 | **Score** | 0–100 score, letter grade (A–F), per-category scores (Secrets, Variables, Auth, Hygiene), and improvement advice. |
 
 ### What gets detected
@@ -125,6 +125,8 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Warning | Plaintext HTTP endpoint | `http://` to a non-local host, including via `{{baseUrl}}` |
 | Warning | TLS certificate verification disabled | `strictSSL: false` |
 | Warning | Sensitive value logged by script | `console.log(pm.environment.get("token"))` |
+| Warning | Variables referenced but never defined | `{{tenant}}` used in a URL or header, or `pm.environment.get('x')`, but no variable, environment or script provides it. Shown as info when no environment is loaded, because the value may live there |
+| Info | Collection variables that are never used | Defined but not referenced by any request, script, auth setting or other variable |
 | Info | Hygiene and structure notes | Descriptions, duplicates, placeholders, nesting, few variables, many auth types, GET with body |
 
 Entries that are switched off in Postman (disabled headers, query params, form fields, scripts) are still checked for secrets, because they stay in the exported file. Their evidence is labelled `(disabled)` and the Requests page shows them greyed out with a **Disabled** badge. Repair and the sanitized copy cover them too.
@@ -142,6 +144,7 @@ Every finding becomes a repair suggestion. **Auto** fixes can be selected and ap
 | Risk | Selected by default | Examples |
 |---|---|---|
 | Low | Yes | Move API key headers or Basic auth to variables, disable empty headers, add starter variables |
+| Low | No | Add empty placeholders for undefined variables |
 | Medium | Yes (descriptions: no) | Replace base URLs with variables (one per host, the most used host keeps `{{baseUrl}}`), move tokens, passwords, query secrets, and auth-helper secrets to variables, clear secret collection variables |
 | Medium | No | Re-enable TLS verification |
 | High | No | Upgrade `http://` endpoints to `https://` |

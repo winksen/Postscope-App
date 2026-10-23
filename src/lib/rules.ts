@@ -15,6 +15,7 @@ export type RuleId =
   | 'KNOWN_SECRET_PATTERN'
   | 'HARDCODED_BASEURL'
   | 'HARDCODED_ENV_URL'
+  | 'UNDEFINED_VARIABLE'
   | 'MISSING_AUTH'
   | 'BASIC_AUTH_PLAINTEXT'
   | 'INSECURE_HTTP'
@@ -23,6 +24,7 @@ export type RuleId =
   | 'HIGH_ENTROPY_LITERAL'
   | 'MISSING_DESCRIPTION'
   | 'NO_COLLECTION_VARIABLES'
+  | 'UNUSED_COLLECTION_VARIABLE'
   | 'INCONSISTENT_AUTH'
   | 'EMPTY_HEADERS'
   | 'DUPLICATE_REQUEST_NAMES'
@@ -176,6 +178,14 @@ const definitions: RuleDefinition[] = [
     category: 'variables',
   },
   {
+    id: 'UNDEFINED_VARIABLE',
+    title: 'Variables referenced but never defined',
+    description: 'Requests reference {{variables}} that no collection, folder, request, environment or globals definition provides and no script sets.',
+    recommendation: 'Define the variable (collection variable or environment value), or fix the name if it is a typo.',
+    severity: 'warning',
+    category: 'variables',
+  },
+  {
     id: 'MISSING_AUTH',
     title: 'Potentially unprotected mutation request',
     description: 'POST/PUT/PATCH/DELETE request has no auth helper and no credential header, cookie, query credential or auth script.',
@@ -249,6 +259,14 @@ const definitions: RuleDefinition[] = [
     recommendation: 'Define baseUrl, apiKey, and other shared values as collection variables.',
     severity: 'info',
     category: 'variables',
+  },
+  {
+    id: 'UNUSED_COLLECTION_VARIABLE',
+    title: 'Collection variables that are never used',
+    description: 'Collection variables are defined but no request, script, auth setting or other variable references them.',
+    recommendation: 'Remove variables nobody uses, or reference them where they belong. Unused values still ship with every export.',
+    severity: 'info',
+    category: 'hygiene',
   },
   {
     id: 'INCONSISTENT_AUTH',

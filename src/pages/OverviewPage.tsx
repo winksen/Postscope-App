@@ -26,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartTooltipFrame } from '@/components/charts/chart-tooltip'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { extractVariableNames } from '@/lib/variables'
+import { analyzeVariableUsage } from '@/lib/variableUsage'
 
 /** Auth / accent slice colors (blue → green → orange). */
 const AUTH_COLORS: Record<string, string> = {
@@ -106,15 +106,6 @@ interface StructureNode {
   name: string
   requests: string[]
   children: StructureNode[]
-}
-
-function variableNamesUsedInRequests(requests: ParsedCollection['requests']): Set<string> {
-  const names = new Set<string>()
-  for (const request of requests) {
-    const blob = [request.url, ...request.headers.map((header) => header.key + header.value), request.bodyRaw ?? ''].join(' ')
-    extractVariableNames(blob).forEach((name) => names.add(name))
-  }
-  return names
 }
 
 function buildStructureTree(parsed: ParsedCollection): StructureNode {
@@ -306,16 +297,20 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
         ? `${criticalCount} critical findings need review`
         : `${warningCount} warnings / ${infoCount} info items`
 
-  const varsUsedInRequests = variableNamesUsedInRequests(parsed.requests)
-  const unusedDefinedVars = parsed.definedVariables.filter((key) => !varsUsedInRequests.has(key)).length
+  const variableUsage = analyzeVariableUsage(parsed)
+  const definedVariableCount = variableUsage.definedAnywhere.size
+  const referencedVariableCount = new Set(variableUsage.references.map((reference) => reference.name)).size
+  const undefinedVariableCount = variableUsage.undefinedNames.size
+  const unusedDefinedVars = variableUsage.unusedCollectionVariables.length
   const secretFindings = findings.filter((finding) => finding.category === 'secrets').length
   const secretAffectedRequests = new Set(
     findings.filter((finding) => finding.category === 'secrets').flatMap((finding) => finding.affected)
   ).size
   const variableFindingCount = findings.filter((finding) => finding.category === 'variables').length
   const variablesSecretsRows = [
-    { label: 'Defined variables', value: parsed.definedVariables.length },
-    { label: 'Used variables', value: varsUsedInRequests.size },
+    { label: 'Defined variables', value: definedVariableCount },
+    { label: 'Referenced variables', value: referencedVariableCount },
+    { label: 'Undefined variables', value: undefinedVariableCount },
     { label: 'Unused definitions', value: unusedDefinedVars },
     { label: 'Secret findings', value: secretFindings },
     { label: 'Secret-affected requests', value: secretAffectedRequests },
@@ -323,7 +318,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
   const variablesSecretsSubtext =
     secretFindings > 0
       ? `${secretFindings} secret finding${secretFindings === 1 ? '' : 's'} across ${secretAffectedRequests} request${secretAffectedRequests === 1 ? '' : 's'}`
-      : `${parsed.definedVariables.length} defined / ${varsUsedInRequests.size} used variables`
+      : `${definedVariableCount} defined / ${referencedVariableCount} referenced / ${undefinedVariableCount} undefined`
 
   const structureTree = buildStructureTree(parsed)
   const rootDirectRequests = structureTree.requests.length
@@ -374,7 +369,7 @@ export function OverviewPage({ parsed, findings }: OverviewPageProps) {
         <StatCard
           icon={Key}
           label="Variables & secrets"
-          value={parsed.definedVariables.length}
+          value={definedVariableCount}
           subtext={variablesSecretsSubtext}
           details={variablesSecretsRows}
           gradient={secretFindings > 0 ? 'rose' : variableFindingCount > 0 ? 'amber' : 'violet'}
