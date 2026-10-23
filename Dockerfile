@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -11,7 +11,7 @@ COPY . .
 # Web bundle (dist/) and the compiled server and CLI (dist-node/).
 RUN npm run build && npm run build:node
 
-FROM node:20-alpine AS runtime
+FROM node:25-alpine AS runtime
 WORKDIR /app
 
 ARG APP_VERSION=0.1.45
