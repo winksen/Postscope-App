@@ -226,3 +226,91 @@ test('XML, form-like and fragment raw bodies are scanned field by field', () => 
   assert.deepEqual(affectedNames('HARDCODED_SECRET'), ['Pairs'])
   assert.deepEqual(byRule.get('HARDCODED_PASSWORD')?.evidence?.map((e) => e.location), ['raw body Password', 'raw body password'])
 })
+
+function urlCollection(requests: Array<{ name: string; method?: string; url: unknown; header?: unknown[]; auth?: unknown; event?: unknown[] }>, extra: Record<string, unknown> = {}) {
+  return {
+    info: { name: 'Urls' },
+    ...extra,
+    item: requests.map((request) => ({
+      name: request.name,
+      event: request.event,
+      request: { method: request.method ?? 'GET', url: request.url, header: request.header, auth: request.auth ?? { type: 'noauth' }, description: 'd' },
+    })),
+  }
+}
+
+test('base URL detection is not fooled by a variable later in the URL', () => {
+  const { affectedNames } = audit(
+    urlCollection([
+      { name: 'Variable in query', url: 'https://api.acme.io/x?next={{baseUrl}}' },
+      { name: 'Variable base', url: '{{baseUrl}}/users' },
+      { name: 'Custom variable name', url: '{{gatewayHost}}/users' },
+      { name: 'Variable host', url: 'https://{{host}}/users' },
+      { name: 'Partly variable host', url: 'https://api.{{region}}.acme.io/users' },
+      { name: 'Literal', url: 'https://api.acme.io/users' },
+    ])
+  )
+  assert.deepEqual(affectedNames('HARDCODED_BASEURL'), ['Variable in query', 'Literal'])
+})
+
+test('environment URL detection looks at host labels, not path segments', () => {
+  const { affectedNames, byRule } = audit(
+    urlCollection([
+      { name: 'Path segment', url: 'https://api.acme.io/v1/prod/items' },
+      { name: 'Product host', url: 'https://product.acme.io/items' },
+      { name: 'UAT label', url: 'https://api-uat.acme.io/items' },
+      { name: 'Staging label', url: 'https://staging.acme.io/items' },
+      { name: 'Preprod label', url: 'https://api.preprod.acme.io/items' },
+      { name: 'Variable only in path', url: 'https://sandbox.acme.io/{{tenant}}/items' },
+      { name: 'Variable host', url: 'https://{{env}}.acme.io/items' },
+      { name: 'Localhost', url: 'http://localhost:3000/items' },
+      { name: 'Scheme-less', url: 'api.qa.acme.io/items' },
+      { name: 'Variable base', url: '{{baseUrl}}/prod/items' },
+    ])
+  )
+  assert.deepEqual(affectedNames('HARDCODED_ENV_URL'), ['UAT label', 'Staging label', 'Preprod label', 'Variable only in path', 'Localhost', 'Scheme-less'])
+  assert.deepEqual(
+    byRule.get('HARDCODED_ENV_URL')?.evidence?.map((item) => item.preview),
+    ['api-uat.acme.io', 'staging.acme.io', 'api.preprod.acme.io', 'sandbox.acme.io', 'localhost', 'api.qa.acme.io']
+  )
+})
+
+test('requests with API keys, cookies, query credentials or auth scripts are not reported as unprotected', () => {
+  const { affectedNames, byRule } = audit(
+    urlCollection(
+      [
+        { name: 'Bare', method: 'POST', url: '{{baseUrl}}/users' },
+        { name: 'API key header', method: 'POST', url: '{{baseUrl}}/a', header: [{ key: 'X-API-Key', value: '{{apiKey}}' }] },
+        { name: 'Session cookie', method: 'PUT', url: '{{baseUrl}}/b', header: [{ key: 'Cookie', value: 'session={{session}}' }] },
+        { name: 'Query credential', method: 'PATCH', url: { raw: '{{baseUrl}}/c?api_key={{key}}', query: [{ key: 'api_key', value: '{{key}}' }] } },
+        { name: 'Own script', method: 'DELETE', url: '{{baseUrl}}/d', event: [{ listen: 'prerequest', script: { exec: ["pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.environment.get('t') })"] } }] },
+        { name: 'CSRF only', method: 'POST', url: '{{baseUrl}}/e', header: [{ key: 'X-CSRF-Token', value: '{{csrf}}' }] },
+        { name: 'Disabled key', method: 'POST', url: '{{baseUrl}}/f', header: [{ key: 'X-API-Key', value: '{{apiKey}}', disabled: true }] },
+      ],
+      {}
+    )
+  )
+  assert.deepEqual(affectedNames('MISSING_AUTH'), ['Bare', 'CSRF only', 'Disabled key'])
+  assert.deepEqual(byRule.get('MISSING_AUTH')?.evidence?.map((item) => item.location), ['POST /users', 'POST /e', 'POST /f'])
+})
+
+test('collection and folder pre-request scripts that set Authorization suppress MISSING_AUTH', () => {
+  const script = (exec: string) => [{ listen: 'prerequest', script: { exec: [exec] } }]
+  const json = {
+    info: { name: 'Scripts' },
+    event: script("pm.request.headers.add('Authorization: Bearer ' + pm.collectionVariables.get('t'))"),
+    item: [
+      {
+        name: 'Folder',
+        event: script('pm.request.auth = { type: "bearer" }'),
+        item: [{ name: 'In folder', request: { method: 'POST', url: '{{baseUrl}}/x', auth: { type: 'noauth' }, description: 'd' } }],
+      },
+      { name: 'At root', request: { method: 'POST', url: '{{baseUrl}}/y', auth: { type: 'noauth' }, description: 'd' } },
+    ],
+  }
+  assert.deepEqual(audit(json).affectedNames('MISSING_AUTH'), [])
+  const unrelated = { ...json, event: script("console.log('hello')"), item: [json.item[0], json.item[1]] }
+  assert.deepEqual(audit(unrelated).affectedNames('MISSING_AUTH'), ['At root'])
+  const disabled = { ...json, event: [{ listen: 'prerequest', disabled: true, script: { exec: ["pm.request.headers.add('Authorization: Bearer x')"] } }] }
+  assert.deepEqual(audit(disabled).affectedNames('MISSING_AUTH'), ['At root'])
+})

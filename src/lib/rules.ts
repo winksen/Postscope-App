@@ -159,7 +159,7 @@ const definitions: RuleDefinition[] = [
   {
     id: 'HARDCODED_ENV_URL',
     title: 'Environment-specific URL',
-    description: 'URL contains literal environment identifiers (prod, staging, dev, localhost).',
+    description: 'URL host contains a literal environment label (prod, staging, uat, qa, dev, sandbox, localhost).',
     recommendation: 'Parameterize host with variables to support multiple environments.',
     severity: 'warning',
     category: 'variables',
@@ -167,7 +167,7 @@ const definitions: RuleDefinition[] = [
   {
     id: 'MISSING_AUTH',
     title: 'Potentially unprotected mutation request',
-    description: 'POST/PUT/PATCH/DELETE request has no auth and no Authorization header.',
+    description: 'POST/PUT/PATCH/DELETE request has no auth helper and no credential header, cookie, query credential or auth script.',
     recommendation: 'Add collection or request-level auth if the endpoint requires authentication.',
     severity: 'warning',
     category: 'auth',

@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.29
+
+- Fixed hardcoded base URL detection when a variable only appears later in the URL
+- Fixed environment URL detection matching path segments and missing common environment names
+- Fixed requests using API keys, cookies or query credentials being reported as unprotected
+
 ## V0.1.28
 
 - Security fix: collection, folder and request descriptions are now scanned and sanitized

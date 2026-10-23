@@ -643,23 +643,77 @@ export function plaintextOrigin(url: string): string | null {
   return `${match[1].toLowerCase()}://${authority}`
 }
 
+/**
+ * Hostname of an absolute or scheme-less URL, or null when the authority is a variable, contains a variable,
+ * or does not look like a host (`{{baseUrl}}/users`, `users/1`).
+ */
+export function urlHostname(url: string): string | null {
+  const match = url.trim().match(/^(?:([a-z][a-z0-9+.-]*):\/\/)?([^/?#\s]+)/i)
+  if (!match) return null
+  const authority = match[2].replace(/^[^@]*@/, '')
+  if (authority.includes('{{')) return null
+  const hostname = (authority.startsWith('[') ? authority.slice(0, authority.indexOf(']') + 1) : authority.split(':')[0]).toLowerCase()
+  if (!hostname) return null
+  if (!match[1] && !hostname.includes('.') && hostname !== 'localhost') return null
+  return hostname
+}
+
+const ENVIRONMENT_LABEL = /(^|[.-])(prod|production|stg|staging|stage|dev|develop|qa|uat|preprod|sandbox|test|int)([.-]|$)/
+const AUTH_ASSIGNING_SCRIPT = [
+  /pm\.request\.headers\.(?:add|upsert)\s*\(\s*(?:\{[^}]{0,300}?\bkey\s*:\s*)?['"`]\s*(?:proxy-)?authorization\b/i,
+  /pm\.request\.auth\s*=[^=]/,
+  /pm\.request\.auth\.update\s*\(/,
+]
+
+function scriptSetsAuthorization(source: string | undefined): boolean {
+  return !!source && AUTH_ASSIGNING_SCRIPT.some((pattern) => pattern.test(source))
+}
+
+/** Enabled pre-request scripts that run for a request: its own, its folders' and the collection's. */
+function requestSetsAuthorizationInScript(req: ParsedRequest, parsed: ParsedCollection): boolean {
+  if (scriptSetsAuthorization(req.scripts?.prerequest)) return true
+  return (parsed.scripts ?? []).some(
+    (script) =>
+      !script.disabled &&
+      script.listen === 'prerequest' &&
+      script.ownerPath.length <= req.itemPath.length &&
+      script.ownerPath.every((index, position) => req.itemPath[position] === index) &&
+      scriptSetsAuthorization(script.source)
+  )
+}
+
+const NON_AUTH_TOKEN_HEADER = /csrf|xsrf/i
+
+/** True when a request without an auth helper still carries credentials: header, cookie, query or script. */
+function hasCredentialsOutsideAuthHelper(req: ParsedRequest, parsed: ParsedCollection): boolean {
+  if (req.headers.some((h) => !NON_AUTH_TOKEN_HEADER.test(h.key) && isSensitiveHeader(h.key))) return true
+  if ((req.queryParams ?? []).some((param) => QUERY_SECRET_KEY.test(param.key.trim()) || isSensitiveKey(param.key))) return true
+  return requestSetsAuthorizationInScript(req, parsed)
+}
+
+/** `POST /v1/users` style label for triage; the origin and query string are dropped. */
+function requestRoute(req: ParsedRequest): string {
+  const path = req.url
+    .replace(/^\s*(?:[a-z][a-z0-9+.-]*:\/\/[^/?#]*|\{\{[^{}]+\}\})/i, '')
+    .split(/[?#]/)[0]
+  return `${req.method} ${path.startsWith('/') ? path : `/${path}`}`
+}
+
 function runWarningChecks(parsed: ParsedCollection, out: FindingCollector): void {
-  const urlVarPattern = /\{\{(baseUrl|base_url|host|url|BASE_URL)\}\}/i
-  const envHostPattern = /(prod|staging|dev|localhost)(\.|\/|$)/i
   const mutationMethods = ['POST', 'PUT', 'PATCH', 'DELETE']
 
   for (const req of parsed.requests) {
     const url = req.url || ''
-    if (url && !urlVarPattern.test(url) && (url.startsWith('http://') || url.startsWith('https://'))) {
+    const hostname = urlHostname(url)
+    if (/^https?:\/\//i.test(url) && hostname) {
       out.add('HARDCODED_BASEURL', req.id)
     }
-    if (url && envHostPattern.test(url) && !/\{\{[^{}]+\}\}/.test(url)) {
-      out.add('HARDCODED_ENV_URL', req.id)
+    if (hostname && (hostname === 'localhost' || ENVIRONMENT_LABEL.test(hostname))) {
+      out.add('HARDCODED_ENV_URL', req.id, { location: 'host', preview: hostname })
     }
 
-    const hasAuthHeader = req.headers.some((h) => h.key.toLowerCase() === 'authorization')
-    if (mutationMethods.includes(req.method) && req.auth === 'noauth' && !hasAuthHeader) {
-      out.add('MISSING_AUTH', req.id)
+    if (mutationMethods.includes(req.method) && req.auth === 'noauth' && !hasCredentialsOutsideAuthHelper(req, parsed)) {
+      out.add('MISSING_AUTH', req.id, { location: requestRoute(req) })
     }
 
     if (req.auth === 'basic' && req.basicAuth) {

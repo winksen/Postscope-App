@@ -116,8 +116,8 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
 | Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, … |
-| Warning | Hardcoded base URL / environment URL | `https://api.prod.example.com/…` instead of `{{baseUrl}}` |
-| Warning | Potentially unprotected mutation request | `POST` without auth (inherited auth is respected) |
+| Warning | Hardcoded base URL / environment URL | `https://api.prod.example.com/…` instead of `{{baseUrl}}`; environment names are matched in the host (`prod`, `staging`, `uat`, `qa`, `dev`, `sandbox`, ...), not in path segments |
+| Warning | Potentially unprotected mutation request | `POST` without auth (inherited auth, API key headers, cookies, query credentials and scripts that set `Authorization` are respected) |
 | Warning | Basic auth with literal credentials | Username/password typed into Basic auth |
 | Warning | Plaintext HTTP endpoint | `http://` to a non-local host, including via `{{baseUrl}}` |
 | Warning | TLS certificate verification disabled | `strictSSL: false` |
