@@ -39,6 +39,7 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 
 ### Out of scope
 
+- Environment and globals files are analyzed in the browser or CLI only. They are never sent to the team library, so a library record cannot leak them.
 - PostScope does not verify whether a detected secret is still valid. Treat every finding as exposed and rotate it.
 - Basic auth is a gate, not identity management. Use an SSO-aware reverse proxy if you need per-user audit trails.
 - Rule-based detection has false positives and negatives. Use the rule settings to tune it, not as proof of absence.
@@ -56,6 +57,7 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 | Scripts | `pm.*.set("token", "literal")`, literal assignments and properties, `Authorization` literals added with `pm.request.headers` or `pm.sendRequest`, bearer literals in `pm.request.auth`, `btoa('user:password')`, provider tokens, `console.log` of credentials |
 | Collection variables | Credential-like names or `secret` type with literal values; provider tokens in any variable; the same for folder and request variables |
 | Descriptions | Provider tokens and `key: value` credential fragments in collection, folder and request descriptions (replaced with `{{REDACTED}}` in sanitized copies) |
+| Environment and globals files | Credential-like names, `secret` typed variables (Postman exports them in clear text) and provider tokens with literal values (`SECRET_IN_ENVIRONMENT`). The sanitized export and the CLI `--sanitize` option write copies with those values emptied |
 | Path variables | Credential-like `url.variable` entries such as `:token` |
 | Saved example responses | Tokens in bodies, `Set-Cookie` sessions, `Authorization`, query credentials and body secrets in the original request |
 | Anywhere else | Provider formats: AWS, GitHub, GitLab, Slack, Stripe live keys, Google, OpenAI, Anthropic, SendGrid, Twilio, npm, Azure storage keys, JWTs, private key blocks, connection strings with passwords, Microsoft Entra ID client secrets, Okta API tokens, HashiCorp Vault tokens, Postman API keys, Atlassian, Shopify, DigitalOcean, Docker Hub, Grafana, Hugging Face, Databricks, PyPI and Square tokens |

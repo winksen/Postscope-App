@@ -336,3 +336,16 @@ export function redactCollection(input: unknown): RedactionResult {
   redactor.items(json.item)
   return { json, redactedCount: redactor.count }
 }
+
+/**
+ * Returns a copy of a Postman environment or globals export with credential values emptied: variables with
+ * credential-like names, the `secret` type, or provider-format tokens. Names, keys and structure are kept so the
+ * file can still be imported and filled in privately.
+ */
+export function redactEnvironment(input: unknown): RedactionResult {
+  const json = cloneJson(input)
+  if (!isRecord(json)) return { json, redactedCount: 0 }
+  const redactor = new Redactor()
+  redactor.variables(json.values)
+  return { json, redactedCount: redactor.count }
+}

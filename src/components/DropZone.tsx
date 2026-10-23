@@ -34,7 +34,8 @@ import type { StorageMode } from '@/lib/storagePreferences'
 const fadeTransition = { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
 
 interface DropZoneProps {
-  onFile: (file: File) => void
+  /** One collection plus any number of Postman environment or globals files. */
+  onFiles: (files: File[]) => void
   onJsonText: (rawJson: string) => void
   loading?: boolean
   loggingMode: LoggingMode
@@ -49,7 +50,7 @@ interface DropZoneProps {
 }
 
 export function DropZone({
-  onFile,
+  onFiles,
   onJsonText,
   loading = false,
   loggingMode,
@@ -84,22 +85,28 @@ export function DropZone({
     }
   }, [])
 
-  const isAcceptedFile = (file: File) => file.name.endsWith('.postman_collection.json') || file.name.endsWith('.json')
+  const isAcceptedFile = (file: File) => file.name.toLowerCase().endsWith('.json')
+
+  const acceptFiles = useCallback(
+    (files: File[]) => {
+      if (!files.length) return
+      if (files.every(isAcceptedFile)) {
+        setEntryError(null)
+        onFiles(files)
+      } else {
+        setEntryError('Choose .json files: a Postman collection and, optionally, environment or globals exports.')
+      }
+    },
+    [onFiles]
+  )
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
       setDrag(false)
-      const file = e.dataTransfer.files[0]
-      if (!file) return
-      if (isAcceptedFile(file)) {
-        setEntryError(null)
-        onFile(file)
-      } else {
-        setEntryError('Choose a .json or .postman_collection.json file.')
-      }
+      acceptFiles(Array.from(e.dataTransfer.files))
     },
-    [onFile]
+    [acceptFiles]
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -114,18 +121,10 @@ export function DropZone({
 
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (file) {
-        if (isAcceptedFile(file)) {
-          setEntryError(null)
-          onFile(file)
-        } else {
-          setEntryError('Choose a .json or .postman_collection.json file.')
-        }
-      }
+      acceptFiles(Array.from(e.target.files ?? []))
       e.target.value = ''
     },
-    [onFile]
+    [acceptFiles]
   )
 
   const handlePasteImport = useCallback(() => {
@@ -320,7 +319,7 @@ export function DropZone({
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
-              Drop a Postman export. Parsed in your browser, never uploaded.
+              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them for secrets.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -406,7 +405,7 @@ export function DropZone({
                           <>Accept the upload warning above to import a collection.</>
                         ) : (
                           <>
-                            <span className="font-medium text-foreground">Drag & drop</span> your JSON here
+                            <span className="font-medium text-foreground">Drag & drop</span> your collection and optional environment files here
                           </>
                         )}
                       </p>
@@ -416,7 +415,8 @@ export function DropZone({
                             Browse files
                             <input
                               type="file"
-                              accept=".json,.postman_collection.json"
+                              accept=".json,.postman_collection.json,.postman_environment.json,.postman_globals.json"
+                              multiple
                               onChange={handleFileInput}
                               className="hidden"
                               disabled={importBlocked}
@@ -482,7 +482,15 @@ export function DropZone({
               <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
                 .postman_collection.json
               </code>{' '}
-              and standard exports.
+              plus optional{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                .postman_environment.json
+              </code>{' '}
+              and{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                .postman_globals.json
+              </code>
+              .
             </p>
           </CardContent>
         </Card>

@@ -13,7 +13,8 @@ import { parseCollection } from '../src/lib/parser'
 import { runAudit, sanitizeAuditOptions, type AuditOptions, type Finding } from '../src/lib/auditor'
 import { calculateScore } from '../src/lib/scorer'
 import { buildJsonReport, buildMarkdownReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
-import { redactCollection } from '../src/lib/redaction'
+import { redactCollection, redactEnvironment } from '../src/lib/redaction'
+import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
 import { readPackageVersion } from '../server/appVersion'
 import { isSeverity, severityRank, type Severity } from '../src/lib/severity'
@@ -29,6 +30,8 @@ interface CliOptions {
   minScore?: number
   audit: AuditOptions
   sanitize?: string
+  /** Postman environment and globals export files (applied to every collection). */
+  environments: Array<{ file: string; globals: boolean }>
   quiet: boolean
 }
 
@@ -44,7 +47,10 @@ Options:
       --min-score <0-100>                  Exit 1 when any collection scores below this value
       --disable <RULE,RULE>                Disable rules (see --list-rules)
       --severity <RULE=level,...>          Override rule severities (critical, warning, info)
-      --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input)
+      --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input).
+                                           Environment files are written next to it as <name>.sanitized.postman_environment.json
+  -e, --environment <file>                 Postman environment export to analyze with the collections (repeatable)
+      --globals <file>                     Postman globals export to analyze with the collections (repeatable)
       --list-rules                         Print every rule id and exit
   -q, --quiet                              Only print the report (no summary on stderr)
   -v, --version                            Print the version
@@ -58,7 +64,7 @@ function readVersion(): string {
 }
 
 function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
-  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, quiet: false }
+  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, environments: [], quiet: false }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
 
@@ -114,6 +120,13 @@ function parseArgs(argv: string[]): CliOptions | 'help' | 'version' | 'rules' {
       case '--sanitize':
         options.sanitize = value()
         break
+      case '-e':
+      case '--environment':
+        options.environments.push({ file: value(), globals: false })
+        break
+      case '--globals':
+        options.environments.push({ file: value(), globals: true })
+        break
       case '-q':
       case '--quiet':
         options.quiet = true
@@ -144,7 +157,37 @@ interface AnalyzedFile {
   ctx: ReportContext
 }
 
-function analyzeFile(input: string, audit: AuditOptions, appVersion: string): { result: AnalyzedFile; json: unknown } {
+interface LoadedEnvironment {
+  file: string
+  text: string
+  json: unknown
+  kind: EnvironmentKind
+  name: string
+}
+
+function loadEnvironments(entries: CliOptions['environments']): LoadedEnvironment[] {
+  return entries.map(({ file, globals }) => {
+    let text: string
+    let json: unknown
+    try {
+      text = fs.readFileSync(file, 'utf8')
+      json = JSON.parse(text)
+    } catch (error) {
+      throw new UsageError(`${file}: cannot read environment file (${error instanceof Error ? error.message : String(error)})`)
+    }
+    const kind = detectEnvironmentKind(json, file)
+    if (!kind) throw new UsageError(`${file}: not a Postman environment or globals export (missing values array)`)
+    if (globals && kind !== 'globals') throw new UsageError(`${file}: --globals expects a globals export; use --environment for environment files`)
+    return { file, text, json, kind, name: parseEnvironment(json, file).name }
+  })
+}
+
+/** `dev.postman_environment.json` becomes `dev`. */
+function environmentStem(file: string): string {
+  return path.basename(file).replace(/\.postman_(?:environment|globals)\.json$/i, '').replace(/\.json$/i, '')
+}
+
+function analyzeFile(input: string, audit: AuditOptions, appVersion: string, environments: LoadedEnvironment[]): { result: AnalyzedFile; json: unknown } {
   let json: unknown
   try {
     json = JSON.parse(readInput(input))
@@ -157,7 +200,7 @@ function analyzeFile(input: string, audit: AuditOptions, appVersion: string): { 
   }
   let parsed
   try {
-    parsed = parseCollection(json)
+    parsed = attachEnvironments(parseCollection(json), environments.map((environment) => environment.text))
   } catch {
     throw new UsageError(`${input}: not a Postman collection (missing item array)`)
   }
@@ -175,6 +218,7 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
     const counts = { critical: 0, warning: 0, info: 0 }
     ctx.findings.forEach((finding) => (counts[finding.severity] += 1))
     lines.push(`PostScope ${appVersion}  ${ctx.parsed.name}  (${input === '-' ? 'stdin' : input}, ${ctx.parsed.totalRequests} requests)`)
+    if (ctx.parsed.environments?.length) lines.push(`Environments: ${ctx.parsed.environments.map((environment) => `${environment.name} (${environment.kind})`).join(', ')}`)
     lines.push(`Score ${ctx.score.total}/100 (grade ${ctx.score.grade})  ·  ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info`)
     const labels = new Map(ctx.parsed.requests.map((r) => [r.id, r.folderPath.length ? `${r.folderPath.join(' / ')} / ${r.name}` : r.name]))
     for (const finding of ctx.findings) {
@@ -230,13 +274,20 @@ export function main(argv: string[]): number {
 
   const files: AnalyzedFile[] = []
   try {
+    const environments = loadEnvironments(options.environments)
     for (const input of options.inputs) {
-      const { result, json } = analyzeFile(input, options.audit, appVersion)
+      const { result, json } = analyzeFile(input, options.audit, appVersion, environments)
       files.push(result)
       if (options.sanitize) {
         const { json: sanitized, redactedCount } = redactCollection(json)
         fs.writeFileSync(options.sanitize, JSON.stringify(sanitized, null, 2))
         if (!options.quiet) process.stderr.write(`Sanitized copy written to ${options.sanitize} (${redactedCount} value(s) replaced)\n`)
+        for (const environment of environments) {
+          const target = path.join(path.dirname(options.sanitize), `${environmentStem(environment.file)}.sanitized.postman_${environment.kind}.json`)
+          const sanitizedEnvironment = redactEnvironment(environment.json)
+          fs.writeFileSync(target, JSON.stringify(sanitizedEnvironment.json, null, 2))
+          if (!options.quiet) process.stderr.write(`Sanitized ${environment.kind} written to ${target} (${sanitizedEnvironment.redactedCount} value(s) emptied)\n`)
+        }
       }
     }
   } catch (error) {

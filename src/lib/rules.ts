@@ -10,6 +10,7 @@ export type RuleId =
   | 'CREDENTIALS_IN_URL'
   | 'SECRET_IN_SCRIPT'
   | 'SECRET_IN_COLLECTION_VARIABLE'
+  | 'SECRET_IN_ENVIRONMENT'
   | 'SECRET_IN_SAVED_RESPONSE'
   | 'KNOWN_SECRET_PATTERN'
   | 'HARDCODED_BASEURL'
@@ -125,6 +126,15 @@ const definitions: RuleDefinition[] = [
     title: 'Secret stored in collection variable',
     description: 'A collection variable with a credential-like name has a literal value, which is shared with everyone who receives the export.',
     recommendation: 'Clear the value in the collection and set it in a private environment, Postman vault, or CI secret store.',
+    severity: 'critical',
+    category: 'secrets',
+    cwe: 'CWE-798',
+  },
+  {
+    id: 'SECRET_IN_ENVIRONMENT',
+    title: 'Secret stored in environment or globals export',
+    description: 'A Postman environment or globals file holds a credential in clear text. Postman exports "secret" typed variables unmasked, so the file leaks it just like the collection would.',
+    recommendation: 'Keep environment files out of source control and chat. Share a copy with the secret values emptied, and load real values from a vault or a private environment.',
     severity: 'critical',
     category: 'secrets',
     cwe: 'CWE-798',

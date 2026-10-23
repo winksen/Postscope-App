@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import { DropZone } from '../components/DropZone'
 import { DashboardShell } from '../components/layout/dashboard-shell'
-import type { ExportFormat } from '../components/layout/app-header'
+import type { EnvironmentOption, ExportFormat } from '../components/layout/app-header'
 import { RequestSearchModal } from '../components/RequestSearchModal'
 import { CollectionLibraryModal } from '../components/CollectionLibraryModal'
 import { RuleSettingsDialog } from '../components/RuleSettingsDialog'
@@ -13,6 +13,7 @@ import { HygienePage } from './HygienePage'
 import { ScorePage } from './ScorePage'
 import { RepairPage } from './RepairPage'
 import { analyzeCollectionText, describeAnalysisError } from '../lib/analyzeCollection'
+import { detectEnvironmentKind, isCollectionJson, parseEnvironment, withActiveEnvironment } from '../lib/environment'
 import {
   clearCollectionSession,
   loadCollectionSession,
@@ -49,8 +50,8 @@ import {
 import { calculateScore } from '../lib/scorer'
 import { createRepairPlan } from '../lib/repairEngine'
 import { runAudit, type AuditOptions, type Finding } from '../lib/auditor'
-import { buildReport, reportFileName, reportMimeType, safeFileStem } from '../lib/reportExport'
-import { redactCollection } from '../lib/redaction'
+import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
+import { redactCollection, redactEnvironment } from '../lib/redaction'
 import { downloadTextFile } from '../lib/download'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
 import type { NavId } from '../components/layout/app-sidebar'
@@ -90,6 +91,8 @@ export function AnalyzeApp({
   const [findings, setFindings] = useState<Finding[]>([])
   const [rawJson, setRawJson] = useState<string | null>(null)
   const [originalRawJson, setOriginalRawJson] = useState<string | null>(null)
+  /** Raw environment and globals exports loaded with the collection (kept for re-analysis and sanitized export). */
+  const [environmentTexts, setEnvironmentTexts] = useState<string[]>([])
   const [currentLibraryId, setCurrentLibraryId] = useState<string | null>(null)
   const [savedCollections, setSavedCollections] = useState<SavedCollectionMeta[]>([])
   const [libraryOpen, setLibraryOpen] = useState(false)
@@ -108,6 +111,10 @@ export function AnalyzeApp({
   const auditOptions = useMemo(() => effectiveAuditOptions(auditPolicy, userAuditPrefs), [auditPolicy, userAuditPrefs])
   const auditOptionsRef = useRef(auditOptions)
   auditOptionsRef.current = auditOptions
+  const environmentTextsRef = useRef<string[]>([])
+  environmentTextsRef.current = environmentTexts
+  const parsedRef = useRef<ParsedCollection | null>(null)
+  parsedRef.current = parsed
   /** Incremented for every analysis; results from superseded analyses are discarded. */
   const analysisSeq = useRef(0)
   const restoreAttempted = useRef(false)
@@ -185,21 +192,31 @@ export function AnalyzeApp({
 
   /** Analyzes raw JSON and shows the dashboard. Returns false when a newer analysis superseded this one. */
   const applyCollectionJson = useCallback(
-    async (raw: string, libraryId?: string | null): Promise<boolean> => {
+    async (raw: string, libraryId?: string | null, environments: string[] = [], activeEnvironment?: number): Promise<boolean> => {
       const seq = ++analysisSeq.current
-      const { parsed: p, findings: f } = await analyzeCollectionText(raw, auditOptionsRef.current)
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments })
       if (seq !== analysisSeq.current) return false
+      let p = analysis.parsed
+      let f = analysis.findings
+      if (activeEnvironment !== undefined && activeEnvironment !== p.activeEnvironment) {
+        const selected = withActiveEnvironment(p, activeEnvironment)
+        if (selected !== p) {
+          p = selected
+          f = runAudit(p, auditOptionsRef.current)
+        }
+      }
 
       setParsed(p)
       setFindings(f)
       setRawJson(raw)
       setOriginalRawJson(raw)
+      setEnvironmentTexts(environments)
       setActive('overview')
       setSearch('')
       notifyParseWarnings(p)
 
       if (shouldPersistSession(loggingMode, storageMode)) {
-        if (!saveCollectionSession(raw, p.name)) {
+        if (!saveCollectionSession(raw, p.name, environments, p.activeEnvironment)) {
           notify({ title: 'Collection not kept for refresh', description: 'It is larger than the browser session storage limit.' })
         }
       }
@@ -241,7 +258,7 @@ export function AnalyzeApp({
       setRestoringSession(false)
       return
     }
-    void applyCollectionJson(session.rawJson)
+    void applyCollectionJson(session.rawJson, null, session.environments ?? [], session.activeEnvironment)
       .catch((e) => {
         console.error(e)
         clearCollectionSession()
@@ -264,9 +281,9 @@ export function AnalyzeApp({
   }, [loggingMode, storageMode, uploadConsent, notify])
 
   const runImport = useCallback(
-    (raw: string) => {
+    (raw: string, environments: string[] = []) => {
       setLandingLoading(true)
-      void applyCollectionJson(raw)
+      void applyCollectionJson(raw, null, environments)
         .catch((e) => {
           console.error(e)
           notify({ variant: 'error', title: 'Import failed', description: describeAnalysisError(e) })
@@ -276,25 +293,57 @@ export function AnalyzeApp({
     [applyCollectionJson, notify]
   )
 
-  const handleFile = useCallback(
-    (file: File) => {
+  const handleFiles = useCallback(
+    (files: File[]) => {
       if (importBlockedByConsent()) return
-      if (file.size > MAX_IMPORT_BYTES) {
+      const oversized = files.find((file) => file.size > MAX_IMPORT_BYTES)
+      if (oversized) {
         notify({
           variant: 'error',
           title: 'File is too large',
-          description: `${file.name} is ${formatMegabytes(file.size)}. The analyzer accepts files up to ${formatMegabytes(MAX_IMPORT_BYTES)}.`,
+          description: `${oversized.name} is ${formatMegabytes(oversized.size)}. The analyzer accepts files up to ${formatMegabytes(MAX_IMPORT_BYTES)}.`,
         })
         return
       }
-      if (file.size === 0) {
-        notify({ variant: 'error', title: 'File is empty', description: `${file.name} has no content.` })
+      const empty = files.find((file) => file.size === 0)
+      if (empty) {
+        notify({ variant: 'error', title: 'File is empty', description: `${empty.name} has no content.` })
         return
       }
       setLandingLoading(true)
-      file
-        .text()
-        .then((text) => runImport(text))
+      Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })))
+        .then((loaded) => {
+          const collections: string[] = []
+          const environments: string[] = []
+          let unknown: string | null = null
+          for (const { name, text } of loaded) {
+            let json: unknown = null
+            try {
+              json = JSON.parse(text) as unknown
+            } catch {
+              // Not JSON: a single file is analyzed so the usual "not valid JSON" message appears.
+            }
+            if (json !== null && detectEnvironmentKind(json, name)) environments.push(text)
+            else if (json === null || isCollectionJson(json)) collections.push(text)
+            else unknown = unknown ?? name
+          }
+          if (collections.length === 0 && !unknown) {
+            setLandingLoading(false)
+            notify({ variant: 'error', title: 'Add a collection', description: 'Environment and globals files are analyzed together with a Postman collection.' })
+            return
+          }
+          if (collections.length > 1) {
+            setLandingLoading(false)
+            notify({ variant: 'error', title: 'Add one collection at a time', description: 'Drop a single collection together with any environment or globals files.' })
+            return
+          }
+          if (collections.length === 0) {
+            setLandingLoading(false)
+            notify({ variant: 'error', title: 'Not a Postman file', description: `${unknown} is neither a collection nor an environment export.` })
+            return
+          }
+          runImport(collections[0], environments)
+        })
         .catch((e) => {
           console.error(e)
           setLandingLoading(false)
@@ -323,6 +372,7 @@ export function AnalyzeApp({
     setFindings([])
     setRawJson(null)
     setOriginalRawJson(null)
+    setEnvironmentTexts([])
     setCurrentLibraryId(null)
     setSearch('')
     setSearchOpen(false)
@@ -380,7 +430,18 @@ export function AnalyzeApp({
   const handleApplyRepairedCollection = useCallback(
     async (raw: string) => {
       const seq = ++analysisSeq.current
-      const { parsed: p, findings: f } = await analyzeCollectionText(raw, auditOptionsRef.current)
+      const environments = environmentTextsRef.current
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments })
+      let p = analysis.parsed
+      let f = analysis.findings
+      const selectedBefore = parsedRef.current?.activeEnvironment
+      if (selectedBefore !== undefined && selectedBefore !== p.activeEnvironment) {
+        const selected = withActiveEnvironment(p, selectedBefore)
+        if (selected !== p) {
+          p = selected
+          f = runAudit(p, auditOptionsRef.current)
+        }
+      }
       if (seq === analysisSeq.current) {
         setParsed(p)
         setFindings(f)
@@ -390,7 +451,7 @@ export function AnalyzeApp({
         setSearch('')
 
         if (shouldPersistSession(loggingMode, storageMode)) {
-          saveCollectionSession(raw, p.name)
+          saveCollectionSession(raw, p.name, environments, p.activeEnvironment)
         }
       }
 
@@ -434,14 +495,52 @@ export function AnalyzeApp({
           })
           return
         }
-        const content = buildReport(format, { parsed, findings, score, appVersion })
-        downloadTextFile(reportFileName(parsed.name, format), content, reportMimeType(format))
+        if (format === 'sanitized-environments') {
+          let total = 0
+          environmentTexts.forEach((text, index) => {
+            const source = JSON.parse(text) as unknown
+            const { json, redactedCount } = redactEnvironment(source)
+            total += redactedCount
+            const { name, kind } = parseEnvironment(source)
+            downloadTextFile(`${safeFileStem(name || `environment-${index + 1}`)}-sanitized.postman_${kind}.json`, JSON.stringify(json, null, 2))
+          })
+          notify({
+            variant: 'success',
+            title: 'Sanitized environments downloaded',
+            description: total ? `${total} secret value(s) were emptied. Names and keys are unchanged.` : 'No secret values were detected; the copies match the originals.',
+          })
+          return
+        }
+        const reportFormat: ReportFormat = format
+        const content = buildReport(reportFormat, { parsed, findings, score, appVersion })
+        downloadTextFile(reportFileName(parsed.name, reportFormat), content, reportMimeType(reportFormat))
       } catch (e) {
         console.error(e)
         notify({ variant: 'error', title: 'Export failed', description: e instanceof Error ? e.message : undefined })
       }
     },
-    [parsed, score, rawJson, findings, appVersion, notify]
+    [parsed, score, rawJson, findings, appVersion, environmentTexts, notify]
+  )
+
+  const handleSelectEnvironment = useCallback(
+    (index: number) => {
+      if (!parsed) return
+      const next = withActiveEnvironment(parsed, index)
+      if (next === parsed) return
+      setParsed(next)
+      setFindings(runAudit(next, auditOptionsRef.current))
+      if (rawJson && shouldPersistSession(loggingMode, storageMode)) saveCollectionSession(rawJson, next.name, environmentTexts, index)
+    },
+    [parsed, rawJson, environmentTexts, loggingMode, storageMode]
+  )
+
+  const environmentOptions = useMemo<EnvironmentOption[]>(
+    () =>
+      (parsed?.environments ?? [])
+        .map((environment, index) => ({ index, name: environment.name, kind: environment.kind }))
+        .filter((environment) => environment.kind === 'environment')
+        .map(({ index, name }) => ({ index, name })),
+    [parsed]
   )
 
   const handleSaveRules = useCallback(
@@ -466,7 +565,7 @@ export function AnalyzeApp({
     return (
       <>
         <DropZone
-          onFile={handleFile}
+          onFiles={handleFiles}
           onJsonText={handleJsonText}
           loading={landingLoading || restoringSession}
           loggingMode={loggingMode}
@@ -517,6 +616,10 @@ export function AnalyzeApp({
         onExport={handleExport}
         onOpenRules={() => setRulesOpen(true)}
         customRulesActive={userAuditPrefs !== null && isCustomized(auditOptions)}
+        environments={environmentOptions}
+        activeEnvironment={parsed.activeEnvironment}
+        onEnvironmentChange={handleSelectEnvironment}
+        hasEnvironmentFiles={environmentTexts.length > 0}
       >
         {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}
         {active === 'requests' && (

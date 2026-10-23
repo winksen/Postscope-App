@@ -76,6 +76,12 @@ export function buildJsonReport(ctx: ReportContext): string {
         methods: ctx.parsed.methods,
         authTypes: ctx.parsed.authTypes,
         parseWarnings: ctx.parsed.parseWarnings ?? [],
+        environments: ctx.parsed.environments?.map((environment, index) => ({
+          name: environment.name,
+          kind: environment.kind,
+          variableCount: environment.variables.length,
+          active: environment.kind === 'environment' && index === ctx.parsed.activeEnvironment,
+        })),
       },
       score: ctx.score,
       summary: severityCounts(ctx.findings),
@@ -200,6 +206,10 @@ export function buildMarkdownReport(ctx: ReportContext): string {
   lines.push(`| Score | **${ctx.score.total}/100** (grade ${ctx.score.grade}) |`)
   lines.push(`| Requests | ${ctx.parsed.totalRequests} in ${ctx.parsed.totalFolders} folder(s) |`)
   lines.push(`| Findings | ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info |`)
+  if (ctx.parsed.environments?.length) {
+    const names = ctx.parsed.environments.map((environment) => `${escapeMarkdown(environment.name)} (${environment.kind})`).join(', ')
+    lines.push(`| Environments | ${names} |`)
+  }
   lines.push(
     `| Category scores | Secrets ${ctx.score.categories.secrets}, Variables ${ctx.score.categories.variables}, Auth ${ctx.score.categories.auth}, Hygiene ${ctx.score.categories.hygiene} |`
   )
