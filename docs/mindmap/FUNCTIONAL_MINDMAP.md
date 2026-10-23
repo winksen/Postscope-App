@@ -178,7 +178,9 @@ Available in `hybrid` and `on` modes.
 - **Consent first (hybrid):** users must accept an upload warning before anything is stored.
 - **No duplicates:** saving identical content returns the existing entry ("Already in the team library").
 - **Operator policies:** maximum items, retention in days, total size quota, optional server-side **secret redaction** before storing, and an option to **disable removal** for audit trails.
-- **Library dialog:** open, export JSON, or remove (when allowed). Load errors show a retry button instead of failing silently.
+- **Library dialog:** open, export JSON, or remove (when allowed). Load errors show a retry button instead of failing silently. When the operator uses single sign-on, each entry shows who saved it ("by alice@example.com").
+- **Encryption at rest (optional):** with an operator-provided key, collections are stored encrypted on the server's disk and in its backups. The dialog says so. Tampered files are skipped.
+- **Audit trail (default on):** the server logs who saved, opened and removed which collection, and when. It never logs collection content.
 
 ## 6. CI automation (CLI)
 

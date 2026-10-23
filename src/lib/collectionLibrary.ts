@@ -11,6 +11,8 @@ export interface SavedCollectionMeta {
   deduplicated?: boolean
   /** Credentials scrubbed by the server before storing (LIBRARY_REDACT_SECRETS). */
   redactedCount?: number
+  /** User reported by the operator's trusted reverse proxy when the collection was saved. */
+  savedBy?: string
 }
 
 export interface SavedCollection extends SavedCollectionMeta {

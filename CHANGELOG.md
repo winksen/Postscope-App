@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.40
+
+- Security fixes: optional encryption at rest for the team library
+- Added an append-only audit log for library saves, opens and removals
+- Added support for user identity from a trusted reverse proxy
+
 ## V0.1.39
 
 - Added a standalone postscope command that runs without the TypeScript toolchain

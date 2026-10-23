@@ -117,3 +117,32 @@ test('the compiled server starts without node_modules and serves the app, config
     await new Promise((resolve) => child.once('exit', resolve))
   }
 })
+
+test('the compiled library tool reports status and encrypts records', async () => {
+  const data = path.join(work, 'library-data')
+  const library = path.join(data, 'library')
+  fs.mkdirSync(library, { recursive: true })
+  const id = '0f0f0f0f-1111-4222-8333-444444444444'
+  const record = { id, name: 'Legacy', rawJson: '{"info":{"name":"Legacy"},"item":[]}', requestCount: 0, savedAt: 1, sizeBytes: 36, contentHash: 'x' }
+  fs.writeFileSync(path.join(library, `${id}.json`), JSON.stringify(record))
+  const run = (...args: string[]) => {
+    const result = spawnSync(process.execPath, [path.join(outdir, 'library.js'), ...args], {
+      cwd: work,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH ?? '', DATA_DIR: data, LIBRARY_ENCRYPTION_KEY: '0'.repeat(63) + '1' },
+    })
+    return { code: result.status, stdout: result.stdout, stderr: result.stderr }
+  }
+  assert.match(run('status').stdout, /Records: 1 \(1 plaintext, 0 encrypted, 0 unreadable\)/)
+  assert.match(run('encrypt', '--dry-run').stdout, /Dry run: 1 record\(s\) scanned, 1 to encrypt/)
+  assert.ok(fs.readFileSync(path.join(library, `${id}.json`), 'utf8').includes('Legacy'), 'a dry run changes nothing')
+  const encrypted = run('encrypt')
+  assert.equal(encrypted.code, 0, encrypted.stderr)
+  assert.match(encrypted.stdout, /1 encrypted/)
+  assert.ok(!fs.readFileSync(path.join(library, `${id}.json`), 'utf8').includes('Legacy'))
+  assert.match(run('status').stdout, /1 encrypted/)
+  assert.equal(run('bogus').code, 2)
+  const noKey = spawnSync(process.execPath, [path.join(outdir, 'library.js'), 'encrypt'], { cwd: work, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', DATA_DIR: data } })
+  assert.equal(noKey.status, 2)
+  assert.match(noKey.stderr, /LIBRARY_ENCRYPTION_KEY/)
+})

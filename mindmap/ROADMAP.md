@@ -110,7 +110,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.1.36 | `v0.1.36` | A2 | Enhancement | Scoring model v2 | `a50f91e` |
 | V0.1.37 | `v0.1.37` | A3 | Feature | Config file, baselines and suppressions | `53e2814` |
 | V0.1.38 | `v0.1.38` | A3 | Enhancement | Precise SARIF locations, report schema, HTML report | `ae025e7` |
-| V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server | |
+| V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server | `a5c4b6f` |
 | V0.1.40 | `v0.1.40` | A4 | Security, Feature | Library encryption at rest, audit log, proxy identity | |
 | V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift | |
 | V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | |
