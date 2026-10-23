@@ -318,3 +318,83 @@ test('score weights are shared through /api/config and ignore invalid entries', 
     delete process.env.SCORE_WEIGHTS
   }
 })
+
+test('library saves, opens and removals are written to an append-only audit log', async () => {
+  const { flushAuditLog } = await import('../server/auditLog')
+  const auditDir = path.join(dataDir, 'audit')
+  fs.rmSync(auditDir, { recursive: true, force: true })
+  process.env.TRUST_PROXY = 'true'
+  process.env.TRUSTED_USER_HEADER = 'X-Auth-Request-Email'
+  try {
+    const forwarded = { 'X-Forwarded-For': '198.51.100.23', 'X-Auth-Request-Email': 'alice@example.com' }
+    const saved = await postCollection({ ...sample, info: { name: 'Audited' } }, forwarded, 'Audited collection')
+    assert.equal(saved.status, 201)
+    const meta = JSON.parse(saved.body)
+    assert.equal(meta.savedBy, 'alice@example.com')
+    assert.equal((await raw(`/api/collections/${meta.id}`, { headers: { 'X-Forwarded-For': '198.51.100.24', 'X-Auth-Request-Email': 'bob@example.com' } })).status, 200)
+    assert.equal((await raw('/api/collections', { headers: forwarded })).status, 200)
+    assert.equal((await raw(`/api/collections/${meta.id}`, { method: 'DELETE', headers: forwarded })).status, 200)
+    await flushAuditLog()
+
+    const files = fs.readdirSync(auditDir)
+    assert.equal(files.length, 1)
+    assert.match(files[0], /^library-\d{4}-\d{2}\.jsonl$/)
+    const entries = fs.readFileSync(path.join(auditDir, files[0]), 'utf8').trim().split('\n').map((line) => JSON.parse(line))
+    assert.deepEqual(entries.map((entry) => [entry.action, entry.user, entry.ip]), [
+      ['save', 'alice@example.com', '198.51.100.23'],
+      ['open', 'bob@example.com', '198.51.100.24'],
+      ['delete', 'alice@example.com', '198.51.100.23'],
+    ])
+    assert.ok(entries.every((entry) => entry.id === meta.id && entry.name === 'Audited collection' && typeof entry.requestId === 'string' && !Number.isNaN(Date.parse(entry.ts))))
+    const text = fs.readFileSync(path.join(auditDir, files[0]), 'utf8')
+    assert.ok(!text.includes('example.com/') && !text.includes('"item"'), 'no collection content in the log')
+  } finally {
+    delete process.env.TRUST_PROXY
+    delete process.env.TRUSTED_USER_HEADER
+    resetLibraryCache()
+  }
+})
+
+test('without TRUST_PROXY the user header is ignored and the socket address is logged', async () => {
+  const { flushAuditLog } = await import('../server/auditLog')
+  fs.rmSync(path.join(dataDir, 'audit'), { recursive: true, force: true })
+  process.env.TRUSTED_USER_HEADER = 'X-Forwarded-User'
+  try {
+    const saved = await postCollection({ ...sample, info: { name: 'Spoof' } }, { 'X-Forwarded-User': 'admin', 'X-Forwarded-For': '6.6.6.6' }, 'Spoof attempt')
+    assert.equal(saved.status, 201)
+    assert.equal(JSON.parse(saved.body).savedBy, undefined)
+    await flushAuditLog()
+    const [file] = fs.readdirSync(path.join(dataDir, 'audit'))
+    const entry = JSON.parse(fs.readFileSync(path.join(dataDir, 'audit', file), 'utf8').trim().split('\n')[0])
+    assert.equal(entry.user, null)
+    assert.equal(entry.ip, '127.0.0.1')
+    await raw(`/api/collections/${JSON.parse(saved.body).id}`, { method: 'DELETE' })
+    await flushAuditLog()
+  } finally {
+    delete process.env.TRUSTED_USER_HEADER
+    resetLibraryCache()
+  }
+})
+
+test('the audit log can be switched off and config reports whether the library is encrypted', async () => {
+  const { flushAuditLog } = await import('../server/auditLog')
+  fs.rmSync(path.join(dataDir, 'audit'), { recursive: true, force: true })
+  process.env.LIBRARY_AUDIT_LOG = 'false'
+  process.env.LIBRARY_ENCRYPTION_KEY = 'a'.repeat(64)
+  try {
+    assert.equal(JSON.parse((await raw('/api/config')).body).libraryEncrypted, true)
+    const saved = await postCollection({ ...sample, info: { name: 'Quiet' } }, {}, 'Quiet')
+    assert.equal(saved.status, 201)
+    const id = JSON.parse(saved.body).id
+    assert.equal(JSON.parse((await raw(`/api/collections/${id}`)).body).name, 'Quiet')
+    assert.ok(!fs.readFileSync(path.join(dataDir, 'library', `${id}.json`), 'utf8').includes('Quiet'), 'stored encrypted')
+    await raw(`/api/collections/${id}`, { method: 'DELETE' })
+    await flushAuditLog()
+    assert.equal(fs.existsSync(path.join(dataDir, 'audit')), false)
+  } finally {
+    delete process.env.LIBRARY_AUDIT_LOG
+    delete process.env.LIBRARY_ENCRYPTION_KEY
+    resetLibraryCache()
+  }
+  assert.equal(JSON.parse((await raw('/api/config')).body).libraryEncrypted, false)
+})

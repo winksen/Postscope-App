@@ -69,6 +69,7 @@ interface AnalyzeAppProps {
   feedbackUrl?: string
   appVersion?: string
   libraryAllowDelete?: boolean
+  libraryEncrypted?: boolean
   auditPolicy?: AuditOptions
 }
 
@@ -86,6 +87,7 @@ export function AnalyzeApp({
   feedbackUrl = 'https://github.com/winksen/Postscope-App/issues/new',
   appVersion,
   libraryAllowDelete = true,
+  libraryEncrypted = false,
   auditPolicy = EMPTY_POLICY,
 }: AnalyzeAppProps) {
   const { notify } = useToast()
@@ -611,6 +613,7 @@ export function AnalyzeApp({
             onLoad={(id) => void handleLoadFromLibrary(id)}
             onLibraryChange={() => void refreshSavedCollections()}
             allowDelete={libraryAllowDelete}
+          encrypted={libraryEncrypted}
           />
         )}
       </>
@@ -703,6 +706,7 @@ export function AnalyzeApp({
           onLoad={(id) => void handleLoadFromLibrary(id)}
           onLibraryChange={() => void refreshSavedCollections()}
           allowDelete={libraryAllowDelete}
+          encrypted={libraryEncrypted}
         />
       )}
     </>

@@ -307,6 +307,9 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `http.ts` | `HttpError`, `sendJson`, bounded `readJsonBody` (415/413/400), safe URL parsing |
 | `staticFiles.ts` | Traversal-safe path resolution, MIME map, ETag/304, immutable caching for `assets/`, in-memory gzip cache |
 | `libraryStore.ts` | Storage engine (below) |
+| `libraryCrypto.ts` | AES-256-GCM envelope (`v`, `alg`, `kid`, `iv`, `tag`, `data`), key parsing (64 hex or base64), key ids, previous keys, keyed hash. The record id is the AAD |
+| `libraryMaintenance.ts`, `libraryCli.ts` | `status` and `encrypt` (migration and rotation) for `DATA_DIR/library`, compiled to `dist-node/library.js` (`npm run library:status`, `npm run library:encrypt`) |
+| `auditLog.ts` | Append-only JSONL audit trail in `DATA_DIR/audit` (queued appends, monthly files, mode `0600`) |
 | `apiHandlers.ts` | Config, health, library handlers; generic 500s with request id |
 | `logger.ts` | Leveled text/JSON logs to stdout/stderr |
 | `loadEnv.ts`, `loggingConfig.ts`, `landingConfig.ts`, `externalLinksConfig.ts`, `appVersion.ts` | Environment loading and existing settings |
@@ -319,6 +322,8 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 - **De-duplication** by SHA-256 of the stored content; request count computed server-side (client value ignored).
 - **Limits**: `MAX_COLLECTION_MB`, `LIBRARY_MAX_TOTAL_MB` (507 when full), `LIBRARY_MAX_ITEMS` and `LIBRARY_RETENTION_DAYS` (pruning after each save and in the background).
 - Optional `transform` hook used for server-side redaction.
+- **Encryption at rest**: with `LIBRARY_ENCRYPTION_KEY[_FILE]` the whole record (name, metadata, rawJson) is sealed into one envelope per file; reads accept both envelopes and legacy plaintext records. The deduplication hash is `HMAC-SHA256(key, content)` while encryption is on. An unusable key makes saves fail with 500 (never plaintext); an encrypted record without a matching key, or one that fails authentication, is logged and skipped like a corrupt file. `libraryEncryptionStatus()` feeds the startup banner and `libraryEncrypted` in `/api/config`.
+- **Identity and audit**: `getProxyUser(req)` (`security.ts`) returns the sanitized `TRUSTED_USER_HEADER` value only when `TRUST_PROXY=true`; saves store it as `savedBy` and `apiHandlers.ts` records `save`, `open` and `delete` through `recordAudit` with the client IP (trusted hops) and request id.
 
 ## 5. Background processes
 
@@ -345,6 +350,10 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `LIBRARY_MAX_ITEMS`, `LIBRARY_RETENTION_DAYS`, `LIBRARY_MAX_TOTAL_MB` | `0` (unlimited) | Retention and quotas |
 | `LIBRARY_ALLOW_DELETE` | `true` | Allow removal |
 | `LIBRARY_REDACT_SECRETS` | `false` | Server-side redaction before storing |
+| `LIBRARY_ENCRYPTION_KEY`, `LIBRARY_ENCRYPTION_KEY_FILE` | unset | 32 byte key (64 hex or base64) enabling encryption at rest; the file wins over the variable |
+| `LIBRARY_ENCRYPTION_KEY_PREVIOUS`, `LIBRARY_ENCRYPTION_KEY_PREVIOUS_FILE` | unset | Retired keys that may still decrypt records during rotation |
+| `LIBRARY_AUDIT_LOG` | `true` | Audit log of library saves, opens and removals |
+| `TRUSTED_USER_HEADER` | unset | Proxy header carrying the signed-in user (needs `TRUST_PROXY=true`) |
 | `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | unset | Enable Basic auth (both required) |
 | `RATE_LIMIT_WRITES_PER_MIN`, `RATE_LIMIT_READS_PER_MIN`, `RATE_LIMIT_AUTH_FAILURES` | `30`, `600`, `20` per 15 min | Abuse limits (0 disables read/write limits) |
 | `TRUST_PROXY`, `ALLOWED_ORIGINS`, `ENABLE_HSTS` | `false`, empty, `false` | Reverse proxy / TLS |
@@ -383,6 +392,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `redactionAndReports.test.ts` | Sanitized copies, idempotence, SARIF/JSON/Markdown validity, no secret leakage |
 | `security.test.ts` | Client IP resolution (hops, spoofed headers, IPv4-mapped, ports), failure tracker eviction and global back-off |
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
+| `libraryEncryption.test.ts` | Key parsing and resolution, envelope round trip and tamper rejection, encrypted store behavior, keyed dedupe hash, migration and rotation, proxy user, audit entries |
 | `server.test.ts` | Traversal, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
 | `libraryStore.test.ts` | Atomic saves, dedupe, cache reconciliation, corrupt files, pruning, quota, concurrency, name sanitization, security helpers |
 | `inputs.test.ts` | Glob compilation, folder search (skips node_modules and .git), duplicates, sibling environments |
@@ -446,3 +456,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.37 | `.postscope.json` project config, occurrence fingerprints, baselines (`--baseline`, `--write-baseline`), config and inline suppressions with mandatory reason and expiry (33 rules), Suppressed view |
 | V0.1.38 | `jsonPositions.ts`, evidence pointers and SARIF line/column regions; JSON report v2 with schema; self-contained HTML report (UI export and CLI `--format html`) |
 | V0.1.39 | Compiled server and CLI (`npm run build:node`, `bin.postscope`), folder/glob input, `--auto-env`, `--format junit`, GitHub composite action, `docs/CI.md`, Docker runtime image without node_modules; server no longer depends on Vite at run time |
+| V0.1.40 | Library encryption at rest (AES-256-GCM, keyed dedupe hash, migration and rotation tool `library.js`), append-only audit log, proxy user identity (`TRUSTED_USER_HEADER`, `savedBy`), `libraryEncrypted` in config |

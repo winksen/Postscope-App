@@ -41,6 +41,7 @@ export default function App() {
       feedbackUrl={config.feedbackUrl}
       appVersion={config.appVersion}
       libraryAllowDelete={config.libraryAllowDelete}
+      libraryEncrypted={config.libraryEncrypted}
       auditPolicy={config.auditPolicy}
     />
   )

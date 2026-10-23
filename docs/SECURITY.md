@@ -34,6 +34,8 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 | Torn writes / corruption on crash | Library storage | Atomic write (temp file + rename), serialized mutations, orphaned temp-file cleanup, corrupt files skipped |
 | Credentials visible on shared screens | UI | Header, query, and body values that look like credentials are masked until explicitly revealed |
 | Leaking secrets when sharing a collection or report | UI / CLI | "Sanitized copy" export and `--sanitize` replace credentials with `{{variables}}`; reports contain masked evidence only |
+| Stolen data volume, backup or disk image exposes stored collections | Library | Optional AES-256-GCM encryption at rest (`LIBRARY_ENCRYPTION_KEY[_FILE]`) with a random IV per record and the record id as authenticated data; tampered or swapped records are rejected; saving is refused (never plaintext) when the key is invalid; key rotation with `LIBRARY_ENCRYPTION_KEY_PREVIOUS` and `library.js encrypt` |
+| No record of who read or changed the shared library | Library | Append-only audit log (`DATA_DIR/audit/library-YYYY-MM.jsonl`) of saves, opens and removals with timestamp, collection id and name, user, IP and request id, never collection content; user identity comes from the SSO proxy through `TRUSTED_USER_HEADER`, only when `TRUST_PROXY=true` |
 | Long-lived secrets in a team library | Library | Optional server-side redaction (`LIBRARY_REDACT_SECRETS=true`), retention (`LIBRARY_RETENTION_DAYS`), and caps (`LIBRARY_MAX_ITEMS`, `LIBRARY_MAX_TOTAL_MB`) |
 | Running as root in containers | Docker | Image runs as the unprivileged `node` user; compose drops all capabilities and sets `no-new-privileges` |
 | Large dependency surface in the runtime image | Docker | The server is compiled to one JavaScript file with no third-party code at run time; the image ships no `node_modules`, no build tools and no TypeScript sources |
@@ -43,7 +45,8 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 - Suppressions are a governance tool, not a detector: they hide findings only for the occurrences they name, need a written reason, can expire, and stay visible in every report. Review `.postscope.json` and baseline changes in code review like any other security policy change. Baseline files contain rule ids, request ids and evidence locations but never credential values.
 - Environment and globals files are analyzed in the browser or CLI only. They are never sent to the team library, so a library record cannot leak them.
 - PostScope does not verify whether a detected secret is still valid. Treat every finding as exposed and rotate it.
-- Basic auth is a gate, not identity management. Use an SSO-aware reverse proxy if you need per-user audit trails.
+- Basic auth is a gate, not identity management. Use an SSO-aware reverse proxy (see the deployment guide) if you need per-user audit trails.
+- Encryption at rest protects the volume and backups, not a running server: anyone who can call the API or read the process environment can still read collections. The key lives where the server can read it, so keep it in a secret store and out of images, compose files committed to git and shell history.
 - Rule-based detection has false positives and negatives. Use the rule settings to tune it, not as proof of absence.
 
 ## 3. Detection coverage

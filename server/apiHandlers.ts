@@ -4,6 +4,7 @@ import {
   checkLibraryWritable,
   deleteCollection,
   getCollection,
+  libraryEncryptionStatus,
   isValidCollectionId,
   listCollections,
   saveCollection,
@@ -13,7 +14,8 @@ import { getExternalLinksConfig } from './externalLinksConfig'
 import { isPublicLandingEnabled } from './landingConfig'
 import { getLoggingMode, isLibraryVisible, isUploadAllowed } from './loggingConfig'
 import { HttpError, readJsonBody, sendJson } from './http'
-import { checkRateLimit, isSameOriginRequest } from './security'
+import { checkRateLimit, getClientIp, getProxyUser, isSameOriginRequest } from './security'
+import { recordAudit } from './auditLog'
 import { getAuditPolicy, getMaxCollectionBytes, getScoreWeights, isHealthVersionExposed, isLibraryDeleteAllowed, isLibraryRedactionEnabled } from './runtimeConfig'
 import { errorFields, log } from './logger'
 import { redactCollection } from '../src/lib/redaction'
@@ -54,6 +56,7 @@ export async function handleConfigApi(req: IncomingMessage, res: ServerResponse,
     maxCollectionBytes: getMaxCollectionBytes(),
     libraryAllowDelete: isLibraryDeleteAllowed(),
     libraryRedactSecrets: isLibraryRedactionEnabled(),
+    libraryEncrypted: libraryEncryptionStatus().enabled,
     auditPolicy: getAuditPolicy(),
     scoreWeights: getScoreWeights(),
   })
@@ -132,6 +135,7 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
         sendJson(res, 404, { error: 'Collection not found' })
         return true
       }
+      void recordAudit({ action: 'open', id: collection.id, name: collection.name, user: getProxyUser(req), ip: getClientIp(req), requestId: requestIdOf(res) })
       sendJson(res, 200, collection)
       return true
     }
@@ -149,8 +153,20 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
         return true
       }
 
+      const user = getProxyUser(req)
       const meta = await saveCollection(body.rawJson, typeof body.name === 'string' ? body.name : '', undefined, {
         transform: isLibraryRedactionEnabled() ? redactCollection : undefined,
+        savedBy: user,
+      })
+      void recordAudit({
+        action: 'save',
+        id: meta.id,
+        name: meta.name,
+        user,
+        ip: getClientIp(req),
+        requestId: requestIdOf(res),
+        redactedCount: meta.redactedCount,
+        deduplicated: meta.deduplicated,
       })
       sendJson(res, meta.deduplicated ? 200 : 201, meta)
       return true
@@ -165,7 +181,9 @@ export async function handleLibraryApi(req: IncomingMessage, res: ServerResponse
         sendJson(res, 403, { error: 'Collection removal is disabled by the operator.' })
         return true
       }
+      const name = (await listCollections()).find((item) => item.id.toLowerCase() === id!.toLowerCase())?.name
       const removed = await deleteCollection(id)
+      if (removed) void recordAudit({ action: 'delete', id: id.toLowerCase(), name, user: getProxyUser(req), ip: getClientIp(req), requestId: requestIdOf(res) })
       sendJson(res, removed ? 200 : 404, { ok: removed })
       return true
     }

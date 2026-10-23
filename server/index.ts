@@ -3,7 +3,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ensureAppEnv } from './loadEnv'
 import { createRequestHandler } from './requestPipeline'
-import { cleanupTempFiles, flushLibraryWrites, pruneLibrary } from './libraryStore'
+import { cleanupTempFiles, flushLibraryWrites, libraryEncryptionStatus, pruneLibrary } from './libraryStore'
+import { flushAuditLog } from './auditLog'
 import { rateLimiter, sweepAuthFailures } from './security'
 import { isUploadAllowed, getLoggingMode } from './loggingConfig'
 import {
@@ -13,6 +14,8 @@ import {
   getLibraryLimits,
   getMaxCollectionBytes,
   isHstsEnabled,
+  getTrustedUserHeader,
+  isLibraryAuditLogEnabled,
   isLibraryDeleteAllowed,
   isLibraryRedactionEnabled,
   isTrustProxyEnabled,
@@ -69,6 +72,7 @@ maintenanceTimer.unref()
 function logStartupSummary(): void {
   const limits = getLibraryLimits()
   const policy = getAuditPolicy()
+  const encryption = libraryEncryptionStatus()
   log.info(`PostScope ${getAppVersion()} running at http://${HOST ?? 'localhost'}:${PORT}`, {
     loggingMode: getLoggingMode(),
     basicAuth: getBasicAuthConfig() ? 'enabled' : 'disabled',
@@ -78,10 +82,19 @@ function logStartupSummary(): void {
     libraryRetentionDays: limits.retentionDays || 'forever',
     libraryDelete: isLibraryDeleteAllowed() ? 'allowed' : 'disabled',
     libraryRedaction: isLibraryRedactionEnabled() ? 'on' : 'off',
+    libraryEncryption: encryption.enabled ? (encryption.error ? 'misconfigured' : `aes-256-gcm (key ${encryption.keyId})`) : 'off',
+    libraryAuditLog: isUploadAllowed() && isLibraryAuditLogEnabled() ? 'on' : 'off',
+    trustedUserHeader: isTrustProxyEnabled() ? (getTrustedUserHeader() ?? 'none') : 'ignored (TRUST_PROXY is off)',
     trustProxy: isTrustProxyEnabled(),
     hsts: isHstsEnabled(),
     disabledRules: policy.disabledRules?.length ? policy.disabledRules.join(',') : 'none',
   })
+  if (encryption.error) {
+    log.error(`Library encryption is misconfigured, so saving collections is refused until it is fixed: ${encryption.error}`)
+  }
+  if (getTrustedUserHeader() && !isTrustProxyEnabled()) {
+    log.warn('TRUSTED_USER_HEADER is ignored because TRUST_PROXY is not enabled.')
+  }
   if (!getBasicAuthConfig() && getLoggingMode() !== 'off') {
     log.warn('Shared library is enabled without authentication. Set BASIC_AUTH_USER/BASIC_AUTH_PASSWORD or restrict network access.')
   }
@@ -116,6 +129,7 @@ async function shutdown(signal: string): Promise<void> {
   server.closeIdleConnections?.()
   try {
     await flushLibraryWrites()
+    await flushAuditLog()
   } catch (error) {
     log.warn('Pending library writes failed during shutdown', errorFields(error))
   }

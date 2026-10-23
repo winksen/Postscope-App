@@ -6,6 +6,7 @@ import {
   getAllowedOrigins,
   getBasicAuthConfig,
   getRateLimits,
+  getTrustedUserHeader,
   getTrustProxyHops,
   isHstsEnabled,
   isTrustProxyEnabled,
@@ -132,6 +133,28 @@ export function checkRateLimit(req: IncomingMessage, bucket: RateBucket): number
   const ip = getClientIp(req)
   if (bucket === 'write') return rateLimiter.hit(`w:${ip}`, limits.writesPerMinute, 60_000)
   return rateLimiter.hit(`r:${ip}`, limits.readsPerMinute, 60_000)
+}
+
+/**
+ * The signed-in user as reported by a trusted reverse proxy (TRUSTED_USER_HEADER, for example oauth2-proxy's
+ * `X-Forwarded-User`). It is only believed when TRUST_PROXY=true, because otherwise any client could send it.
+ * Control characters are stripped and the value is capped, so it is safe to store and to write to logs.
+ */
+export function getProxyUser(req: IncomingMessage): string | null {
+  if (!isTrustProxyEnabled()) return null
+  const header = getTrustedUserHeader()
+  if (!header) return null
+  const raw = req.headers[header]
+  const value = (Array.isArray(raw) ? raw[0] : raw) ?? ''
+  const cleaned = [...value]
+    .filter((char) => {
+      const code = char.codePointAt(0) ?? 0
+      return code > 0x1f && !(code >= 0x7f && code <= 0x9f) && !(code >= 0x200b && code <= 0x200f) && !(code >= 0x202a && code <= 0x202e) && !(code >= 0x2066 && code <= 0x2069)
+    })
+    .join('')
+    .trim()
+    .slice(0, 200)
+  return cleaned || null
 }
 
 const AUTH_WINDOW_MS = 15 * 60_000

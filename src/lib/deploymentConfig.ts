@@ -21,6 +21,8 @@ export interface AppConfig {
   maxCollectionBytes: number
   libraryAllowDelete: boolean
   libraryRedactSecrets: boolean
+  /** The server encrypts stored collections at rest (LIBRARY_ENCRYPTION_KEY). */
+  libraryEncrypted: boolean
   /** Team audit policy defaults (disabled rules, severity overrides). */
   auditPolicy: AuditOptions
   /** Points per finding severity used by the score (scoring model v2). */
@@ -37,6 +39,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   maxCollectionBytes: DEFAULT_MAX_COLLECTION_BYTES,
   libraryAllowDelete: true,
   libraryRedactSecrets: false,
+  libraryEncrypted: false,
   auditPolicy: {},
   scoreWeights: DEFAULT_SCORE_WEIGHTS,
 }
@@ -78,6 +81,7 @@ export async function fetchAppConfig(): Promise<AppConfig> {
       maxCollectionBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : DEFAULT_MAX_COLLECTION_BYTES,
       libraryAllowDelete: body.libraryAllowDelete !== false,
       libraryRedactSecrets: body.libraryRedactSecrets === true,
+      libraryEncrypted: body.libraryEncrypted === true,
       auditPolicy: sanitizeAuditOptions(body.auditPolicy),
       scoreWeights: sanitizeScoreWeights(body.scoreWeights),
     }

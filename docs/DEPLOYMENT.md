@@ -40,6 +40,11 @@ Set these variables on the container or host process:
 | `SHOW_FEEDBACK_LINK` | `true` | `true`, `false`, `yes`, `no`, `1`, `0`, `on`, `off` | Shows or hides the analyzer sidebar feedback link. Set to `false` for closed internal networks. |
 | `FEEDBACK_URL` | GitHub issue form | Absolute URL | External form opened by the analyzer sidebar feedback link. |
 | `SCORE_WEIGHTS` | `critical=20,warning=8,info=2` | Any subset of `critical=N,warning=N,info=N`, each 0 to 100 | Points deducted per finding severity in the score (scoring model v2). Sent to every browser through `/api/config`; the CLI uses `--weights`. Invalid entries are ignored with a warning. |
+| `LIBRARY_ENCRYPTION_KEY` | unset | 32 random bytes as 64 hex characters or base64 | Encrypts every stored collection with AES-256-GCM. See [Encrypting the library](#encrypting-the-library). |
+| `LIBRARY_ENCRYPTION_KEY_FILE` | unset | Path to a file holding the key | Same, but reads the key from a file such as a Docker or Kubernetes secret. Takes precedence over `LIBRARY_ENCRYPTION_KEY`. |
+| `LIBRARY_ENCRYPTION_KEY_PREVIOUS`, `LIBRARY_ENCRYPTION_KEY_PREVIOUS_FILE` | unset | Comma separated keys (file: one per line) | Older keys that may still decrypt records while you rotate. |
+| `LIBRARY_AUDIT_LOG` | `true` | `true`, `false` | Appends one JSON line per library save, open and removal to `DATA_DIR/audit/library-YYYY-MM.jsonl`. |
+| `TRUSTED_USER_HEADER` | unset | A header name such as `X-Forwarded-User` or `X-Auth-Request-Email` | Records the signed-in user set by your SSO proxy as `savedBy` and in the audit log. Honored only when `TRUST_PROXY=true`. |
 | `TRUST_PROXY` | `false` | `true`, `false` | Trust `X-Forwarded-For` / `X-Forwarded-Host` from a reverse proxy. Leave `false` when clients connect directly. |
 | `TRUST_PROXY_HOPS` | `1` | Integer 1 to 10 | Number of trusted proxies in front of PostScope (only with `TRUST_PROXY=true`). The client IP is the entry that many positions from the right of `X-Forwarded-For`; entries further left are client-controlled and ignored. Use `2` for a CDN plus a load balancer. |
 | `HEALTH_EXPOSE_VERSION` | `true` | `true`, `false` | When `false`, the unauthenticated `/api/health` endpoint omits `version`. `/api/config` is behind Basic auth when it is enabled. |
@@ -368,7 +373,64 @@ docker run --rm \
   tar xzf /backup/postscope-data.tgz -C /data
 ```
 
-Treat this backup as sensitive if users save real Postman collections. Collections may contain tokens, internal URLs, or credentials.
+Treat this backup as sensitive if users save real Postman collections. Collections may contain tokens, internal URLs, or credentials. With encryption on, backups of the volume hold ciphertext; keep the key in a different place than the backup.
+
+### Encrypting the library
+
+Set a key and every new collection is written as an AES-256-GCM envelope (`{ v, alg, kid, iv, tag, data }`) with a random IV per record. The record id is part of the authenticated data, so a record copied to another file name, or edited, is rejected and skipped instead of being shown. The deduplication hash becomes an HMAC under the key, so a listing cannot be used to test whether a known collection is stored.
+
+```bash
+# generate a key once and keep it in your secret store
+openssl rand -hex 32
+```
+
+Pass it as `LIBRARY_ENCRYPTION_KEY`, or mount it as a secret and point `LIBRARY_ENCRYPTION_KEY_FILE` at the file (preferred, the value then stays out of `docker inspect` and process listings):
+
+```bash
+docker run -d --name postscope -p 127.0.0.1:3010:3010 \
+  -e LOGGING_MODE=hybrid \
+  -e LIBRARY_ENCRYPTION_KEY_FILE=/run/secrets/postscope_key \
+  -v ./postscope_key:/run/secrets/postscope_key:ro \
+  -v postscope-data:/app/data \
+  postscope:<version>
+```
+
+| Situation | What happens |
+|---|---|
+| Key set, existing plaintext records | They stay readable. New saves are encrypted. Run the migration below to encrypt the old ones |
+| Key set but invalid (not 32 bytes) | The server logs an error and refuses new saves; it never falls back to plaintext. Reads of plaintext records keep working |
+| Key removed after records were encrypted | Encrypted records are skipped (and logged once) until the key is back |
+| A record was modified | It fails authentication and is skipped |
+
+Migrate existing records (run it while the server is stopped, or restart the server afterwards):
+
+```bash
+docker exec postscope node dist-node/library.js status
+docker exec postscope node dist-node/library.js encrypt --dry-run
+docker exec postscope node dist-node/library.js encrypt
+# from a clone: npm run library:status, npm run library:encrypt
+```
+
+Each record is written to a temporary file, decrypted again and compared before it replaces the original, so an interrupted run never loses a collection.
+
+**Rotating the key**
+
+1. Generate a new key.
+2. Set `LIBRARY_ENCRYPTION_KEY` to the new key and `LIBRARY_ENCRYPTION_KEY_PREVIOUS` to the old one, then restart. New saves use the new key; old records still open.
+3. Run `library.js encrypt`. It rewrites every record sealed with the old key.
+4. Run `library.js status`; when all records show the current key, remove `LIBRARY_ENCRYPTION_KEY_PREVIOUS` and destroy the old key.
+
+Losing the key means losing the encrypted records. Back the key up separately from the data volume.
+
+### Audit log
+
+With the library enabled, every save, open and removal is appended to `DATA_DIR/audit/library-YYYY-MM.jsonl` (one file per month, mode `0600`):
+
+```json
+{"ts":"2026-10-15T08:30:00.000Z","action":"save","id":"...","name":"Payments API","user":"alice@example.com","ip":"203.0.113.9","requestId":"...","redactedCount":2}
+```
+
+Entries name the collection and the actor but never contain collection content. Listing the library is not logged. If a line cannot be written the request still succeeds and a warning is logged. Ship the folder to your log platform and keep it on storage the application cannot rewrite if you need tamper evidence. Disable with `LIBRARY_AUDIT_LOG=false`.
 
 ## Reverse Proxy And Internal Access
 
@@ -388,6 +450,27 @@ docker run -d \
 ```
 
 Proxy `https://postscope.internal.example.com` to `http://127.0.0.1:3010`.
+
+### Single sign-on with a reverse proxy
+
+Basic auth is one shared credential. To know who saved a collection, put an SSO-aware proxy in front, for example [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) with nginx, and let it pass the user through:
+
+```nginx
+location / {
+    auth_request /oauth2/auth;
+    error_page 401 = /oauth2/sign_in;
+
+    # Set from the proxy's own answer, so a client cannot supply it.
+    auth_request_set $auth_email $upstream_http_x_auth_request_email;
+    proxy_set_header X-Auth-Request-Email $auth_email;
+
+    proxy_set_header X-Forwarded-For $remote_addr;   # one trusted hop
+    proxy_set_header Host $host;
+    proxy_pass http://127.0.0.1:3010;
+}
+```
+
+Then configure PostScope: `TRUST_PROXY=true`, `TRUST_PROXY_HOPS=1`, `TRUSTED_USER_HEADER=X-Auth-Request-Email`. The address is stored as `savedBy`, shown in the team library dialog and written to the audit log. The header is ignored when `TRUST_PROXY` is off, and PostScope must not be reachable around the proxy, otherwise anyone could send the header themselves.
 
 When the proxy sits in front of PostScope, set `TRUST_PROXY=true` so rate limits and the failed sign-in lockout use the real client address, and set `TRUST_PROXY_HOPS` to the number of proxies you control (default `1`). Make sure the outermost trusted proxy appends the address it sees to `X-Forwarded-For` instead of passing a client-supplied value through unchanged. If PostScope is also reachable directly, bypassing the proxy, do not enable `TRUST_PROXY`.
 

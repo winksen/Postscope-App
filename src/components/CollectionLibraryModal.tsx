@@ -37,6 +37,8 @@ interface CollectionLibraryModalProps {
   onLibraryChange?: () => void
   /** Operators can disable removal (LIBRARY_ALLOW_DELETE=false) to keep an audit trail. */
   allowDelete?: boolean
+  /** The server stores collections encrypted at rest (LIBRARY_ENCRYPTION_KEY). */
+  encrypted?: boolean
 }
 
 export function CollectionLibraryModal({
@@ -46,6 +48,7 @@ export function CollectionLibraryModal({
   onLoad,
   onLibraryChange,
   allowDelete = true,
+  encrypted = false,
 }: CollectionLibraryModalProps) {
   const { notify } = useToast()
   const [collections, setCollections] = useState<SavedCollectionMeta[]>([])
@@ -121,7 +124,7 @@ export function CollectionLibraryModal({
             Team library
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Collections saved on this app. Visible to everyone on your team. Export a JSON file for an
+            Collections saved on this app. Visible to everyone on your team{encrypted ? ', stored encrypted on the server' : ''}. Export a JSON file for an
             offline copy.
           </p>
         </DialogHeader>
@@ -180,6 +183,14 @@ export function CollectionLibraryModal({
                               <Clock className="h-3 w-3" />
                               {formatSavedAt(item.savedAt)}
                             </span>
+                            {item.savedBy && (
+                              <>
+                                <span aria-hidden>·</span>
+                                <span className="truncate" title={`Saved by ${item.savedBy}`}>
+                                  by {item.savedBy}
+                                </span>
+                              </>
+                            )}
                           </p>
                         </div>
                         {isActive && (
