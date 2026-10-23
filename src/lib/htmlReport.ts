@@ -13,7 +13,10 @@ const MAX_AFFECTED = 50
 const MAX_EVIDENCE = 10
 
 export function escapeHtml(value: unknown): string {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] as string)
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] as string
+  )
 }
 
 const STYLE = `
@@ -55,7 +58,9 @@ function renderFinding(finding: Finding, requests: Map<string, ParsedRequest>, e
     ? `<p class="small"><b>Affected requests (${finding.affected.length})</b></p><ul>${finding.affected
         .slice(0, MAX_AFFECTED)
         .map((id) => `<li>${escapeHtml(label(requests, id))}</li>`)
-        .join('')}${finding.affected.length > MAX_AFFECTED ? `<li class="muted">and ${finding.affected.length - MAX_AFFECTED} more</li>` : ''}</ul>`
+        .join(
+          ''
+        )}${finding.affected.length > MAX_AFFECTED ? `<li class="muted">and ${finding.affected.length - MAX_AFFECTED} more</li>` : ''}</ul>`
     : ''
   const evidence = finding.evidence?.length
     ? `<p class="small"><b>Evidence (masked)</b></p><ul>${finding.evidence
@@ -64,7 +69,9 @@ function renderFinding(finding: Finding, requests: Map<string, ParsedRequest>, e
           const where = entry.requestId ? `${escapeHtml(label(requests, entry.requestId))}: ` : ''
           return `<li>${where}${escapeHtml(entry.location)}${entry.preview ? ` <code>${escapeHtml(entry.preview)}</code>` : ''}${entry.pointer ? ` <span class="muted small">${escapeHtml(entry.pointer)}</span>` : ''}</li>`
         })
-        .join('')}${finding.evidence.length > MAX_EVIDENCE ? `<li class="muted">and ${finding.evidence.length - MAX_EVIDENCE} more</li>` : ''}</ul>`
+        .join(
+          ''
+        )}${finding.evidence.length > MAX_EVIDENCE ? `<li class="muted">and ${finding.evidence.length - MAX_EVIDENCE} more</li>` : ''}</ul>`
     : ''
   return `<article class="finding ${escapeHtml(finding.severity)}">
 <h3><span class="badge ${escapeHtml(finding.severity)}">${escapeHtml(finding.severity)}</span>${escapeHtml(finding.title)}</h3>
@@ -93,10 +100,14 @@ ${counts.map(({ severity, count }) => `<div class="card"><span class="muted smal
 <p class="muted">${escapeHtml(ctx.score.summary)}</p>`)
 
   if (ctx.parsed.environments?.length) {
-    sections.push(`<p class="small"><b>Environments:</b> ${ctx.parsed.environments.map((environment) => `${escapeHtml(environment.name)} (${escapeHtml(environment.kind)})`).join(', ')}</p>`)
+    sections.push(
+      `<p class="small"><b>Environments:</b> ${ctx.parsed.environments.map((environment) => `${escapeHtml(environment.name)} (${escapeHtml(environment.kind)})`).join(', ')}</p>`
+    )
   }
   if (ctx.parsed.parseWarnings?.length) {
-    sections.push(`<h2>Parse warnings</h2><ul>${ctx.parsed.parseWarnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`)
+    sections.push(
+      `<h2>Parse warnings</h2><ul>${ctx.parsed.parseWarnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`
+    )
   }
 
   if (!ctx.findings.length) sections.push('<p>No findings.</p>')
@@ -131,7 +142,9 @@ ${counts.map(({ severity, count }) => `<div class="card"><span class="muted smal
 export function renderHtmlReports(contexts: ReportContext[]): string {
   const [first] = contexts
   const title = contexts.length === 1 ? `PostScope report: ${first.parsed.name}` : `PostScope report: ${contexts.length} collections`
-  const body = contexts.map((ctx, index) => `${index > 0 ? '<hr>' : ''}${renderCollection(ctx, contexts.length === 1 ? 'h1' : 'h2')}`).join('\n')
+  const body = contexts
+    .map((ctx, index) => `${index > 0 ? '<hr>' : ''}${renderCollection(ctx, contexts.length === 1 ? 'h1' : 'h2')}`)
+    .join('\n')
   return `<!doctype html>
 <html lang="en">
 <head>

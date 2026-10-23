@@ -88,21 +88,21 @@ export default {
           '0%, 100%': { boxShadow: '0 0 20px hsl(var(--primary) / 0.1)' },
           '50%': { boxShadow: '0 0 40px hsl(var(--primary) / 0.2)' },
         },
-        'shimmer': {
+        shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
-        'float': {
+        float: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' },
         },
-        'blob': {
+        blob: {
           '0%': { transform: 'translate(0px, 0px) scale(1)' },
           '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
           '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
           '100%': { transform: 'translate(0px, 0px) scale(1)' },
         },
-        'march': {
+        march: {
           '0%': { strokeDashoffset: '0' },
           '100%': { strokeDashoffset: '24' },
         },
@@ -127,10 +127,10 @@ export default {
         'slide-in-right': 'slide-in-right 0.4s ease-out forwards',
         'slide-in-left': 'slide-in-left 0.4s ease-out forwards',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
-        'shimmer': 'shimmer 2s linear infinite',
-        'float': 'float 3s ease-in-out infinite',
-        'blob': 'blob 7s infinite',
-        'march': 'march 1s linear infinite',
+        shimmer: 'shimmer 2s linear infinite',
+        float: 'float 3s ease-in-out infinite',
+        blob: 'blob 7s infinite',
+        march: 'march 1s linear infinite',
         'count-up': 'count-up 0.3s ease-out forwards',
         'gauge-fill': 'gauge-fill 1s ease-out forwards',
         'spin-slow': 'spin-slow 20s linear infinite',

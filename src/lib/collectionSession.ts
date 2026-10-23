@@ -13,7 +13,12 @@ export interface CollectionSession {
   activeEnvironment?: number
 }
 
-export function saveCollectionSession(rawJson: string, collectionName: string, environments: readonly string[] = [], activeEnvironment?: number): boolean {
+export function saveCollectionSession(
+  rawJson: string,
+  collectionName: string,
+  environments: readonly string[] = [],
+  activeEnvironment?: number
+): boolean {
   if (rawJson.length + environments.reduce((total, text) => total + text.length, 0) > MAX_BYTES) return false
   const payload: CollectionSession = {
     rawJson,
@@ -30,8 +35,14 @@ export function loadCollectionSession(): CollectionSession | null {
   try {
     const session = JSON.parse(raw) as CollectionSession
     if (!session || typeof session.rawJson !== 'string' || !session.rawJson) return null
-    const environments = Array.isArray(session.environments) ? session.environments.filter((text): text is string => typeof text === 'string') : []
-    return { ...session, environments, activeEnvironment: Number.isInteger(session.activeEnvironment) ? session.activeEnvironment : undefined }
+    const environments = Array.isArray(session.environments)
+      ? session.environments.filter((text): text is string => typeof text === 'string')
+      : []
+    return {
+      ...session,
+      environments,
+      activeEnvironment: Number.isInteger(session.activeEnvironment) ? session.activeEnvironment : undefined,
+    }
   } catch {
     removeStorage(STORAGE_KEY, 'session')
     return null

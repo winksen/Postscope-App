@@ -1,22 +1,11 @@
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  FileCode,
-  Flask,
-  ShieldCheck,
-  Lightning,
-} from '@phosphor-icons/react'
+import { ArrowRight, FileCode, Flask, ShieldCheck, Lightning } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  FeatureCard,
-  MarketingBackground,
-  MarketingCtaButton,
-  MarketingHeader,
-} from '@/components/marketing/marketing-shell'
+import { FeatureCard, MarketingBackground, MarketingCtaButton, MarketingHeader } from '@/components/marketing/marketing-shell'
 import { SAMPLE_COLLECTIONS, type SampleCollectionId } from '@/lib/sampleCollections'
 
 interface SampleDropZoneProps {
@@ -25,11 +14,7 @@ interface SampleDropZoneProps {
   analyzePath?: string
 }
 
-export function SampleDropZone({
-  onSelectSample,
-  loading = false,
-  analyzePath = '/analyze',
-}: SampleDropZoneProps) {
+export function SampleDropZone({ onSelectSample, loading = false, analyzePath = '/analyze' }: SampleDropZoneProps) {
   const [loadingId, setLoadingId] = useState<SampleCollectionId | null>(null)
 
   const handleSelect = useCallback(
@@ -87,9 +72,7 @@ export function SampleDropZone({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold">{sample.label}</p>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                          {sample.description}
-                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{sample.description}</p>
                       </div>
                     </div>
                     {isLoading ? (
@@ -130,18 +113,8 @@ export function SampleDropZone({
             description="Samples never touch your saved library or session."
             delay={200}
           />
-          <FeatureCard
-            icon={Lightning}
-            title="Instant analysis"
-            description="Results in milliseconds, no waiting."
-            delay={400}
-          />
-          <FeatureCard
-            icon={Flask}
-            title="Realistic scenarios"
-            description="From clean APIs to messy enterprise exports."
-            delay={600}
-          />
+          <FeatureCard icon={Lightning} title="Instant analysis" description="Results in milliseconds, no waiting." delay={400} />
+          <FeatureCard icon={Flask} title="Realistic scenarios" description="From clean APIs to messy enterprise exports." delay={600} />
         </div>
       </div>
     </div>

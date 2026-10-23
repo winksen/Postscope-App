@@ -34,19 +34,28 @@ test('scrubbing replaces only the values, keeps the prose and handles very large
 
 test('parser reads descriptions, scoped variables, path variables and saved request bodies', () => {
   const parsed = parseCollection(scopedSecretsCollection())
-  assert.deepEqual(parsed.descriptions?.map((entry) => [entry.kind, entry.owner]), [
-    ['collection', 'collection'],
-    ['folder', 'Admin'],
-    ['request', 'Admin/Get user'],
-    ['request', 'Admin/Get user'],
-  ])
-  assert.deepEqual(parsed.scopedVariables?.map((entry) => [entry.scope, entry.owner, entry.key]), [
-    ['folder', 'Admin', 'clientSecret'],
-    ['folder', 'Admin', 'region'],
-    ['request', 'Admin/Get user', 'apiKey'],
-  ])
+  assert.deepEqual(
+    parsed.descriptions?.map((entry) => [entry.kind, entry.owner]),
+    [
+      ['collection', 'collection'],
+      ['folder', 'Admin'],
+      ['request', 'Admin/Get user'],
+      ['request', 'Admin/Get user'],
+    ]
+  )
+  assert.deepEqual(
+    parsed.scopedVariables?.map((entry) => [entry.scope, entry.owner, entry.key]),
+    [
+      ['folder', 'Admin', 'clientSecret'],
+      ['folder', 'Admin', 'region'],
+      ['request', 'Admin/Get user', 'apiKey'],
+    ]
+  )
   const request = parsed.requests[0]
-  assert.deepEqual(request.pathVariables?.map((entry) => entry.key), ['token', 'id'])
+  assert.deepEqual(
+    request.pathVariables?.map((entry) => entry.key),
+    ['token', 'id']
+  )
   assert.match(request.savedResponses?.[0].requestBody ?? '', /"password"/)
   assert.deepEqual(request.savedResponses?.[0].requestQuery, [{ key: 'api_key', value: FAKE.apiKey }])
 })
@@ -54,8 +63,14 @@ test('parser reads descriptions, scoped variables, path variables and saved requ
 test('auditor flags secrets in descriptions, scoped variables, path variables and saved request bodies', () => {
   const findings = runAudit(parseCollection(scopedSecretsCollection()))
   assert.deepEqual(evidence(findings, 'KNOWN_SECRET_PATTERN'), ['description (collection) (GitHub token)'])
-  assert.deepEqual(evidence(findings, 'HARDCODED_SECRET'), ['description (folder "Admin"): password', 'description (folder "Admin"): Authorization'])
-  assert.deepEqual(evidence(findings, 'SECRET_IN_COLLECTION_VARIABLE'), ['folder variable clientSecret (folder "Admin")', 'request variable apiKey'])
+  assert.deepEqual(evidence(findings, 'HARDCODED_SECRET'), [
+    'description (folder "Admin"): password',
+    'description (folder "Admin"): Authorization',
+  ])
+  assert.deepEqual(evidence(findings, 'SECRET_IN_COLLECTION_VARIABLE'), [
+    'folder variable clientSecret (folder "Admin")',
+    'request variable apiKey',
+  ])
   assert.ok(evidence(findings, 'SECRET_IN_QUERY').includes('path variable token'))
   const saved = evidence(findings, 'SECRET_IN_SAVED_RESPONSE')
   assert.ok(saved.includes('saved response "Example" original request body password'))
@@ -71,7 +86,10 @@ test('sanitized copy removes documentation, scoped variable and path variable se
   for (const secret of Object.values(FAKE)) assert.ok(!serialized.includes(secret), `leaked ${secret.slice(0, 6)}`)
   const folder = (json as { item: Array<{ description: string; variable: Array<{ key: string; value: string }> }> }).item[0]
   assert.match(folder.description, /password: \{\{REDACTED\}\}/)
-  assert.deepEqual(folder.variable, [{ key: 'clientSecret', value: '' }, { key: 'region', value: 'eu-west-1' }])
+  assert.deepEqual(folder.variable, [
+    { key: 'clientSecret', value: '' },
+    { key: 'region', value: 'eu-west-1' },
+  ])
   const remaining = runAudit(parseCollection(json)).filter((finding) => finding.category === 'secrets')
   assert.deepEqual(remaining, [])
 })
@@ -82,7 +100,9 @@ test('repair clears scoped variables and scrubs request documentation', () => {
   const findings = runAudit(parsed)
   const plan = createRepairPlan(original, parsed, findings)
   const { fixedJson } = applyRepairPlan(original, plan.defaultSelectedFixIds, plan)
-  const folder = (fixedJson as { item: Array<{ variable: Array<{ key: string; value: string }>; item: Array<{ variable: Array<{ value: string }> }> }> }).item[0]
+  const folder = (
+    fixedJson as { item: Array<{ variable: Array<{ key: string; value: string }>; item: Array<{ variable: Array<{ value: string }> }> }> }
+  ).item[0]
   assert.equal(folder.variable[0].value, '')
   assert.equal(folder.variable[1].value, 'eu-west-1')
   assert.equal(folder.item[0].variable[0].value, '')

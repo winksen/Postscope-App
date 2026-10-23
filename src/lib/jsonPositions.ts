@@ -110,7 +110,14 @@ export function locatePointers(text: string, wanted: ReadonlySet<string>): Map<s
       const skip = !!frame?.skip
       const pointer = skip ? '' : valuePointer()
       if (!skip) record(pointer, i)
-      frames.push({ kind: char === 123 ? 'object' : 'array', prefix: pointer, index: 0, key: '', expectKey: char === 123, skip: skip || !ancestors.has(pointer) })
+      frames.push({
+        kind: char === 123 ? 'object' : 'array',
+        prefix: pointer,
+        index: 0,
+        key: '',
+        expectKey: char === 123,
+        skip: skip || !ancestors.has(pointer),
+      })
       i += 1
       continue
     }

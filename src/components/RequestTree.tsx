@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  CaretRight,
-  Folder,
-  FolderOpen,
-  Lock,
-  LockOpen,
-} from '@phosphor-icons/react'
+import { CaretRight, Folder, FolderOpen, Lock, LockOpen } from '@phosphor-icons/react'
 import { MethodBadge } from './MethodBadge'
 import { RequestAnalysisModal } from './RequestAnalysisModal'
 import type { ParsedCollection, ParsedRequest } from '../lib/parser'
@@ -21,13 +15,7 @@ interface RequestTreeProps {
   search?: string
 }
 
-function RequestRow({
-  request,
-  onSelect,
-}: {
-  request: ParsedRequest
-  onSelect: (r: ParsedRequest) => void
-}) {
+function RequestRow({ request, onSelect }: { request: ParsedRequest; onSelect: (r: ParsedRequest) => void }) {
   const hasAuth = request.auth !== 'noauth'
   return (
     <Button
@@ -147,12 +135,7 @@ function FolderNode({
         <span className="font-medium">{node.name}</span>
         <span className="text-xs text-muted-foreground">({total})</span>
       </button>
-      <div
-        className={cn(
-          'overflow-hidden transition-all duration-300',
-          open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
-        )}
-      >
+      <div className={cn('overflow-hidden transition-all duration-300', open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0')}>
         <div className="ml-1 mt-1 space-y-0.5 pl-2">
           {node.requests.map((req) => (
             <RequestRow key={req.id} request={req} onSelect={onSelectRequest} />
@@ -213,11 +196,7 @@ export function RequestTree({ parsed, findings, search = '' }: RequestTreeProps)
           </div>
         )}
       </ScrollArea>
-      <RequestAnalysisModal
-        request={selected}
-        findings={modalFindings}
-        onClose={() => setSelected(null)}
-      />
+      <RequestAnalysisModal request={selected} findings={modalFindings} onClose={() => setSelected(null)} />
     </>
   )
 }

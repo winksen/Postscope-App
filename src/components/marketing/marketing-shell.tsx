@@ -8,14 +8,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 export const GITHUB_REPO_URL = 'https://github.com/winksen/Postscope-App'
 
 export function AnimatedBlob({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'absolute rounded-full blur-3xl opacity-30 dark:opacity-20',
-        className
-      )}
-    />
-  )
+  return <div className={cn('absolute rounded-full blur-3xl opacity-30 dark:opacity-20', className)} />
 }
 
 export function MarketingBackground() {

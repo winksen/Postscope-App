@@ -1,6 +1,14 @@
 import type { Finding } from './auditor'
 import type { ParsedCollection } from './parser'
-import { DEFAULT_SCORE_WEIGHTS, findingAffectedCount, findingPenalty, sanitizeScoreWeights, type FindingCategory, type ScoreWeights, type Severity } from './severity'
+import {
+  DEFAULT_SCORE_WEIGHTS,
+  findingAffectedCount,
+  findingPenalty,
+  sanitizeScoreWeights,
+  type FindingCategory,
+  type ScoreWeights,
+  type Severity,
+} from './severity'
 
 /** Version of the scoring formula, written to reports so scores from different releases are not compared blindly. */
 export const SCORE_MODEL = 2
@@ -21,22 +29,22 @@ export interface ScorePenalty {
 
 export interface ScoreBreakdown {
   /** Headline score: `round(0.85 * security + 0.15 * hygiene)`. */
-  total: number;
+  total: number
   /** Secrets, variables and auth findings only. */
-  security: number;
+  security: number
   /** Maintainability findings only. */
-  hygiene: number;
+  hygiene: number
   categories: {
-    secrets: number;
-    variables: number;
-    auth: number;
-    hygiene: number;
-  };
-  grade: 'A' | 'B' | 'C' | 'D' | 'F';
-  summary: string;
-  scoreModel: typeof SCORE_MODEL;
+    secrets: number
+    variables: number
+    auth: number
+    hygiene: number
+  }
+  grade: 'A' | 'B' | 'C' | 'D' | 'F'
+  summary: string
+  scoreModel: typeof SCORE_MODEL
   /** Every finding's contribution, largest first. */
-  penalties: ScorePenalty[];
+  penalties: ScorePenalty[]
 }
 
 let activeWeights: ScoreWeights = DEFAULT_SCORE_WEIGHTS

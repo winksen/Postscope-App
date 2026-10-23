@@ -3,7 +3,14 @@ import assert from 'node:assert/strict'
 import { parseCollection } from '../src/lib/parser'
 import { runAudit, type Finding } from '../src/lib/auditor'
 import { SCORE_MODEL, calculateScore, getActiveScoreWeights, setActiveScoreWeights } from '../src/lib/scorer'
-import { DEFAULT_SCORE_WEIGHTS, findingAffectedCount, findingPenalty, parseScoreWeights, penaltyScore, sanitizeScoreWeights } from '../src/lib/severity'
+import {
+  DEFAULT_SCORE_WEIGHTS,
+  findingAffectedCount,
+  findingPenalty,
+  parseScoreWeights,
+  penaltyScore,
+  sanitizeScoreWeights,
+} from '../src/lib/severity'
 import { requestHealthScore } from '../src/lib/requestFindings'
 import { FAKE, cleanCollection, kitchenSinkCollection } from './fixtures'
 
@@ -95,7 +102,11 @@ test('weights override the defaults and the score stays within 0 to 100', () => 
   assert.equal(light.security, 93)
   assert.equal(calculateScore(empty, findings, { critical: 0, warning: 0, info: 0 }).total, 100)
   for (const weights of [{ critical: 100, warning: 100, info: 100 }, DEFAULT_SCORE_WEIGHTS, { critical: 0, warning: 0, info: 0 }]) {
-    const { total, security, hygiene } = calculateScore(empty, Array.from({ length: 30 }, (_, i) => finding('critical', 'secrets', 9, { id: String(i) })), weights)
+    const { total, security, hygiene } = calculateScore(
+      empty,
+      Array.from({ length: 30 }, (_, i) => finding('critical', 'secrets', 9, { id: String(i) })),
+      weights
+    )
     for (const value of [total, security, hygiene]) assert.ok(value >= 0 && value <= 100)
   }
 })
@@ -135,7 +146,10 @@ test('the breakdown lists every finding with its points, largest first', () => {
   const findings = runAudit(parsed)
   const score = calculateScore(parsed, findings)
   assert.equal(score.penalties.length, findings.length)
-  assert.deepEqual(score.penalties.map((penalty) => penalty.penalty), [...score.penalties.map((penalty) => penalty.penalty)].sort((a, b) => b - a))
+  assert.deepEqual(
+    score.penalties.map((penalty) => penalty.penalty),
+    [...score.penalties.map((penalty) => penalty.penalty)].sort((a, b) => b - a)
+  )
   const clean = parseCollection(cleanCollection())
   assert.equal(calculateScore(clean, runAudit(clean)).total, 100)
 })

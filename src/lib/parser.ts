@@ -34,55 +34,55 @@ export interface ParsedSavedResponse {
 }
 
 export interface ParsedRequest {
-  id: string;
-  name: string;
-  method: string;
-  protocol: RequestProtocol;
-  url: string;
+  id: string
+  name: string
+  method: string
+  protocol: RequestProtocol
+  url: string
   /** Index path through nested Postman item arrays back to the raw collection item. */
-  itemPath: number[];
+  itemPath: number[]
   /** JSON pointer of the raw item (`/item/0/item/3`), for locating evidence in the exported file. */
-  pointer: string;
-  folderPath: string[];
+  pointer: string
+  folderPath: string[]
   /** Effective auth type, including auth inherited from folders or the collection. */
-  auth: string;
+  auth: string
   /** Present when the effective Postman auth type is basic (username/password fields). */
-  basicAuth?: { username: string; password: string };
-  headers: Array<{ key: string; value: string }>;
+  basicAuth?: { username: string; password: string }
+  headers: Array<{ key: string; value: string }>
   /** Headers switched off in Postman. They are not sent but still ship in the export. */
-  disabledHeaders?: KeyValue[];
-  bodyRaw?: string;
+  disabledHeaders?: KeyValue[]
+  bodyRaw?: string
   /** True when `bodyRaw` was cut to the first 64 KB for display (see `compactResult.ts`); findings used the full text. */
-  bodyTruncated?: boolean;
+  bodyTruncated?: boolean
   /** Length of the full body in characters, set together with `bodyTruncated`. */
-  bodySize?: number;
-  hasDescription: boolean;
-  authSource?: AuthSource;
+  bodySize?: number
+  hasDescription: boolean
+  authSource?: AuthSource
   /** Item path of the request or folder that owns the effective auth; `[]` means collection level. */
-  authOwnerPath?: number[];
+  authOwnerPath?: number[]
   /** Entries of the effective auth helper (all types except basic). */
-  authFields?: AuthEntry[];
-  queryParams?: KeyValue[];
+  authFields?: AuthEntry[]
+  queryParams?: KeyValue[]
   /** Path variables (`:id` segments) from `url.variable`. */
-  pathVariables?: KeyValue[];
+  pathVariables?: KeyValue[]
   /** Query params switched off in Postman (kept in `url.query`, absent from `url.raw`). */
-  disabledQueryParams?: KeyValue[];
-  bodyMode?: string;
+  disabledQueryParams?: KeyValue[]
+  bodyMode?: string
   /** Text fields of urlencoded / form-data bodies. */
-  bodyFields?: KeyValue[];
+  bodyFields?: KeyValue[]
   /** Disabled text fields of urlencoded / form-data bodies. */
-  disabledBodyFields?: KeyValue[];
-  scripts?: { prerequest?: string; test?: string; disabledPrerequest?: string; disabledTest?: string };
-  savedResponses?: ParsedSavedResponse[];
+  disabledBodyFields?: KeyValue[]
+  scripts?: { prerequest?: string; test?: string; disabledPrerequest?: string; disabledTest?: string }
+  savedResponses?: ParsedSavedResponse[]
   /** True when Postman SSL certificate verification is disabled for this request (directly or inherited). */
-  tlsVerificationDisabled?: boolean;
+  tlsVerificationDisabled?: boolean
 }
 
 export interface ParsedFolder {
-  name: string;
-  path: string[];
-  requestCount: number;
-  requests: ParsedRequest[];
+  name: string
+  path: string[]
+  requestCount: number
+  requests: ParsedRequest[]
 }
 
 export interface ParsedScript {
@@ -134,32 +134,32 @@ export interface ParsedVariable {
 }
 
 export interface ParsedCollection {
-  name: string;
-  version: string;
-  totalRequests: number;
-  totalFolders: number;
-  methods: Record<string, number>;
-  authTypes: Record<string, number>;
-  variables: string[];
-  definedVariables: string[];
-  requests: ParsedRequest[];
-  folders: ParsedFolder[];
-  collectionVariables?: ParsedVariable[];
+  name: string
+  version: string
+  totalRequests: number
+  totalFolders: number
+  methods: Record<string, number>
+  authTypes: Record<string, number>
+  variables: string[]
+  definedVariables: string[]
+  requests: ParsedRequest[]
+  folders: ParsedFolder[]
+  collectionVariables?: ParsedVariable[]
   /** Postman environment and globals exports loaded with the collection (see `environment.ts`). */
-  environments?: ParsedEnvironment[];
+  environments?: ParsedEnvironment[]
   /** Index into `environments` of the selected environment; globals are always applied. */
-  activeEnvironment?: number;
+  activeEnvironment?: number
   /** Folder and request level variables. */
-  scopedVariables?: ParsedScopedVariable[];
+  scopedVariables?: ParsedScopedVariable[]
   /** Collection, folder and request descriptions. */
-  descriptions?: ParsedDescription[];
-  collectionAuthType?: string;
+  descriptions?: ParsedDescription[]
+  collectionAuthType?: string
   /** Collection- and folder-level auth definitions. */
-  authOwners?: ParsedAuthOwner[];
+  authOwners?: ParsedAuthOwner[]
   /** Collection- and folder-level scripts (request scripts live on each request). */
-  scripts?: ParsedScript[];
+  scripts?: ParsedScript[]
   /** Non-fatal problems found while reading a malformed export. */
-  parseWarnings?: string[];
+  parseWarnings?: string[]
 }
 
 /** Nesting deeper than this is almost certainly malformed and is skipped to protect the call stack. */
@@ -404,14 +404,29 @@ interface ParseAccumulator {
   warnings: string[]
 }
 
-function readScopedVariables(variables: unknown, scope: ParsedScopedVariable['scope'], owner: string, ownerPath: number[], requestId?: string): ParsedScopedVariable[] {
+function readScopedVariables(
+  variables: unknown,
+  scope: ParsedScopedVariable['scope'],
+  owner: string,
+  ownerPath: number[],
+  requestId?: string
+): ParsedScopedVariable[] {
   return readCollectionVariables(variables).map((variable) => ({ ...variable, scope, owner, ownerPath, requestId }))
 }
 
-function addDescription(acc: ParseAccumulator, kind: ParsedDescription['kind'], owner: string, ownerPath: number[], value: unknown, requestId?: string): void {
+function addDescription(
+  acc: ParseAccumulator,
+  kind: ParsedDescription['kind'],
+  owner: string,
+  ownerPath: number[],
+  value: unknown,
+  requestId?: string
+): void {
   const text = descriptionText(value)
   if (!text.trim()) return
-  const duplicate = acc.descriptions.some((entry) => entry.owner === owner && entry.kind === kind && entry.text === text.slice(0, MAX_DESCRIPTION_LENGTH))
+  const duplicate = acc.descriptions.some(
+    (entry) => entry.owner === owner && entry.kind === kind && entry.text === text.slice(0, MAX_DESCRIPTION_LENGTH)
+  )
   if (duplicate) return
   acc.descriptions.push({ kind, owner, ownerPath, requestId, text: text.slice(0, MAX_DESCRIPTION_LENGTH) })
 }
@@ -420,13 +435,7 @@ function warn(acc: ParseAccumulator, message: string): void {
   if (acc.warnings.length < MAX_WARNINGS) acc.warnings.push(message)
 }
 
-function parseItem(
-  rawItem: unknown,
-  folderPath: string[],
-  itemPath: number[],
-  inherited: InheritedContext,
-  acc: ParseAccumulator
-): void {
+function parseItem(rawItem: unknown, folderPath: string[], itemPath: number[], inherited: InheritedContext, acc: ParseAccumulator): void {
   if (!isRecord(rawItem)) {
     warn(acc, `Skipped a malformed item at position ${itemPath.join('.')}.`)
     return
@@ -471,7 +480,10 @@ function parseItem(
     const pathVariables = getPathVariables(req.url)
     const events = readEvents(rawItem.event)
     const joinSources = (listen: string, disabled: boolean) =>
-      events.filter((e) => e.listen === listen && e.disabled === disabled).map((e) => e.source).join('\n') || undefined
+      events
+        .filter((e) => e.listen === listen && e.disabled === disabled)
+        .map((e) => e.source)
+        .join('\n') || undefined
     const scripts = events.length
       ? {
           prerequest: joinSources('prerequest', false),
@@ -558,7 +570,13 @@ function parseItem(
     acc.scopedVariables.push(...readScopedVariables(rawItem.variable, 'folder', newPath.join(' / '), itemPath))
 
     for (const event of readEvents(rawItem.event)) {
-      acc.scripts.push({ owner: newPath.join(' / '), ownerPath: itemPath, listen: event.listen, source: event.source, disabled: event.disabled || undefined })
+      acc.scripts.push({
+        owner: newPath.join(' / '),
+        ownerPath: itemPath,
+        listen: event.listen,
+        source: event.source,
+        disabled: event.disabled || undefined,
+      })
     }
 
     rawItem.item.forEach((child, index) => parseItem(child, newPath, [...itemPath, index], childContext, acc))
@@ -615,7 +633,13 @@ export function parseCollection(json: unknown): ParsedCollection {
   addDescription(acc, 'collection', 'collection', [], isRecord(col.info) ? col.info.description : undefined)
 
   for (const event of readEvents(col.event)) {
-    acc.scripts.push({ owner: 'collection', ownerPath: [], listen: event.listen, source: event.source, disabled: event.disabled || undefined })
+    acc.scripts.push({
+      owner: 'collection',
+      ownerPath: [],
+      listen: event.listen,
+      source: event.source,
+      disabled: event.disabled || undefined,
+    })
   }
 
   col.item.forEach((item, index) => parseItem(item, [], [index], rootContext, acc))

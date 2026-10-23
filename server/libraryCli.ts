@@ -41,12 +41,23 @@ export async function main(argv: string[]): Promise<number> {
     const status = await libraryStatus(dir)
     const state = getLibraryEncryption()
     process.stdout.write(`Library folder: ${dir}\n`)
-    process.stdout.write(`Records: ${status.records} (${status.plaintext} plaintext, ${status.encrypted} encrypted, ${status.unreadable.length} unreadable)\n`)
+    process.stdout.write(
+      `Records: ${status.records} (${status.plaintext} plaintext, ${status.encrypted} encrypted, ${status.unreadable.length} unreadable)\n`
+    )
     for (const [kid, count] of Object.entries(status.byKey)) {
-      const label = state.enabled && 'keys' in state ? (kid === state.keys.current.id ? 'current key' : state.keys.previous.some((key) => key.id === kid) ? 'previous key' : 'key not configured') : 'no key configured'
+      const label =
+        state.enabled && 'keys' in state
+          ? kid === state.keys.current.id
+            ? 'current key'
+            : state.keys.previous.some((key) => key.id === kid)
+              ? 'previous key'
+              : 'key not configured'
+          : 'no key configured'
       process.stdout.write(`  key ${kid}: ${count} (${label})\n`)
     }
-    process.stdout.write(`Encryption: ${state.enabled ? ('error' in state ? `misconfigured (${state.error})` : `on, current key ${state.keys.current.id}`) : 'off'}\n`)
+    process.stdout.write(
+      `Encryption: ${state.enabled ? ('error' in state ? `misconfigured (${state.error})` : `on, current key ${state.keys.current.id}`) : 'off'}\n`
+    )
     return status.unreadable.length ? 1 : 0
   }
 

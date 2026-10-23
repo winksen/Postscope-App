@@ -29,7 +29,10 @@ test('sanitized copy contains no credentials and no secret findings', () => {
   assert.ok(!serialized.includes('hunter2pass'))
 
   const remaining = runAudit(parseCollection(json)).filter((finding) => SECRET_RULES.has(finding.ruleId))
-  assert.deepEqual(remaining.map((finding) => finding.ruleId), [])
+  assert.deepEqual(
+    remaining.map((finding) => finding.ruleId),
+    []
+  )
 })
 
 test('redaction is idempotent and does not mutate input', () => {
@@ -107,7 +110,10 @@ test('sanitized copy scrubs credentials in disabled headers, query params, form 
   const serialized = JSON.stringify(json)
   for (const secret of [FAKE.bearer, FAKE.apiKey, FAKE.password, FAKE.refreshToken]) assert.ok(!serialized.includes(secret))
   const findings = runAudit(parseCollection(json))
-  assert.deepEqual(findings.filter((finding) => SECRET_RULES.has(finding.ruleId)).map((finding) => finding.ruleId), [])
+  assert.deepEqual(
+    findings.filter((finding) => SECRET_RULES.has(finding.ruleId)).map((finding) => finding.ruleId),
+    []
+  )
 })
 
 test('sanitized copy keeps unquoted variables, indentation and XML structure in raw bodies', () => {
@@ -116,14 +122,21 @@ test('sanitized copy keeps unquoted variables, indentation and XML structure in 
     item: [
       {
         name: 'JSON with variable',
-        request: { method: 'POST', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{\n\t"id": {{userId}},\n\t"password": "${FAKE.password}"\n}` } },
+        request: {
+          method: 'POST',
+          url: '{{baseUrl}}/a',
+          body: { mode: 'raw', raw: `{\n\t"id": {{userId}},\n\t"password": "${FAKE.password}"\n}` },
+        },
       },
       {
         name: 'SOAP',
         request: {
           method: 'POST',
           url: '{{baseUrl}}/soap',
-          body: { mode: 'raw', raw: `<s:Envelope><wsse:Password Type="x">${FAKE.password}</wsse:Password><user>{{user}}</user></s:Envelope>` },
+          body: {
+            mode: 'raw',
+            raw: `<s:Envelope><wsse:Password Type="x">${FAKE.password}</wsse:Password><user>{{user}}</user></s:Envelope>`,
+          },
         },
       },
     ],
@@ -132,7 +145,10 @@ test('sanitized copy keeps unquoted variables, indentation and XML structure in 
   assert.equal(redactedCount, 2)
   const [first, second] = (sanitized as { item: Array<{ request: { body: { raw: string } } }> }).item
   assert.equal(first.request.body.raw, '{\n\t"id": {{userId}},\n\t"password": "{{password}}"\n}')
-  assert.equal(second.request.body.raw, '<s:Envelope><wsse:Password Type="x">{{Password}}</wsse:Password><user>{{user}}</user></s:Envelope>')
+  assert.equal(
+    second.request.body.raw,
+    '<s:Envelope><wsse:Password Type="x">{{Password}}</wsse:Password><user>{{user}}</user></s:Envelope>'
+  )
   assert.ok(!JSON.stringify(sanitized).includes(FAKE.password))
 })
 
@@ -147,7 +163,10 @@ test('redaction counts every secret in query parameters exactly once', () => {
           method: 'GET',
           url: {
             raw: `https://x.test/b?api_key=${FAKE.apiKey}&page=2`,
-            query: [{ key: 'api_key', value: FAKE.apiKey }, { key: 'page', value: '2' }],
+            query: [
+              { key: 'api_key', value: FAKE.apiKey },
+              { key: 'page', value: '2' },
+            ],
           },
         },
       },
@@ -163,9 +182,15 @@ test('redaction counts every secret in query parameters exactly once', () => {
 test('sanitized bodies keep their original indentation', () => {
   for (const indent of [2, 4, '\t'] as const) {
     const raw = JSON.stringify({ user: 'admin', password: FAKE.password, nested: { client_secret: FAKE.clientSecret } }, null, indent)
-    const { json } = redactCollection({ info: { name: 'Indent' }, item: [{ name: 'R', request: { method: 'POST', url: 'https://x.test', body: { mode: 'raw', raw } } }] })
+    const { json } = redactCollection({
+      info: { name: 'Indent' },
+      item: [{ name: 'R', request: { method: 'POST', url: 'https://x.test', body: { mode: 'raw', raw } } }],
+    })
     const sanitized = (json as { item: Array<{ request: { body: { raw: string } } }> }).item[0].request.body.raw
-    assert.equal(sanitized, JSON.stringify({ user: 'admin', password: '{{password}}', nested: { client_secret: '{{client_secret}}' } }, null, indent))
+    assert.equal(
+      sanitized,
+      JSON.stringify({ user: 'admin', password: '{{password}}', nested: { client_secret: '{{client_secret}}' } }, null, indent)
+    )
   }
 })
 
@@ -175,6 +200,13 @@ test('markdown report has no emoji, including when there are no findings', () =>
   const markdown = buildMarkdownReport({ parsed: clean, findings: [], score: calculateScore(clean, findings), appVersion: '0.0.0' })
   assert.match(markdown, /No findings\./)
   const risky = parseCollection(kitchenSinkCollection())
-  const report = buildMarkdownReport({ parsed: risky, findings: runAudit(risky), score: calculateScore(risky, runAudit(risky)), appVersion: '0.0.0' })
+  const report = buildMarkdownReport({
+    parsed: risky,
+    findings: runAudit(risky),
+    score: calculateScore(risky, runAudit(risky)),
+    appVersion: '0.0.0',
+  })
+  // The variation selector in the class is intended: the check is for emoji presentation.
+  // eslint-disable-next-line no-misleading-character-class
   for (const text of [markdown, report]) assert.ok(!/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/u.test(text))
 })

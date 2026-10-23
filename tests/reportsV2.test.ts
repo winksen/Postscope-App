@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- the schema validator walks arbitrary JSON */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -6,20 +7,33 @@ import { runAuditDetailed } from '../src/lib/auditor'
 import { attachEvidencePointers } from '../src/lib/evidencePointers'
 import { locatePointers } from '../src/lib/jsonPositions'
 import { buildHtmlReport, escapeHtml, renderHtmlReports } from '../src/lib/htmlReport'
-import { REPORT_VERSION, buildJsonReport, buildMarkdownReport, buildReport, buildSarifReport, reportFileName, reportMimeType } from '../src/lib/reportExport'
+import {
+  REPORT_VERSION,
+  buildJsonReport,
+  buildMarkdownReport,
+  buildReport,
+  buildSarifReport,
+  reportFileName,
+  reportMimeType,
+} from '../src/lib/reportExport'
 import { calculateScore } from '../src/lib/scorer'
 import { attachEnvironments } from '../src/lib/environment'
 import { validate } from './schema'
 import { FAKE, cleanCollection, environmentExport, kitchenSinkCollection, scopedSecretsCollection } from './fixtures'
 
-const schema = JSON.parse(fs.readFileSync(new URL('../docs/schemas/postscope-report.v2.schema.json', import.meta.url), 'utf8')) as Record<string, unknown>
+const schema = JSON.parse(fs.readFileSync(new URL('../docs/schemas/postscope-report.v2.schema.json', import.meta.url), 'utf8')) as Record<
+  string,
+  unknown
+>
 
 function context(json: unknown, options: { suppress?: boolean; environment?: boolean; pretty?: boolean } = {}) {
   const sourceText = JSON.stringify(json, null, options.pretty === false ? 0 : 2)
   const raw = JSON.parse(sourceText) as unknown
   let parsed = parseCollection(raw)
   if (options.environment) parsed = attachEnvironments(parsed, [JSON.stringify(environmentExport())])
-  const result = runAuditDetailed(parsed, { suppressions: options.suppress ? [{ ruleId: 'MISSING_AUTH', reason: 'Accepted', request: 'Users/**' }] : undefined })
+  const result = runAuditDetailed(parsed, {
+    suppressions: options.suppress ? [{ ruleId: 'MISSING_AUTH', reason: 'Accepted', request: 'Users/**' }] : undefined,
+  })
   return {
     raw,
     sourceText,
@@ -41,7 +55,10 @@ function resolvePointer(root: unknown, pointer: string): unknown {
   return pointer
     .split('/')
     .slice(1)
-    .reduce<unknown>((node, segment) => (node as Record<string, unknown> | undefined)?.[segment.replace(/~1/g, '/').replace(/~0/g, '~')], root)
+    .reduce<unknown>(
+      (node, segment) => (node as Record<string, unknown> | undefined)?.[segment.replace(/~1/g, '/').replace(/~0/g, '~')],
+      root
+    )
 }
 
 test('the JSON report validates against the published version 2 schema', () => {
@@ -64,12 +81,36 @@ test('the schema rejects reports that drift from the contract', () => {
     mutate(copy)
     return validate(schema, copy)
   }
-  assert.ok(broken((copy) => { copy.reportVersion = 1 }).length > 0)
-  assert.ok(broken((copy) => { delete copy.score.security }).length > 0)
-  assert.ok(broken((copy) => { copy.findings[0].severity = 'urgent' }).length > 0)
-  assert.ok(broken((copy) => { copy.findings[0].occurrences[0].fingerprint = 'abc' }).length > 0)
-  assert.ok(broken((copy) => { copy.findings[0].secretValue = 'leak' }).length > 0)
-  assert.ok(broken((copy) => { copy.score.total = 101 }).length > 0)
+  assert.ok(
+    broken((copy) => {
+      copy.reportVersion = 1
+    }).length > 0
+  )
+  assert.ok(
+    broken((copy) => {
+      delete copy.score.security
+    }).length > 0
+  )
+  assert.ok(
+    broken((copy) => {
+      copy.findings[0].severity = 'urgent'
+    }).length > 0
+  )
+  assert.ok(
+    broken((copy) => {
+      copy.findings[0].occurrences[0].fingerprint = 'abc'
+    }).length > 0
+  )
+  assert.ok(
+    broken((copy) => {
+      copy.findings[0].secretValue = 'leak'
+    }).length > 0
+  )
+  assert.ok(
+    broken((copy) => {
+      copy.score.total = 101
+    }).length > 0
+  )
 })
 
 test('evidence pointers resolve to the value that was reported', () => {
@@ -77,13 +118,18 @@ test('evidence pointers resolve to the value that was reported', () => {
   const all = ctx.findings.flatMap((finding) => (finding.evidence ?? []).map((entry) => ({ finding, entry })))
   const withPointer = all.filter(({ entry }) => entry.pointer !== undefined)
   assert.ok(withPointer.length / all.length > 0.9, `${withPointer.length}/${all.length} evidence entries have a pointer`)
-  for (const { entry } of withPointer) assert.notEqual(resolvePointer(raw, entry.pointer!), undefined, `${entry.location} -> ${entry.pointer}`)
+  for (const { entry } of withPointer)
+    assert.notEqual(resolvePointer(raw, entry.pointer!), undefined, `${entry.location} -> ${entry.pointer}`)
 
-  const find = (ruleId: string, location: string) => ctx.findings.find((finding) => finding.ruleId === ruleId)?.evidence?.find((entry) => entry.location === location)
+  const find = (ruleId: string, location: string) =>
+    ctx.findings.find((finding) => finding.ruleId === ruleId)?.evidence?.find((entry) => entry.location === location)
   assert.equal(resolvePointer(raw, find('HARDCODED_API_KEY', 'header X-API-Key')!.pointer!), FAKE.apiKey)
   assert.equal(resolvePointer(raw, find('SECRET_IN_QUERY', 'query api_key')!.pointer!), FAKE.apiKey)
   assert.equal(resolvePointer(raw, find('HARDCODED_SECRET', 'body field client_secret')!.pointer!), FAKE.clientSecret)
-  assert.equal(find('HARDCODED_SECRET', 'body field disabled_secret (disabled)')!.pointer, find('HARDCODED_SECRET', 'body field client_secret')!.pointer!.replace(/\/\d+\/value$/, '/2/value'))
+  assert.equal(
+    find('HARDCODED_SECRET', 'body field disabled_secret (disabled)')!.pointer,
+    find('HARDCODED_SECRET', 'body field client_secret')!.pointer!.replace(/\/\d+\/value$/, '/2/value')
+  )
   assert.equal(resolvePointer(raw, find('SECRET_IN_COLLECTION_VARIABLE', 'collection variable clientSecret')!.pointer!), FAKE.clientSecret)
   assert.ok(String(resolvePointer(raw, find('HARDCODED_TOKEN', 'header Authorization')!.pointer!)).includes('Token '))
 })
@@ -102,7 +148,9 @@ test('SARIF results carry line and column regions that point at the reported val
 
     const apiKey = ctx.findings.find((finding) => finding.ruleId === 'HARDCODED_API_KEY')!
     const pointer = apiKey.evidence![0].pointer!
-    const result = run.results.find((candidate: any) => candidate.ruleId === 'HARDCODED_API_KEY' && candidate.locations[0].physicalLocation.region)
+    const result = run.results.find(
+      (candidate: any) => candidate.ruleId === 'HARDCODED_API_KEY' && candidate.locations[0].physicalLocation.region
+    )
     const { startLine, startColumn } = result.locations[0].physicalLocation.region
     const line = sourceText.split('\n')[startLine - 1]
     assert.ok(line.slice(startColumn - 1).startsWith(JSON.stringify(resolvePointer(raw, pointer)).slice(0, 8)), line)
@@ -117,7 +165,10 @@ test('SARIF without the source text still works, and truncation is reported', ()
 
   const huge = {
     info: { name: 'Huge' },
-    item: Array.from({ length: 5200 }, (_, index) => ({ name: `R${index}`, request: { method: 'GET', url: 'http://api.example.com/x', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] } })),
+    item: Array.from({ length: 5200 }, (_, index) => ({
+      name: `R${index}`,
+      request: { method: 'GET', url: 'http://api.example.com/x', header: [{ key: 'X-API-Key', value: FAKE.apiKey }] },
+    })),
   }
   const big = context(huge, { pretty: false })
   const run = JSON.parse(buildSarifReport(big.ctx)).runs[0]
@@ -128,8 +179,18 @@ test('SARIF without the source text still works, and truncation is reported', ()
 
 test('SARIF results keep both fingerprints and mark suppressed results', () => {
   const { ctx } = context(kitchenSinkCollection(), { suppress: true })
-  const results = JSON.parse(buildSarifReport(ctx)).runs[0].results as Array<{ ruleId: string; suppressions?: unknown[]; partialFingerprints: Record<string, string> }>
-  assert.ok(results.every((result) => /^[0-9a-f]{8}$/.test(result.partialFingerprints['postscope/v1']) && /^[0-9a-f]{64}$/.test(result.partialFingerprints['postscope/v2'])))
+  const results = JSON.parse(buildSarifReport(ctx)).runs[0].results as Array<{
+    ruleId: string
+    suppressions?: unknown[]
+    partialFingerprints: Record<string, string>
+  }>
+  assert.ok(
+    results.every(
+      (result) =>
+        /^[0-9a-f]{8}$/.test(result.partialFingerprints['postscope/v1']) &&
+        /^[0-9a-f]{64}$/.test(result.partialFingerprints['postscope/v2'])
+    )
+  )
   assert.ok(results.some((result) => result.ruleId === 'MISSING_AUTH' && result.suppressions?.length === 1))
 })
 
@@ -142,7 +203,16 @@ test('the HTML report is one self-contained file without scripts or secrets', ()
   assert.ok(!/<script/i.test(html) && !/\son\w+=/i.test(html) && !/javascript:/i.test(html))
   assert.ok(!/<link|<img|<iframe|src=|href=|@import|url\(/i.test(html), 'no external resources')
   for (const secret of Object.values(FAKE)) assert.ok(!html.includes(secret))
-  for (const text of ['Critical (', 'Warning (', 'Suppressed (', 'Environments:', 'PostScope 9.9.9', 'known occurrence(s) are hidden by the baseline', 'Score impact: -', 'Hardcoded password in headers or body']) {
+  for (const text of [
+    'Critical (',
+    'Warning (',
+    'Suppressed (',
+    'Environments:',
+    'PostScope 9.9.9',
+    'known occurrence(s) are hidden by the baseline',
+    'Score impact: -',
+    'Hardcoded password in headers or body',
+  ]) {
     assert.ok(html.includes(text), text)
   }
   assert.ok(!/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u2014]/u.test(html))
@@ -150,7 +220,10 @@ test('the HTML report is one self-contained file without scripts or secrets', ()
 
 test('HTML output escapes every dynamic value', () => {
   const nasty = '<img src=x onerror=alert(1)> & "quotes" \'single\''
-  const json = { info: { name: nasty }, item: [{ name: nasty, request: { method: 'GET', url: 'https://x.test', header: [{ key: nasty, value: FAKE.apiKey }] } }] }
+  const json = {
+    info: { name: nasty },
+    item: [{ name: nasty, request: { method: 'GET', url: 'https://x.test', header: [{ key: nasty, value: FAKE.apiKey }] } }],
+  }
   const { ctx } = context(json)
   const html = buildHtmlReport(ctx)
   assert.ok(!html.includes('<img src=x'))

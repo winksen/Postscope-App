@@ -11,17 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { SeverityBadge } from '@/components/SeverityBadge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import {
-  CheckCircle,
-  DownloadSimple,
-  Gauge,
-  Key,
-  Lightbulb,
-  Link,
-  Lock,
-  Sparkle,
-  WarningCircle,
-} from '@phosphor-icons/react'
+import { CheckCircle, DownloadSimple, Gauge, Key, Lightbulb, Link, Lock, Sparkle, WarningCircle } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 function getProgressTone(value: number): string {
@@ -59,15 +49,7 @@ interface ScorePageProps {
   findings: Finding[]
 }
 
-function CategoryBar({
-  keyName,
-  value,
-  delay,
-}: {
-  keyName: keyof ScoreBreakdown['categories']
-  value: number
-  delay: number
-}) {
+function CategoryBar({ keyName, value, delay }: { keyName: keyof ScoreBreakdown['categories']; value: number; delay: number }) {
   const Icon = CATEGORY_ICONS[keyName]
   const [animatedValue, setAnimatedValue] = useState(0)
 
@@ -94,22 +76,19 @@ function CategoryBar({
           </div>
           <span className="text-muted-foreground">{CATEGORY_LABELS[keyName]}</span>
         </div>
-        <span className={cn('text-xs tabular-nums font-semibold', getScoreTone(value))}>
-          {animatedValue}/100
-        </span>
+        <span className={cn('text-xs tabular-nums font-semibold', getScoreTone(value))}>{animatedValue}/100</span>
       </div>
-      <Progress value={animatedValue} indicatorClassName={getProgressTone(value)} className="h-2" aria-label={`${CATEGORY_LABELS[keyName]} score`} />
+      <Progress
+        value={animatedValue}
+        indicatorClassName={getProgressTone(value)}
+        className="h-2"
+        aria-label={`${CATEGORY_LABELS[keyName]} score`}
+      />
     </div>
   )
 }
 
-function ActionCard({
-  advice,
-  priority,
-}: {
-  advice: string
-  priority: 'P0' | 'P1' | 'P2'
-}) {
+function ActionCard({ advice, priority }: { advice: string; priority: 'P0' | 'P1' | 'P2' }) {
   const priorityConfig = {
     P0: { icon: WarningCircle, color: 'bg-destructive/10 text-destructive-text' },
     P1: { icon: Lightbulb, color: 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning-text))]' },
@@ -271,7 +250,8 @@ export function ScorePage({ score, findings }: ScorePageProps) {
         <CardHeader>
           <CardTitle className="text-lg">Penalty breakdown</CardTitle>
           <CardDescription>
-            Headline score = 85% security + 15% hygiene. Each finding deducts its severity weight times (1 + log2 of the requests it affects), capped per rule.
+            Headline score = 85% security + 15% hygiene. Each finding deducts its severity weight times (1 + log2 of the requests it
+            affects), capped per rule.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -336,7 +316,16 @@ export function ScorePage({ score, findings }: ScorePageProps) {
               <ul className="space-y-3">
                 {advice.map((a, i) => (
                   <li key={i} className="flex gap-3 rounded-lg bg-muted/35 px-4 py-3">
-                    <span className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', a.priority === 'P0' ? 'bg-destructive' : a.priority === 'P1' ? 'bg-[hsl(var(--warning))]' : 'bg-[hsl(var(--success))]')} />
+                    <span
+                      className={cn(
+                        'mt-0.5 h-2 w-2 shrink-0 rounded-full',
+                        a.priority === 'P0'
+                          ? 'bg-destructive'
+                          : a.priority === 'P1'
+                            ? 'bg-[hsl(var(--warning))]'
+                            : 'bg-[hsl(var(--success))]'
+                      )}
+                    />
                     <div>
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 mb-1">
                         {a.priority}

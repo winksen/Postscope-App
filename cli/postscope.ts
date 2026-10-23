@@ -96,7 +96,16 @@ function readVersion(): string {
 function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules' {
   // `postscope scan <paths>` is the documented form; the bare form keeps working for existing scripts.
   const argv = rawArgv[0] === 'scan' ? rawArgv.slice(1) : rawArgv
-  const options: CliOptions = { inputs: [], format: 'text', failOn: 'critical', audit: {}, environments: [], autoEnv: false, noConfig: false, quiet: false }
+  const options: CliOptions = {
+    inputs: [],
+    format: 'text',
+    failOn: 'critical',
+    audit: {},
+    environments: [],
+    autoEnv: false,
+    noConfig: false,
+    quiet: false,
+  }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
 
@@ -140,7 +149,12 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
         break
       }
       case '--disable':
-        disabled.push(...value().split(',').map((rule) => rule.trim().toUpperCase()).filter(Boolean))
+        disabled.push(
+          ...value()
+            .split(',')
+            .map((rule) => rule.trim().toUpperCase())
+            .filter(Boolean)
+        )
         break
       case '--severity':
         for (const pair of value().split(',')) {
@@ -277,17 +291,27 @@ function loadEnvironments(entries: CliOptions['environments']): LoadedEnvironmen
     }
     const kind = detectEnvironmentKind(json, file)
     if (!kind) throw new UsageError(`${file}: not a Postman environment or globals export (missing values array)`)
-    if (globals && kind !== 'globals') throw new UsageError(`${file}: --globals expects a globals export; use --environment for environment files`)
+    if (globals && kind !== 'globals')
+      throw new UsageError(`${file}: --globals expects a globals export; use --environment for environment files`)
     return { file, text, json, kind, name: parseEnvironment(json, file).name }
   })
 }
 
 /** `dev.postman_environment.json` becomes `dev`. */
 function environmentStem(file: string): string {
-  return path.basename(file).replace(/\.postman_(?:environment|globals)\.json$/i, '').replace(/\.json$/i, '')
+  return path
+    .basename(file)
+    .replace(/\.postman_(?:environment|globals)\.json$/i, '')
+    .replace(/\.json$/i, '')
 }
 
-function analyzeFile(input: string, options: CliOptions, appVersion: string, environments: LoadedEnvironment[], baseline?: Baseline): { result: AnalyzedFile; json: unknown } {
+function analyzeFile(
+  input: string,
+  options: CliOptions,
+  appVersion: string,
+  environments: LoadedEnvironment[],
+  baseline?: Baseline
+): { result: AnalyzedFile; json: unknown } {
   let json: unknown
   let sourceText = ''
   try {
@@ -303,7 +327,10 @@ function analyzeFile(input: string, options: CliOptions, appVersion: string, env
   }
   let parsed
   try {
-    parsed = attachEnvironments(parseCollection(json), environments.map((environment) => environment.text))
+    parsed = attachEnvironments(
+      parseCollection(json),
+      environments.map((environment) => environment.text)
+    )
   } catch {
     throw new UsageError(`${input}: not a Postman collection (missing item array)`)
   }
@@ -340,13 +367,18 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
     const counts = { critical: 0, warning: 0, info: 0 }
     ctx.findings.forEach((finding) => (counts[finding.severity] += 1))
     lines.push(`PostScope ${appVersion}  ${ctx.parsed.name}  (${input === '-' ? 'stdin' : input}, ${ctx.parsed.totalRequests} requests)`)
-    if (ctx.parsed.environments?.length) lines.push(`Environments: ${ctx.parsed.environments.map((environment) => `${environment.name} (${environment.kind})`).join(', ')}`)
-    lines.push(`Score ${ctx.score.total}/100 (grade ${ctx.score.grade}, security ${ctx.score.security}, hygiene ${ctx.score.hygiene})  ·  ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info`)
+    if (ctx.parsed.environments?.length)
+      lines.push(`Environments: ${ctx.parsed.environments.map((environment) => `${environment.name} (${environment.kind})`).join(', ')}`)
+    lines.push(
+      `Score ${ctx.score.total}/100 (grade ${ctx.score.grade}, security ${ctx.score.security}, hygiene ${ctx.score.hygiene})  ·  ${counts.critical} critical, ${counts.warning} warning, ${counts.info} info`
+    )
     const labels = new Map(ctx.parsed.requests.map((r) => [r.id, r.folderPath.length ? `${r.folderPath.join(' / ')} / ${r.name}` : r.name]))
     for (const finding of ctx.findings) {
-      lines.push(`  ${finding.severity.toUpperCase().padEnd(8)} ${finding.ruleId.padEnd(30)} ${finding.title}${finding.affected.length ? ` (${finding.affected.length})` : ''}`)
+      lines.push(
+        `  ${finding.severity.toUpperCase().padEnd(8)} ${finding.ruleId.padEnd(30)} ${finding.title}${finding.affected.length ? ` (${finding.affected.length})` : ''}`
+      )
       for (const evidence of (finding.evidence ?? []).slice(0, 3)) {
-        const where = evidence.requestId ? labels.get(evidence.requestId) ?? evidence.requestId : 'collection'
+        const where = evidence.requestId ? (labels.get(evidence.requestId) ?? evidence.requestId) : 'collection'
         lines.push(`           ↳ ${where}: ${evidence.location}${evidence.preview ? ` = ${evidence.preview}` : ''}`)
       }
     }
@@ -359,7 +391,11 @@ function render(files: AnalyzedFile[], format: Format, appVersion: string, failO
   if (format === 'text') return textReport(files, appVersion)
   if (format === 'markdown') return files.map(({ ctx }) => buildMarkdownReport(ctx)).join('\n\n---\n\n')
   if (format === 'html') return renderHtmlReports(files.map(({ ctx }) => ctx))
-  if (format === 'junit') return buildJunitReport(files.map(({ ctx }) => ctx), { failOn })
+  if (format === 'junit')
+    return buildJunitReport(
+      files.map(({ ctx }) => ctx),
+      { failOn }
+    )
   if (format === 'json') {
     const reports = files.map(({ ctx }) => JSON.parse(buildJsonReport(ctx)) as unknown)
     return JSON.stringify(reports.length === 1 ? reports[0] : reports, null, 2)
@@ -429,7 +465,8 @@ function parseDiffArgs(argv: string[]): DiffOptions | 'help' {
       case '-f':
       case '--format': {
         const format = value()
-        if (!['text', 'json', 'markdown'].includes(format)) throw new UsageError(`Unknown diff format "${format}" (use text, json or markdown)`)
+        if (!['text', 'json', 'markdown'].includes(format))
+          throw new UsageError(`Unknown diff format "${format}" (use text, json or markdown)`)
         options.format = format as DiffFormat
         break
       }
@@ -444,7 +481,12 @@ function parseDiffArgs(argv: string[]): DiffOptions | 'help' {
         break
       }
       case '--disable':
-        disabled.push(...value().split(',').map((rule) => rule.trim().toUpperCase()).filter(Boolean))
+        disabled.push(
+          ...value()
+            .split(',')
+            .map((rule) => rule.trim().toUpperCase())
+            .filter(Boolean)
+        )
         break
       case '--severity':
         for (const pair of value().split(',')) {
@@ -473,7 +515,12 @@ function parseDiffArgs(argv: string[]): DiffOptions | 'help' {
   if (unknownRules.length) throw new UsageError(`Unknown rule id(s): ${unknownRules.join(', ')}`)
   if (paths.length !== 2) throw new UsageError('Provide exactly two collection files: the old one and the new one.')
   if (options.config && options.noConfig) throw new UsageError('Use either --config or --no-config, not both.')
-  return { ...options, before: paths[0], after: paths[1], audit: sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides }) }
+  return {
+    ...options,
+    before: paths[0],
+    after: paths[1],
+    audit: sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides }),
+  }
 }
 
 function runDiff(argv: string[], appVersion: string): number {
@@ -493,14 +540,31 @@ function runDiff(argv: string[], appVersion: string): number {
   let newFindings: number
   try {
     // Reuses the scan pipeline, so config, suppressions, severity overrides and library records behave the same way.
-    const scanOptions: CliOptions = { inputs: [], format: 'json', failOn: 'none', audit: options.audit, environments: [], autoEnv: false, noConfig: options.noConfig, config: options.config, quiet: true }
+    const scanOptions: CliOptions = {
+      inputs: [],
+      format: 'json',
+      failOn: 'none',
+      audit: options.audit,
+      environments: [],
+      autoEnv: false,
+      noConfig: options.noConfig,
+      config: options.config,
+      quiet: true,
+    }
     const [older, newer] = [options.before, options.after].map((input) => analyzeFile(input, scanOptions, appVersion, []).result.ctx)
     const comparison = compareCollections(older, newer)
-    output = options.format === 'json' ? buildComparisonJson(comparison, appVersion) : options.format === 'markdown' ? buildComparisonMarkdown(comparison) : buildComparisonText(comparison)
+    output =
+      options.format === 'json'
+        ? buildComparisonJson(comparison, appVersion)
+        : options.format === 'markdown'
+          ? buildComparisonMarkdown(comparison)
+          : buildComparisonText(comparison)
     newFindings = newFindingsAtOrAbove(comparison, options.failOnNew).length
     if (!options.quiet) {
       const { scoreDelta, findings } = comparison
-      process.stderr.write(`PostScope diff: score ${comparison.before.score} -> ${comparison.after.score} (${scoreDelta.total > 0 ? '+' : ''}${scoreDelta.total}), ${findings.added.length} new and ${findings.resolved.length} resolved finding(s)\n`)
+      process.stderr.write(
+        `PostScope diff: score ${comparison.before.score} -> ${comparison.after.score} (${scoreDelta.total > 0 ? '+' : ''}${scoreDelta.total}), ${findings.added.length} new and ${findings.resolved.length} resolved finding(s)\n`
+      )
     }
   } catch (error) {
     process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`)
@@ -510,7 +574,10 @@ function runDiff(argv: string[], appVersion: string): number {
   if (options.output) fs.writeFileSync(options.output, output)
   else process.stdout.write(output.endsWith('\n') ? output : `${output}\n`)
   const passed = newFindings === 0
-  if (!options.quiet) process.stderr.write(passed ? 'PostScope: PASS\n' : `PostScope: FAIL (${newFindings} new finding(s) at or above "${options.failOnNew}")\n`)
+  if (!options.quiet)
+    process.stderr.write(
+      passed ? 'PostScope: PASS\n' : `PostScope: FAIL (${newFindings} new finding(s) at or above "${options.failOnNew}")\n`
+    )
   return passed ? 0 : 1
 }
 
@@ -533,7 +600,8 @@ export function main(argv: string[]): number {
     return 0
   }
   if (options === 'rules') {
-    for (const rule of RULE_LIST) process.stdout.write(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.category.padEnd(9)} ${rule.title}\n`)
+    for (const rule of RULE_LIST)
+      process.stdout.write(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.category.padEnd(9)} ${rule.title}\n`)
     return 0
   }
 
@@ -544,7 +612,11 @@ export function main(argv: string[]): number {
     const inputs = expandInputs(options.inputs)
     if (options.sanitize && inputs.length > 1) throw new UsageError('--sanitize works with a single input.')
     for (const input of inputs) {
-      const extra = options.autoEnv ? findSiblingEnvironments(input).filter((file) => !explicit.some((entry) => path.resolve(entry.file) === path.resolve(file))).map((file) => ({ file, globals: /\.postman_globals\.json$/i.test(file) })) : []
+      const extra = options.autoEnv
+        ? findSiblingEnvironments(input)
+            .filter((file) => !explicit.some((entry) => path.resolve(entry.file) === path.resolve(file)))
+            .map((file) => ({ file, globals: /\.postman_globals\.json$/i.test(file) }))
+        : []
       const environments = loadEnvironments([...explicit, ...extra])
       const { result, json } = analyzeFile(input, options, appVersion, environments, baseline)
       files.push(result)
@@ -553,10 +625,16 @@ export function main(argv: string[]): number {
         fs.writeFileSync(options.sanitize, JSON.stringify(sanitized, null, 2))
         if (!options.quiet) process.stderr.write(`Sanitized copy written to ${options.sanitize} (${redactedCount} value(s) replaced)\n`)
         for (const environment of environments) {
-          const target = path.join(path.dirname(options.sanitize), `${environmentStem(environment.file)}.sanitized.postman_${environment.kind}.json`)
+          const target = path.join(
+            path.dirname(options.sanitize),
+            `${environmentStem(environment.file)}.sanitized.postman_${environment.kind}.json`
+          )
           const sanitizedEnvironment = redactEnvironment(environment.json)
           fs.writeFileSync(target, JSON.stringify(sanitizedEnvironment.json, null, 2))
-          if (!options.quiet) process.stderr.write(`Sanitized ${environment.kind} written to ${target} (${sanitizedEnvironment.redactedCount} value(s) emptied)\n`)
+          if (!options.quiet)
+            process.stderr.write(
+              `Sanitized ${environment.kind} written to ${target} (${sanitizedEnvironment.redactedCount} value(s) emptied)\n`
+            )
         }
       }
     }
@@ -577,7 +655,8 @@ export function main(argv: string[]): number {
       process.stderr.write(`Error: cannot write baseline (${error instanceof Error ? error.message : String(error)})\n`)
       return 2
     }
-    if (!options.quiet) process.stderr.write(`PostScope: baseline of ${baseline.entries.length} occurrence(s) written to ${options.writeBaseline}\n`)
+    if (!options.quiet)
+      process.stderr.write(`PostScope: baseline of ${baseline.entries.length} occurrence(s) written to ${options.writeBaseline}\n`)
     return 0
   }
 
@@ -586,7 +665,10 @@ export function main(argv: string[]): number {
   const passed = failures.length === 0 && lowScores.length === 0
 
   if (!options.quiet) {
-    const suppressedCount = files.reduce((total, { ctx }) => total + (ctx.suppressed ?? []).reduce((sum, finding) => sum + finding.suppressions.length, 0), 0)
+    const suppressedCount = files.reduce(
+      (total, { ctx }) => total + (ctx.suppressed ?? []).reduce((sum, finding) => sum + finding.suppressions.length, 0),
+      0
+    )
     const baselinedCount = files.reduce((total, { ctx }) => total + (ctx.baselined ?? 0), 0)
     for (const file of files) if (file.configFile) process.stderr.write(`Config: ${file.configFile}\n`)
     if (suppressedCount) process.stderr.write(`Suppressed: ${suppressedCount} occurrence(s) with a reviewed reason (not scored)\n`)

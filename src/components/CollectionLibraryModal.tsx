@@ -1,20 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  ArrowsLeftRight,
-  Books,
-  Clock,
-  DownloadSimple,
-  FileCode,
-  FolderOpen,
-  Trash,
-} from '@phosphor-icons/react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { ArrowsLeftRight, Books, Clock, DownloadSimple, FileCode, FolderOpen, Trash } from '@phosphor-icons/react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -125,25 +111,21 @@ export function CollectionLibraryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] w-[min(60rem,calc(100vw-3rem))] max-w-none gap-0 overflow-hidden p-0">
         <DialogHeader className="space-y-3 bg-card p-6 pb-4 text-left">
-          <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            App storage
-          </DialogDescription>
+          <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">App storage</DialogDescription>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Books className="h-5 w-5 text-muted-foreground" weight="fill" />
             Team library
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Collections saved on this app. Visible to everyone on your team{encrypted ? ', stored encrypted on the server' : ''}. Export a JSON file for an
-            offline copy.
+            Collections saved on this app. Visible to everyone on your team{encrypted ? ', stored encrypted on the server' : ''}. Export a
+            JSON file for an offline copy.
           </p>
         </DialogHeader>
 
         <ScrollArea className="max-h-[min(58vh,520px)]">
           <div className="space-y-2 px-6 py-4">
             {loading ? (
-              [...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-[72px] rounded-xl" />
-              ))
+              [...Array(3)].map((_, i) => <Skeleton key={i} className="h-[72px] rounded-xl" />)
             ) : loadError ? (
               <div className="flex flex-col items-center gap-3 rounded-xl bg-destructive/10 px-6 py-8 text-center">
                 <p className="text-sm font-medium text-destructive-text">{loadError}</p>

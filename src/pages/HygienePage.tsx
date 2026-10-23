@@ -1,10 +1,4 @@
-import {
-  ArrowSquareOut,
-  CheckCircle,
-  ClipboardText,
-  FunnelSimple,
-  Sparkle,
-} from '@phosphor-icons/react'
+import { ArrowSquareOut, CheckCircle, ClipboardText, FunnelSimple, Sparkle } from '@phosphor-icons/react'
 import { SeverityBadge } from '../components/SeverityBadge'
 import { FindingEvidence } from '../components/FindingEvidence'
 import { StatCard } from '../components/StatCard'
@@ -15,13 +9,7 @@ import type { AppLocation } from '../lib/appRoutes'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -123,7 +111,9 @@ export function HygienePage({ parsed, findings, search, location, onLocationChan
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
           <div className="grid w-full gap-2 sm:w-48">
-            <Label htmlFor="hygiene-severity" className="text-xs">Severity</Label>
+            <Label htmlFor="hygiene-severity" className="text-xs">
+              Severity
+            </Label>
             <Select value={severityFilter} onValueChange={(value) => setSeverityFilter(value as (typeof SEVERITIES)[number])}>
               <SelectTrigger id="hygiene-severity" className="h-9 transition-colors duration-200">
                 <SelectValue />
@@ -148,7 +138,9 @@ export function HygienePage({ parsed, findings, search, location, onLocationChan
       <Card className="overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Findings</CardTitle>
-          <CardDescription>{filtered.length} of {findings.length} rows</CardDescription>
+          <CardDescription>
+            {filtered.length} of {findings.length} rows
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {filtered.length === 0 ? (

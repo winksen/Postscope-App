@@ -39,11 +39,14 @@ interface RawResponse {
 
 function raw(pathname: string, options: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<RawResponse> {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, path: pathname, method: options.method ?? 'GET', headers: options.headers }, (res) => {
-      const chunks: Buffer[] = []
-      res.on('data', (chunk: Buffer) => chunks.push(chunk))
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }))
-    })
+    const req = http.request(
+      { host: '127.0.0.1', port, path: pathname, method: options.method ?? 'GET', headers: options.headers },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }))
+      }
+    )
     req.on('error', reject)
     if (options.body) req.write(options.body)
     req.end()
@@ -78,7 +81,14 @@ beforeEach(() => {
 })
 
 test('static server blocks path traversal and dotfiles', async () => {
-  for (const attack of ['/../secret.txt', '/..%2fsecret.txt', '/%2e%2e/secret.txt', '/assets/..%5c..%5csecret.txt', '/.env', '/%00index.html']) {
+  for (const attack of [
+    '/../secret.txt',
+    '/..%2fsecret.txt',
+    '/%2e%2e/secret.txt',
+    '/assets/..%5c..%5csecret.txt',
+    '/.env',
+    '/%00index.html',
+  ]) {
     const res = await raw(attack)
     assert.ok(res.status === 404 || res.status === 400, `${attack} -> ${res.status}`)
     assert.ok(!res.body.includes('top-secret'), attack)
@@ -105,7 +115,12 @@ test('static server serves SPA routes, assets with caching and gzip, and 404s mi
 
 test('browser navigations to deep links open the app, even when the last segment looks like a file', async () => {
   const html = { headers: { Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' } }
-  for (const link of ['/analyze/requests/Users%2FList%20users', '/analyze/requests/v1.2%2FGet%20item.v2', '/requests/%2Ehidden%2Fa', '/analyze/security?severity=critical&rule=HARDCODED_TOKEN']) {
+  for (const link of [
+    '/analyze/requests/Users%2FList%20users',
+    '/analyze/requests/v1.2%2FGet%20item.v2',
+    '/requests/%2Ehidden%2Fa',
+    '/analyze/security?severity=critical&rule=HARDCODED_TOKEN',
+  ]) {
     const res = await raw(link, html)
     assert.equal(res.status, 200, link)
     assert.match(String(res.headers['content-type']), /text\/html/)
@@ -176,7 +191,11 @@ test('library API enforces JSON content type, same-origin, and payload validatio
 })
 
 test('library API saves, de-duplicates, sanitizes names, lists, and deletes', async () => {
-  const saved = await postCollection(sample, { Origin: `http://127.0.0.1:${port}` }, `Evil${String.fromCharCode(0x202e)}name${String.fromCharCode(0)}`)
+  const saved = await postCollection(
+    sample,
+    { Origin: `http://127.0.0.1:${port}` },
+    `Evil${String.fromCharCode(0x202e)}name${String.fromCharCode(0)}`
+  )
   assert.equal(saved.status, 201)
   const meta = JSON.parse(saved.body)
   assert.equal(meta.name, 'Evil name')
@@ -206,7 +225,10 @@ test('server-side redaction scrubs credentials before storing', async () => {
   process.env.LIBRARY_REDACT_SECRETS = 'true'
   try {
     const secret = 'Bearer live-token-abcdef123456'
-    const collection = { info: { name: 'Secrets' }, item: [{ name: 'A', request: { url: 'https://x', header: [{ key: 'Authorization', value: secret }] } }] }
+    const collection = {
+      info: { name: 'Secrets' },
+      item: [{ name: 'A', request: { url: 'https://x', header: [{ key: 'Authorization', value: secret }] } }],
+    }
     const res = await postCollection(collection)
     assert.equal(res.status, 201)
     const meta = JSON.parse(res.body)
@@ -232,7 +254,8 @@ test('write rate limit returns 429 with Retry-After', async () => {
   process.env.RATE_LIMIT_WRITES_PER_MIN = '3'
   try {
     const statuses: number[] = []
-    for (let i = 0; i < 5; i += 1) statuses.push((await raw('/api/collections/00000000-0000-4000-8000-000000000000', { method: 'DELETE' })).status)
+    for (let i = 0; i < 5; i += 1)
+      statuses.push((await raw('/api/collections/00000000-0000-4000-8000-000000000000', { method: 'DELETE' })).status)
     assert.deepEqual(statuses, [404, 404, 404, 429, 429])
     const limited = await raw('/api/collections/00000000-0000-4000-8000-000000000000', { method: 'DELETE' })
     assert.ok(Number(limited.headers['retry-after']) > 0)
@@ -287,7 +310,8 @@ test('rotating X-Forwarded-For does not dodge the sign-in lockout behind a trust
   const bad = `Basic ${Buffer.from('admin:wrong').toString('base64')}`
   try {
     const statuses: number[] = []
-    for (let i = 0; i < 4; i += 1) statuses.push((await raw('/', { headers: { Authorization: bad, 'X-Forwarded-For': `10.9.8.${i}, 198.51.100.7` } })).status)
+    for (let i = 0; i < 4; i += 1)
+      statuses.push((await raw('/', { headers: { Authorization: bad, 'X-Forwarded-For': `10.9.8.${i}, 198.51.100.7` } })).status)
     assert.deepEqual(statuses, [401, 401, 401, 429])
   } finally {
     delete process.env.BASIC_AUTH_USER
@@ -344,7 +368,14 @@ test('library saves, opens and removals are written to an append-only audit log'
     assert.equal(saved.status, 201)
     const meta = JSON.parse(saved.body)
     assert.equal(meta.savedBy, 'alice@example.com')
-    assert.equal((await raw(`/api/collections/${meta.id}`, { headers: { 'X-Forwarded-For': '198.51.100.24', 'X-Auth-Request-Email': 'bob@example.com' } })).status, 200)
+    assert.equal(
+      (
+        await raw(`/api/collections/${meta.id}`, {
+          headers: { 'X-Forwarded-For': '198.51.100.24', 'X-Auth-Request-Email': 'bob@example.com' },
+        })
+      ).status,
+      200
+    )
     assert.equal((await raw('/api/collections', { headers: forwarded })).status, 200)
     assert.equal((await raw(`/api/collections/${meta.id}`, { method: 'DELETE', headers: forwarded })).status, 200)
     await flushAuditLog()
@@ -352,13 +383,28 @@ test('library saves, opens and removals are written to an append-only audit log'
     const files = fs.readdirSync(auditDir)
     assert.equal(files.length, 1)
     assert.match(files[0], /^library-\d{4}-\d{2}\.jsonl$/)
-    const entries = fs.readFileSync(path.join(auditDir, files[0]), 'utf8').trim().split('\n').map((line) => JSON.parse(line))
-    assert.deepEqual(entries.map((entry) => [entry.action, entry.user, entry.ip]), [
-      ['save', 'alice@example.com', '198.51.100.23'],
-      ['open', 'bob@example.com', '198.51.100.24'],
-      ['delete', 'alice@example.com', '198.51.100.23'],
-    ])
-    assert.ok(entries.every((entry) => entry.id === meta.id && entry.name === 'Audited collection' && typeof entry.requestId === 'string' && !Number.isNaN(Date.parse(entry.ts))))
+    const entries = fs
+      .readFileSync(path.join(auditDir, files[0]), 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    assert.deepEqual(
+      entries.map((entry) => [entry.action, entry.user, entry.ip]),
+      [
+        ['save', 'alice@example.com', '198.51.100.23'],
+        ['open', 'bob@example.com', '198.51.100.24'],
+        ['delete', 'alice@example.com', '198.51.100.23'],
+      ]
+    )
+    assert.ok(
+      entries.every(
+        (entry) =>
+          entry.id === meta.id &&
+          entry.name === 'Audited collection' &&
+          typeof entry.requestId === 'string' &&
+          !Number.isNaN(Date.parse(entry.ts))
+      )
+    )
     const text = fs.readFileSync(path.join(auditDir, files[0]), 'utf8')
     assert.ok(!text.includes('example.com/') && !text.includes('"item"'), 'no collection content in the log')
   } finally {
@@ -373,12 +419,21 @@ test('without TRUST_PROXY the user header is ignored and the socket address is l
   fs.rmSync(path.join(dataDir, 'audit'), { recursive: true, force: true })
   process.env.TRUSTED_USER_HEADER = 'X-Forwarded-User'
   try {
-    const saved = await postCollection({ ...sample, info: { name: 'Spoof' } }, { 'X-Forwarded-User': 'admin', 'X-Forwarded-For': '6.6.6.6' }, 'Spoof attempt')
+    const saved = await postCollection(
+      { ...sample, info: { name: 'Spoof' } },
+      { 'X-Forwarded-User': 'admin', 'X-Forwarded-For': '6.6.6.6' },
+      'Spoof attempt'
+    )
     assert.equal(saved.status, 201)
     assert.equal(JSON.parse(saved.body).savedBy, undefined)
     await flushAuditLog()
     const [file] = fs.readdirSync(path.join(dataDir, 'audit'))
-    const entry = JSON.parse(fs.readFileSync(path.join(dataDir, 'audit', file), 'utf8').trim().split('\n')[0])
+    const entry = JSON.parse(
+      fs
+        .readFileSync(path.join(dataDir, 'audit', file), 'utf8')
+        .trim()
+        .split('\n')[0]
+    )
     assert.equal(entry.user, null)
     assert.equal(entry.ip, '127.0.0.1')
     await raw(`/api/collections/${JSON.parse(saved.body).id}`, { method: 'DELETE' })

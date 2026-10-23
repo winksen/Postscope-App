@@ -149,7 +149,13 @@ export function getProxyUser(req: IncomingMessage): string | null {
   const cleaned = [...value]
     .filter((char) => {
       const code = char.codePointAt(0) ?? 0
-      return code > 0x1f && !(code >= 0x7f && code <= 0x9f) && !(code >= 0x200b && code <= 0x200f) && !(code >= 0x202a && code <= 0x202e) && !(code >= 0x2066 && code <= 0x2069)
+      return (
+        code > 0x1f &&
+        !(code >= 0x7f && code <= 0x9f) &&
+        !(code >= 0x200b && code <= 0x200f) &&
+        !(code >= 0x202a && code <= 0x202e) &&
+        !(code >= 0x2066 && code <= 0x2069)
+      )
     })
     .join('')
     .trim()

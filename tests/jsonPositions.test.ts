@@ -6,7 +6,8 @@ import { escapePointerSegment, itemPointer, locatePointers } from '../src/lib/js
 function allPointers(value: unknown, prefix = '', out: string[] = []): string[] {
   out.push(prefix)
   if (Array.isArray(value)) value.forEach((child, index) => allPointers(child, `${prefix}/${index}`, out))
-  else if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) allPointers(child, `${prefix}/${escapePointerSegment(key)}`, out)
+  else if (value && typeof value === 'object')
+    for (const [key, child] of Object.entries(value)) allPointers(child, `${prefix}/${escapePointerSegment(key)}`, out)
   return out
 }
 
@@ -33,7 +34,7 @@ test('matches a brute force search on a generated document with every kind of va
   const doc = {
     a: 1,
     'b/c': { 'd~e': [true, null, -1.5e3, 'text with "quotes" and \\ backslash', { z: [] }], '': 'empty key' },
-    'ключ': ['日本語', { nested: { deep: [[1, 2], [3]] } }],
+    ключ: ['日本語', { nested: { deep: [[1, 2], [3]] } }],
     esc: { 'a"b': 1, 'tab\tkey': 2 },
   }
   for (const [name, text] of [
@@ -47,11 +48,19 @@ test('matches a brute force search on a generated document with every kind of va
     const found = locatePointers(text, new Set(pointers))
     assert.equal(found.size, pointers.length, name)
     for (const [pointer, position] of found) {
-      const value = pointer.split('/').slice(1).reduce<unknown>((current, segment) => (current as Record<string, unknown>)[segment.replace(/~1/g, '/').replace(/~0/g, '~')], JSON.parse(text))
+      const value = pointer
+        .split('/')
+        .slice(1)
+        .reduce<unknown>(
+          (current, segment) => (current as Record<string, unknown>)[segment.replace(/~1/g, '/').replace(/~0/g, '~')],
+          JSON.parse(text)
+        )
       const serialized = JSON.stringify(value)
       // The value must start exactly where the scanner says it does.
       const lines = text.split(/\r\n|\n|\r/)
-      const startOfLine = lines.slice(0, position.line - 1).reduce((total, current) => total + current.length + (name === 'crlf' ? 2 : 1), 0)
+      const startOfLine = lines
+        .slice(0, position.line - 1)
+        .reduce((total, current) => total + current.length + (name === 'crlf' ? 2 : 1), 0)
       const offset = startOfLine + position.column - 1
       assert.equal(text[offset], serialized[0], `${name} ${pointer}`)
       assert.deepEqual(at(text, offset), position, `${name} ${pointer}`)
@@ -77,7 +86,12 @@ test('keys with escapes and slashes use RFC 6901 pointers', () => {
 })
 
 test('large documents are scanned in linear time with a tiny wanted set', () => {
-  const doc = { item: Array.from({ length: 20_000 }, (_, index) => ({ name: `Request ${index}`, request: { header: [{ key: 'X', value: String(index) }], url: 'https://example.com/' + index } })) }
+  const doc = {
+    item: Array.from({ length: 20_000 }, (_, index) => ({
+      name: `Request ${index}`,
+      request: { header: [{ key: 'X', value: String(index) }], url: 'https://example.com/' + index },
+    })),
+  }
   const text = JSON.stringify(doc, null, 2)
   const started = Date.now()
   const found = locatePointers(text, new Set(['/item/19999/request/header/0/value', '/item/10/name']))

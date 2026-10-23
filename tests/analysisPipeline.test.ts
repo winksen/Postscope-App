@@ -21,7 +21,10 @@ test('auditAgain applies new rule settings without parsing again', async () => {
 
 test('the reference collection has its own slot and never replaces the one on screen', async () => {
   const main = await analyzeCollectionText(JSON.stringify(kitchenSinkCollection()), undefined, { slot: 'main' })
-  const other = { info: { name: 'Other', schema: 'x' }, item: [{ name: 'Only', request: { method: 'GET', url: 'https://example.com/only', description: 'Only.' } }] }
+  const other = {
+    info: { name: 'Other', schema: 'x' },
+    item: [{ name: 'Only', request: { method: 'GET', url: 'https://example.com/only', description: 'Only.' } }],
+  }
   const reference = await analyzeCollectionText(JSON.stringify(other), undefined, { slot: 'reference' })
   assert.equal(reference.parsed.requests.length, 1)
 
@@ -32,7 +35,10 @@ test('the reference collection has its own slot and never replaces the one on sc
 })
 
 test('another environment can be selected and audited from the cached analysis', async () => {
-  const environments = [JSON.stringify(environmentExport('Staging', 'http://staging.corp.internal')), JSON.stringify(environmentExport('Production', 'https://api.corp.example'))]
+  const environments = [
+    JSON.stringify(environmentExport('Staging', 'http://staging.corp.internal')),
+    JSON.stringify(environmentExport('Production', 'https://api.corp.example')),
+  ]
   const raw = JSON.stringify(kitchenSinkCollection())
   const first = await analyzeCollectionText(raw, undefined, { environments })
   const firstSelected = first.parsed.activeEnvironment
@@ -44,7 +50,10 @@ test('another environment can be selected and audited from the cached analysis',
 
   const direct = await analyzeCollectionText(raw, undefined, { environments, activeEnvironment: 1 })
   assert.equal(direct.parsed.activeEnvironment, 1)
-  assert.deepEqual(direct.findings.map((finding) => finding.ruleId), production?.findings.map((finding) => finding.ruleId))
+  assert.deepEqual(
+    direct.findings.map((finding) => finding.ruleId),
+    production?.findings.map((finding) => finding.ruleId)
+  )
 })
 
 test('nothing is leaked into results', async () => {

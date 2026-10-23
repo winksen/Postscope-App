@@ -61,7 +61,11 @@ test('variable helpers', () => {
 test('detects every added provider token format and ignores near misses', () => {
   for (const [id, sample] of Object.entries(PROVIDER_SAMPLES)) {
     const found = findSecretPatterns(`value=${sample.token};`)
-    assert.deepEqual(found.map((match) => [match.patternId, match.label]), [[id, sample.label]], id)
+    assert.deepEqual(
+      found.map((match) => [match.patternId, match.label]),
+      [[id, sample.label]],
+      id
+    )
     assert.equal(found[0].match.includes(sample.token) || sample.token.includes(found[0].match), true, id)
     assert.deepEqual(findSecretPatterns(`value=${sample.near};`), [], `${id} near miss`)
     assert.ok(!redactSecretsInText(`x ${sample.token} y`).includes(sample.token), `${id} redaction`)
@@ -70,7 +74,27 @@ test('detects every added provider token format and ignores near misses', () => 
 
 test('every provider pattern has a sample', () => {
   const covered = new Set(Object.keys(PROVIDER_SAMPLES))
-  const added = SECRET_PATTERNS.map((pattern) => pattern.id).filter((id) => !['private-key', 'aws-access-key', 'github-token', 'gitlab-token', 'slack-token', 'slack-webhook', 'stripe-key', 'google-api-key', 'anthropic-key', 'openai-key', 'sendgrid-key', 'twilio-key', 'npm-token', 'azure-storage-key', 'jwt', 'connection-string'].includes(id))
+  const added = SECRET_PATTERNS.map((pattern) => pattern.id).filter(
+    (id) =>
+      ![
+        'private-key',
+        'aws-access-key',
+        'github-token',
+        'gitlab-token',
+        'slack-token',
+        'slack-webhook',
+        'stripe-key',
+        'google-api-key',
+        'anthropic-key',
+        'openai-key',
+        'sendgrid-key',
+        'twilio-key',
+        'npm-token',
+        'azure-storage-key',
+        'jwt',
+        'connection-string',
+      ].includes(id)
+  )
   assert.deepEqual(added.sort(), [...covered].sort())
 })
 

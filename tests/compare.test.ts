@@ -25,7 +25,7 @@ function clone<T>(value: T): T {
 }
 
 function users(collection: Record<string, unknown>): Item[] {
-  return ((collection.item as Item[])[0].item as Item[])
+  return (collection.item as Item[])[0].item as Item[]
 }
 
 test('identical collections have no differences', () => {
@@ -89,11 +89,20 @@ test('changed methods, added and removed requests, hosts and auth types', () => 
   const list = users(next)
   list[0].request = { ...list[0].request, method: 'POST' }
   list.splice(1, 1)
-  list.push({ name: 'Health', request: { method: 'GET', url: 'https://status.example.org/health', auth: { type: 'noauth' }, description: 'Health.' } })
+  list.push({
+    name: 'Health',
+    request: { method: 'GET', url: 'https://status.example.org/health', auth: { type: 'noauth' }, description: 'Health.' },
+  })
 
   const result = compare(cleanCollection(), next)
-  assert.deepEqual(result.requests.added.map((request) => request.name), ['Health'])
-  assert.deepEqual(result.requests.removed.map((request) => request.name), ['Create user'])
+  assert.deepEqual(
+    result.requests.added.map((request) => request.name),
+    ['Health']
+  )
+  assert.deepEqual(
+    result.requests.removed.map((request) => request.name),
+    ['Create user']
+  )
   assert.equal(result.requests.changed.length, 1)
   assert.deepEqual(result.requests.changed[0].fields, ['method'])
   assert.deepEqual(result.newHosts, ['status.example.org'])
@@ -115,12 +124,18 @@ test('output is deterministic and carries no secret values or query strings', ()
   const first = compare(cleanCollection(), risky)
   const second = compare(cleanCollection(), risky)
   assert.deepEqual(first, second)
-  assert.deepEqual(first.requests.added.map((request) => request.name), ['Alpha', 'Zeta'])
+  assert.deepEqual(
+    first.requests.added.map((request) => request.name),
+    ['Alpha', 'Zeta']
+  )
   assert.deepEqual(first.newHosts, ['alpha.example.com', 'zeta.example.com'])
 
   const severities = first.findings.added.map((finding) => finding.severity)
   const rank = { critical: 0, warning: 1, info: 2 }
-  assert.deepEqual([...severities].sort((a, b) => rank[a] - rank[b]), severities)
+  assert.deepEqual(
+    [...severities].sort((a, b) => rank[a] - rank[b]),
+    severities
+  )
 
   for (const output of [buildComparisonJson(first), buildComparisonMarkdown(first), buildComparisonText(first)]) {
     assert.ok(!output.includes(FAKE.bearer))

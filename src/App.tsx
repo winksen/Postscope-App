@@ -64,22 +64,22 @@ export default function App() {
   return (
     <BrowserRouter>
       <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        {config.publicLandingPage ? (
-          <>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/analyze/*" element={analyzer} />
-            <Route path="/samples" element={<SamplesApp analyzePath="/analyze" />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </>
-        ) : (
-          <>
-            <Route path="/analyze/*" element={<Navigate to="/" replace />} />
-            <Route path="/samples" element={<SamplesApp analyzePath="/" />} />
-            <Route path="/*" element={analyzer} />
-          </>
-        )}
-      </Routes>
+        <Routes>
+          {config.publicLandingPage ? (
+            <>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/analyze/*" element={analyzer} />
+              <Route path="/samples" element={<SamplesApp analyzePath="/analyze" />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          ) : (
+            <>
+              <Route path="/analyze/*" element={<Navigate to="/" replace />} />
+              <Route path="/samples" element={<SamplesApp analyzePath="/" />} />
+              <Route path="/*" element={analyzer} />
+            </>
+          )}
+        </Routes>
       </Suspense>
     </BrowserRouter>
   )

@@ -108,13 +108,7 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
   }, [handleApplyRepairedCollection, originalRawJson])
 
   if (!parsed) {
-    return (
-      <SampleDropZone
-        onSelectSample={handleSelectSample}
-        loading={landingLoading}
-        analyzePath={analyzePath}
-      />
-    )
+    return <SampleDropZone onSelectSample={handleSelectSample} loading={landingLoading} analyzePath={analyzePath} />
   }
 
   const score = calculateScore(parsed, findings)
@@ -155,10 +149,23 @@ export function SamplesApp({ analyzePath = '/analyze' }: SamplesAppProps) {
           />
         )}
         {active === 'security' && (
-          <SecurityPage parsed={parsed} findings={securityFindings} score={score} search={search} location={securityView} onLocationChange={setSecurityView} />
+          <SecurityPage
+            parsed={parsed}
+            findings={securityFindings}
+            score={score}
+            search={search}
+            location={securityView}
+            onLocationChange={setSecurityView}
+          />
         )}
         {active === 'hygiene' && (
-          <HygienePage parsed={parsed} findings={hygieneFindings} search={search} location={hygieneView} onLocationChange={setHygieneView} />
+          <HygienePage
+            parsed={parsed}
+            findings={hygieneFindings}
+            search={search}
+            location={hygieneView}
+            onLocationChange={setHygieneView}
+          />
         )}
         {active === 'repair' && rawJson && (
           <RepairPage

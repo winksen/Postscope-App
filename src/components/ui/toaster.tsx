@@ -46,7 +46,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       const id = nextId.current++
       const ttl = duration ?? (variant === 'error' ? 8000 : 5000)
       setToasts((current) => [...current.slice(-(MAX_VISIBLE - 1)), { id, title, description, variant, duration: ttl }])
-      if (ttl > 0) timers.current.set(id, setTimeout(() => dismiss(id), ttl))
+      if (ttl > 0)
+        timers.current.set(
+          id,
+          setTimeout(() => dismiss(id), ttl)
+        )
     },
     [dismiss]
   )
@@ -81,7 +85,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <Icon
                 className={cn(
                   'mt-0.5 h-5 w-5 shrink-0',
-                  toast.variant === 'error' ? 'text-destructive-text' : toast.variant === 'success' ? 'text-[hsl(var(--success-text))]' : 'text-muted-foreground'
+                  toast.variant === 'error'
+                    ? 'text-destructive-text'
+                    : toast.variant === 'success'
+                      ? 'text-[hsl(var(--success-text))]'
+                      : 'text-muted-foreground'
                 )}
                 weight="fill"
               />

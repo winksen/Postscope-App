@@ -135,6 +135,10 @@ None are required for local development or a static production build. The Node s
 | `npm run start:node` | Run the compiled server |
 | `npm run preview` | Serve the production build locally on **port 3010** |
 | `npm test` | Run every `tests/*.test.ts` suite with the Node test runner |
+| `npm run lint` | ESLint (typescript-eslint, react-hooks, jsx-a11y) with zero warnings allowed |
+| `npm run format` / `npm run format:check` | Write or check Prettier formatting (no semicolons, single quotes, 140 columns) |
+| `npm run check:style` | Fail when the em dash character appears anywhere in the project (docs/VISUAL_STYLE.md) |
+| `npm run test:e2e` | Browser smoke, navigation, accessibility (axe) and large-collection tests with Playwright against the compiled server; run `npm run build && npm run build:node` first and `npx playwright install chromium` once (or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chromium) |
 | `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports folders and globs, `postscope diff <old> <new>` to compare two versions, `--format junit`, `--auto-env`, `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
 | `npm run bench` | Parse and audit time on a 6000-request collection plus bundle sizes; `-- --check` fails when a number is more than 20 percent worse than `scripts/bench-baseline.json`, `-- --update` records a new baseline, `-- --report file` writes JSON |
 | `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
@@ -219,7 +223,7 @@ No API keys are required for the stock app.
 
 1. Fork the repository and create a feature branch (`feat/…`, `fix/…`).
 2. Keep changes focused; match existing TypeScript and component patterns.
-3. Run `npm test` and `npm run build` locally to ensure tests, typecheck and production build succeed.
+3. Run `npm run lint`, `npm run format:check`, `npm run check:style`, `npm test` and `npm run build` locally (CI also runs `npm run test:e2e`, the performance budgets and a Docker smoke test).
 4. Open a pull request with a short description of behavior changes and any UI impact.
 
 For audit rules, register the rule in `src/lib/rules.ts`, implement it in `src/lib/auditor.ts` and add positive and false-positive tests. Release rules (one commit per version, changelog, tags) are in [mindmap/ROADMAP.md](mindmap/ROADMAP.md).

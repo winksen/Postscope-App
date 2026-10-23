@@ -28,18 +28,37 @@ function itemAt(raw: unknown, itemPath: readonly number[]): Json | undefined {
 function indexOfKey(list: unknown, key: string, disabled: boolean): number {
   if (!Array.isArray(list)) return -1
   const wanted = key.trim().toLowerCase()
-  const exact = list.findIndex((entry) => isRecord(entry) && String(entry.key ?? '').trim().toLowerCase() === wanted && (entry.disabled === true) === disabled)
-  return exact !== -1 ? exact : list.findIndex((entry) => isRecord(entry) && String(entry.key ?? '').trim().toLowerCase() === wanted)
+  const exact = list.findIndex(
+    (entry) =>
+      isRecord(entry) &&
+      String(entry.key ?? '')
+        .trim()
+        .toLowerCase() === wanted &&
+      (entry.disabled === true) === disabled
+  )
+  return exact !== -1
+    ? exact
+    : list.findIndex(
+        (entry) =>
+          isRecord(entry) &&
+          String(entry.key ?? '')
+            .trim()
+            .toLowerCase() === wanted
+      )
 }
 
 function eventIndex(events: unknown, listen: string, disabled: boolean): number {
   if (!Array.isArray(events)) return -1
-  const index = events.findIndex((event) => isRecord(event) && event.listen === listen && (event.disabled === true) === disabled && isRecord(event.script))
+  const index = events.findIndex(
+    (event) => isRecord(event) && event.listen === listen && (event.disabled === true) === disabled && isRecord(event.script)
+  )
   return index !== -1 ? index : events.findIndex((event) => isRecord(event) && event.listen === listen && isRecord(event.script))
 }
 
 function folderPointer(parsed: ParsedCollection, name: string): string | undefined {
-  const owner = parsed.authOwners?.find((candidate) => candidate.owner === name) ?? parsed.descriptions?.find((candidate) => candidate.kind === 'folder' && candidate.owner === name)
+  const owner =
+    parsed.authOwners?.find((candidate) => candidate.owner === name) ??
+    parsed.descriptions?.find((candidate) => candidate.kind === 'folder' && candidate.owner === name)
   return owner ? itemPointer(owner.ownerPath) : undefined
 }
 
@@ -51,7 +70,12 @@ function requestPointer(raw: unknown, req: ParsedRequest, evidence: FindingEvide
   const location = evidence.location
   const disabled = /\(disabled\)/.test(location)
   const url = request?.url
-  const urlPointer = typeof url === 'string' ? `${base}/request/url` : isRecord(url) ? `${base}/request/url${typeof url.raw === 'string' ? '/raw' : ''}` : `${base}/request`
+  const urlPointer =
+    typeof url === 'string'
+      ? `${base}/request/url`
+      : isRecord(url)
+        ? `${base}/request/url${typeof url.raw === 'string' ? '/raw' : ''}`
+        : `${base}/request`
   let match: RegExpMatchArray | null
 
   if ((match = location.match(/^(?:header|cookie) ([^\s(][^(]*?)(?: \(.*)?$/))) {
@@ -119,8 +143,12 @@ function collectionPointer(raw: unknown, parsed: ParsedCollection, evidence: Fin
     return index !== -1 ? `/variable/${index}/value` : '/variable'
   }
   if ((match = location.match(/^folder variable (\S+) \(folder "(.*?)"\)/))) {
-    const pointer = folderPointer(parsed, match[2]) ?? parsed.scopedVariables?.map((variable) => (variable.owner === match![2] ? itemPointer(variable.ownerPath) : undefined)).find(Boolean)
-    const item = pointer ? itemAt(raw, (parsed.scopedVariables ?? []).find((variable) => variable.owner === match![2])?.ownerPath ?? []) : undefined
+    const pointer =
+      folderPointer(parsed, match[2]) ??
+      parsed.scopedVariables?.map((variable) => (variable.owner === match![2] ? itemPointer(variable.ownerPath) : undefined)).find(Boolean)
+    const item = pointer
+      ? itemAt(raw, (parsed.scopedVariables ?? []).find((variable) => variable.owner === match![2])?.ownerPath ?? [])
+      : undefined
     const index = indexOfKey(item?.variable, match[1], false)
     return pointer ? (index !== -1 ? `${pointer}/variable/${index}/value` : `${pointer}/variable`) : undefined
   }
@@ -158,4 +186,3 @@ export function attachEvidencePointers<T extends Finding>(raw: unknown, parsed: 
     return { ...finding, evidence }
   })
 }
-

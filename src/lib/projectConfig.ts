@@ -30,7 +30,8 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
   for (const key of Object.keys(raw)) if (!KEYS.has(key)) errors.push(`unknown key "${key}"`)
 
   if (raw.disabledRules !== undefined) {
-    if (!Array.isArray(raw.disabledRules) || raw.disabledRules.some((rule) => typeof rule !== 'string')) errors.push('"disabledRules" must be an array of rule ids')
+    if (!Array.isArray(raw.disabledRules) || raw.disabledRules.some((rule) => typeof rule !== 'string'))
+      errors.push('"disabledRules" must be an array of rule ids')
     else {
       const rules = raw.disabledRules.map((rule) => String(rule).toUpperCase())
       for (const rule of rules) if (!isRuleId(rule)) errors.push(`"disabledRules" has unknown rule "${rule}"`)
@@ -40,7 +41,8 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
 
   if (raw.severityOverrides !== undefined) {
     const overrides = raw.severityOverrides
-    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) errors.push('"severityOverrides" must be an object of rule id to severity')
+    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides))
+      errors.push('"severityOverrides" must be an object of rule id to severity')
     else {
       config.severityOverrides = {}
       for (const [rule, severity] of Object.entries(overrides as Record<string, unknown>)) {
@@ -54,11 +56,13 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
 
   if (raw.weights !== undefined) {
     const weights = raw.weights
-    if (!weights || typeof weights !== 'object' || Array.isArray(weights)) errors.push('"weights" must be an object such as {"critical": 20, "warning": 8, "info": 2}')
+    if (!weights || typeof weights !== 'object' || Array.isArray(weights))
+      errors.push('"weights" must be an object such as {"critical": 20, "warning": 8, "info": 2}')
     else {
       for (const [severity, value] of Object.entries(weights as Record<string, unknown>)) {
         if (!isSeverity(severity)) errors.push(`"weights" has unknown severity "${severity}"`)
-        else if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) errors.push(`"weights.${severity}" must be a number from 0 to 100`)
+        else if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100)
+          errors.push(`"weights.${severity}" must be a number from 0 to 100`)
       }
       config.weights = sanitizeScoreWeights(weights)
     }
@@ -80,11 +84,14 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
         for (const key of Object.keys(item)) if (!SUPPRESSION_KEYS.has(key)) errors.push(`${where} has unknown key "${key}"`)
         const ruleId = typeof item.ruleId === 'string' ? item.ruleId.toUpperCase() : ''
         if (!ruleId || !isRuleId(ruleId)) errors.push(`${where}.ruleId must be a known rule id`)
-        if (typeof item.reason !== 'string' || !item.reason.trim()) errors.push(`${where}.reason is required: explain why the finding is accepted`)
+        if (typeof item.reason !== 'string' || !item.reason.trim())
+          errors.push(`${where}.reason is required: explain why the finding is accepted`)
         for (const key of ['request', 'location'] as const) {
-          if (item[key] !== undefined && (typeof item[key] !== 'string' || !String(item[key]).trim())) errors.push(`${where}.${key} must be a non-empty string`)
+          if (item[key] !== undefined && (typeof item[key] !== 'string' || !String(item[key]).trim()))
+            errors.push(`${where}.${key} must be a non-empty string`)
         }
-        if (item.expires !== undefined && (typeof item.expires !== 'string' || !isValidDate(item.expires))) errors.push(`${where}.expires must be a date such as 2027-01-31`)
+        if (item.expires !== undefined && (typeof item.expires !== 'string' || !isValidDate(item.expires)))
+          errors.push(`${where}.expires must be a date such as 2027-01-31`)
         if (ruleId && isRuleId(ruleId) && typeof item.reason === 'string' && item.reason.trim()) {
           config.suppressions!.push({
             ruleId,
@@ -100,4 +107,3 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
 
   return { config, errors }
 }
-

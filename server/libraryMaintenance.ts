@@ -97,11 +97,13 @@ export async function migrateLibrary(dir: string, keys: EncryptionKeys, { dryRun
       }
 
       const record = JSON.parse(plaintext) as { rawJson?: unknown; id?: unknown; contentHash?: unknown }
-      if (typeof record.rawJson !== 'string' || typeof record.id !== 'string' || record.id.toLowerCase() !== id) throw new Error('not a library record')
+      if (typeof record.rawJson !== 'string' || typeof record.id !== 'string' || record.id.toLowerCase() !== id)
+        throw new Error('not a library record')
       // The deduplication hash becomes a keyed hash under the current key.
       record.contentHash = keyedHash(record.rawJson, keys.current)
       const sealed = JSON.stringify(encryptRecord(JSON.stringify(record), id, keys.current))
-      if (JSON.parse(decryptRecord(JSON.parse(sealed), id, keys)).rawJson !== record.rawJson) throw new Error('verification after encryption failed')
+      if (JSON.parse(decryptRecord(JSON.parse(sealed), id, keys)).rawJson !== record.rawJson)
+        throw new Error('verification after encryption failed')
 
       if (!dryRun) await replaceFile(file, sealed)
       if (wasEncrypted) report.rotated += 1

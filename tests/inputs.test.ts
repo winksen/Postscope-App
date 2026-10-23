@@ -59,13 +59,18 @@ test('globs are expanded by the tool, relative to the working folder or absolute
     'collections/team/deep/c.postman_collection.json',
   ])
   assert.deepEqual(rel(expandInput(at('collections', '*', '*.postman_collection.json'))), ['collections/team/b.postman_collection.json'])
-  assert.deepEqual(rel(expandInput(at('{collections,other}', '*.postman_collection.json').replace(root, `${root}`))), ['collections/a.postman_collection.json', 'other/d.postman_collection.json'])
+  assert.deepEqual(rel(expandInput(at('{collections,other}', '*.postman_collection.json').replace(root, `${root}`))), [
+    'collections/a.postman_collection.json',
+    'other/d.postman_collection.json',
+  ])
   assert.throws(() => expandInput(at('collections', '**', '*.nothing')), NoMatchError)
 
   const previous = process.cwd()
   process.chdir(root)
   try {
-    assert.deepEqual(rel(expandInput('./collections/team/*.postman_collection.json').map((file) => path.resolve(file))), ['collections/team/b.postman_collection.json'])
+    assert.deepEqual(rel(expandInput('./collections/team/*.postman_collection.json').map((file) => path.resolve(file))), [
+      'collections/team/b.postman_collection.json',
+    ])
     assert.deepEqual(rel(expandInput('other/*.json').map((file) => path.resolve(file))), ['other/d.postman_collection.json'])
   } finally {
     process.chdir(previous)
@@ -86,7 +91,10 @@ test('plain paths, stdin and missing files pass through, and duplicates are remo
 })
 
 test('sibling environment and globals files are found next to a collection only', () => {
-  assert.deepEqual(rel(findSiblingEnvironments(at('collections', 'team', 'b.postman_collection.json'))), ['collections/team/b.postman_environment.json', 'collections/team/b.postman_globals.json'])
+  assert.deepEqual(rel(findSiblingEnvironments(at('collections', 'team', 'b.postman_collection.json'))), [
+    'collections/team/b.postman_environment.json',
+    'collections/team/b.postman_globals.json',
+  ])
   assert.deepEqual(findSiblingEnvironments(at('collections', 'a.postman_collection.json')), [])
   assert.deepEqual(findSiblingEnvironments('-'), [])
   assert.deepEqual(findSiblingEnvironments(at('nowhere', 'x.postman_collection.json')), [])

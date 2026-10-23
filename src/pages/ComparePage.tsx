@@ -32,7 +32,9 @@ function Delta({ value }: { value: number }) {
   }
   const better = value > 0
   return (
-    <span className={cn('inline-flex items-center gap-1 font-medium', better ? 'text-[hsl(var(--success-text))]' : 'text-destructive-text')}>
+    <span
+      className={cn('inline-flex items-center gap-1 font-medium', better ? 'text-[hsl(var(--success-text))]' : 'text-destructive-text')}
+    >
       {better ? <ArrowUp className="h-3.5 w-3.5" aria-hidden /> : <ArrowDown className="h-3.5 w-3.5" aria-hidden />}
       {better ? `+${value}` : value}
       <span className="sr-only">{better ? ' (better)' : ' (worse)'}</span>
@@ -98,7 +100,16 @@ function ListCard({ title, description, items }: { title: string; description: s
   )
 }
 
-export function ComparePage({ current, reference, loading, library, currentLibraryId, onChooseFile, onChooseLibrary, onClear }: ComparePageProps) {
+export function ComparePage({
+  current,
+  reference,
+  loading,
+  library,
+  currentLibraryId,
+  onChooseFile,
+  onChooseLibrary,
+  onClear,
+}: ComparePageProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const comparison = useMemo(() => (reference ? compareCollections(reference, current) : null), [reference, current])
   const candidates = library.filter((item) => item.id !== currentLibraryId)
@@ -109,7 +120,8 @@ export function ComparePage({ current, reference, loading, library, currentLibra
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Compare versions</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            See what changed between an older version and the collection that is open now: new and resolved findings, the score change, and requests that were added, removed or edited. Both files are analyzed in your browser.
+            See what changed between an older version and the collection that is open now: new and resolved findings, the score change, and
+            requests that were added, removed or edited. Both files are analyzed in your browser.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -149,7 +161,11 @@ export function ComparePage({ current, reference, loading, library, currentLibra
             <CardDescription>The open collection is the newer one. Choose a file, or a collection from the team library.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loading && <p role="status" className="text-sm text-muted-foreground">Analyzing the older version...</p>}
+            {loading && (
+              <p role="status" className="text-sm text-muted-foreground">
+                Analyzing the older version...
+              </p>
+            )}
             {candidates.length > 0 && (
               <div className="space-y-2">
                 <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -158,7 +174,12 @@ export function ComparePage({ current, reference, loading, library, currentLibra
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {candidates.slice(0, 12).map((item) => (
                     <li key={item.id}>
-                      <Button variant="secondary" className="h-auto w-full justify-between gap-3 py-2 text-left" disabled={loading} onClick={() => onChooseLibrary(item.id)}>
+                      <Button
+                        variant="secondary"
+                        className="h-auto w-full justify-between gap-3 py-2 text-left"
+                        disabled={loading}
+                        onClick={() => onChooseLibrary(item.id)}
+                      >
                         <span className="min-w-0 truncate text-sm">{item.name}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">{item.requestCount} requests</span>
                       </Button>
@@ -180,13 +201,15 @@ export function ComparePage({ current, reference, loading, library, currentLibra
                 {comparison.before.score} <span className="text-muted-foreground">to</span> {comparison.after.score}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Change <Delta value={comparison.scoreDelta.total} />, security <Delta value={comparison.scoreDelta.security} />, hygiene <Delta value={comparison.scoreDelta.hygiene} />
+                Change <Delta value={comparison.scoreDelta.total} />, security <Delta value={comparison.scoreDelta.security} />, hygiene{' '}
+                <Delta value={comparison.scoreDelta.hygiene} />
               </p>
             </Card>
             <Card className="p-5">
               <p className="text-sm font-medium text-muted-foreground">Findings</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
-                {comparison.findings.added.length} new <span className="text-muted-foreground">/</span> {comparison.findings.resolved.length} resolved
+                {comparison.findings.added.length} new <span className="text-muted-foreground">/</span>{' '}
+                {comparison.findings.resolved.length} resolved
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{comparison.findings.unchanged} unchanged occurrence(s)</p>
             </Card>
@@ -196,13 +219,15 @@ export function ComparePage({ current, reference, loading, library, currentLibra
                 {comparison.before.totalRequests} <span className="text-muted-foreground">to</span> {comparison.after.totalRequests}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {comparison.requests.added.length} added, {comparison.requests.removed.length} removed, {comparison.requests.changed.length} changed
+                {comparison.requests.added.length} added, {comparison.requests.removed.length} removed, {comparison.requests.changed.length}{' '}
+                changed
               </p>
             </Card>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Before: <span className="font-medium text-foreground">{comparison.before.name}</span>. After: <span className="font-medium text-foreground">{comparison.after.name}</span>.
+            Before: <span className="font-medium text-foreground">{comparison.before.name}</span>. After:{' '}
+            <span className="font-medium text-foreground">{comparison.after.name}</span>.
           </p>
 
           <Card>
@@ -229,8 +254,16 @@ export function ComparePage({ current, reference, loading, library, currentLibra
           </Card>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <ListCard title="Added requests" description="Only in the open collection." items={comparison.requests.added.map((request) => `${request.method} ${requestLabel(request)}`)} />
-            <ListCard title="Removed requests" description="Only in the older version." items={comparison.requests.removed.map((request) => `${request.method} ${requestLabel(request)}`)} />
+            <ListCard
+              title="Added requests"
+              description="Only in the open collection."
+              items={comparison.requests.added.map((request) => `${request.method} ${requestLabel(request)}`)}
+            />
+            <ListCard
+              title="Removed requests"
+              description="Only in the older version."
+              items={comparison.requests.removed.map((request) => `${request.method} ${requestLabel(request)}`)}
+            />
             <ListCard
               title="Changed requests"
               description="Matched by id or by method and URL, with different content."
@@ -247,8 +280,15 @@ export function ComparePage({ current, reference, loading, library, currentLibra
               ]}
             />
           </div>
-          {comparison.requests.added.length + comparison.requests.removed.length + comparison.requests.changed.length + comparison.findings.added.length + comparison.findings.resolved.length === 0 && (
-            <Badge variant="secondary" className="w-fit">No differences found</Badge>
+          {comparison.requests.added.length +
+            comparison.requests.removed.length +
+            comparison.requests.changed.length +
+            comparison.findings.added.length +
+            comparison.findings.resolved.length ===
+            0 && (
+            <Badge variant="secondary" className="w-fit">
+              No differences found
+            </Badge>
           )}
         </>
       )}

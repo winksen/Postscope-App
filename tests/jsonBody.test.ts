@@ -54,13 +54,19 @@ test('detects indentation', () => {
 test('raw body scanner finds pairs, XML elements and JSON fragments with exact ranges', () => {
   const raw = 'a=1&token=abc123def <x:Pass Type="t">hunter22</x:Pass> {"password": "p4ss-word",}'
   const fields = scanRawBodyFields(raw)
-  assert.deepEqual(fields.map((field) => [field.kind, field.key, field.value]), [
-    ['pair', 'a', '1'],
-    ['pair', 'token', 'abc123def'],
-    ['xml', 'Pass', 'hunter22'],
-    ['json', 'password', 'p4ss-word'],
-  ])
+  assert.deepEqual(
+    fields.map((field) => [field.kind, field.key, field.value]),
+    [
+      ['pair', 'a', '1'],
+      ['pair', 'token', 'abc123def'],
+      ['xml', 'Pass', 'hunter22'],
+      ['json', 'password', 'p4ss-word'],
+    ]
+  )
   for (const field of fields) assert.equal(raw.slice(field.start, field.end), field.value)
-  const replaced = replaceRawBodyFields(raw, fields.filter((field) => field.key !== 'a').map((field) => ({ field, value: '{{v}}' })))
+  const replaced = replaceRawBodyFields(
+    raw,
+    fields.filter((field) => field.key !== 'a').map((field) => ({ field, value: '{{v}}' }))
+  )
   assert.equal(replaced, 'a=1&token={{v}} <x:Pass Type="t">{{v}}</x:Pass> {"password": "{{v}}",}')
 })

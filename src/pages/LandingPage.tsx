@@ -1,21 +1,8 @@
-import {
-  ArrowRight,
-  ChartBar,
-  FileCode,
-  Lightning,
-  MagnifyingGlass,
-  ShieldCheck,
-  Stethoscope,
-} from '@phosphor-icons/react'
+import { ArrowRight, ChartBar, FileCode, Lightning, MagnifyingGlass, ShieldCheck, Stethoscope } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  FeatureCard,
-  MarketingBackground,
-  MarketingCtaButton,
-  MarketingHeader,
-} from '@/components/marketing/marketing-shell'
+import { FeatureCard, MarketingBackground, MarketingCtaButton, MarketingHeader } from '@/components/marketing/marketing-shell'
 
 const STEPS = [
   {
@@ -43,24 +30,17 @@ export function LandingPage() {
     <div className="relative min-h-screen overflow-hidden bg-background">
       <MarketingBackground />
 
-      <MarketingHeader
-        actions={
-          <MarketingCtaButton to="/analyze">
-            Open analyzer
-          </MarketingCtaButton>
-        }
-      />
+      <MarketingHeader actions={<MarketingCtaButton to="/analyze">Open analyzer</MarketingCtaButton>} />
 
       <main className="relative px-6 pb-24 pt-28">
         <section className="mx-auto flex max-w-4xl flex-col items-center text-center">
           <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl animate-fade-in">
-            Understand your <span className="text-orange-400">Postman</span> collections{' '}
-            <span className="text-primary">in Seconds</span>
+            Understand your <span className="text-orange-400">Postman</span> collections <span className="text-primary">in Seconds</span>
           </h1>
 
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg animate-fade-in">
-            PostScope audits API collections locally: security risks, structural debt, and coverage gaps,
-            without uploading your data to any server.
+            PostScope audits API collections locally: security risks, structural debt, and coverage gaps, without uploading your data to any
+            server.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3 animate-fade-in">
@@ -77,32 +57,15 @@ export function LandingPage() {
         </section>
 
         <section className="mx-auto mt-20 grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-3">
-          <FeatureCard
-            icon={ShieldCheck}
-            title="Privacy-first"
-            description="Parsed locally, never uploaded to any server."
-            delay={100}
-          />
-          <FeatureCard
-            icon={Lightning}
-            title="Instant analysis"
-            description="Results in milliseconds, no waiting."
-            delay={200}
-          />
-          <FeatureCard
-            icon={ChartBar}
-            title="Visual insights"
-            description="Charts and security scoring at a glance."
-            delay={300}
-          />
+          <FeatureCard icon={ShieldCheck} title="Privacy-first" description="Parsed locally, never uploaded to any server." delay={100} />
+          <FeatureCard icon={Lightning} title="Instant analysis" description="Results in milliseconds, no waiting." delay={200} />
+          <FeatureCard icon={ChartBar} title="Visual insights" description="Charts and security scoring at a glance." delay={300} />
         </section>
 
         <section className="mx-auto mt-24 max-w-4xl">
           <div className="mb-10 text-center">
             <p className="text-sm font-medium text-primary">How it works</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-              From export to actionable insights
-            </h2>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">From export to actionable insights</h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
               Three steps to a healthier, safer API collection. No account required.
             </p>
@@ -141,8 +104,7 @@ export function LandingPage() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold tracking-tight">Ready to diagnose your APIs?</h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
-                  Drop a Postman collection and get security findings, request maps, and a health score,
-                  all processed on your device.
+                  Drop a Postman collection and get security findings, request maps, and a health score, all processed on your device.
                 </p>
               </div>
               <Button size="lg" className="gap-2 shadow-sm" asChild>

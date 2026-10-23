@@ -20,18 +20,24 @@ function matchesType(value: unknown, type: string): boolean {
 export function validate(schema: Schema, value: unknown, root: Schema = schema, path = '$'): string[] {
   const errors: string[] = []
   if (typeof schema.$ref === 'string') {
-    const target = schema.$ref.replace(/^#\//, '').split('/').reduce<unknown>((node, key) => (node as Record<string, unknown>)?.[key], root)
+    const target = schema.$ref
+      .replace(/^#\//, '')
+      .split('/')
+      .reduce<unknown>((node, key) => (node as Record<string, unknown>)?.[key], root)
     if (!target) return [`${path}: unresolved reference ${schema.$ref}`]
     return validate(target as Schema, value, root, path)
   }
-  if ('const' in schema && JSON.stringify(schema.const) !== JSON.stringify(value)) errors.push(`${path}: expected ${JSON.stringify(schema.const)}`)
-  if (Array.isArray(schema.enum) && !schema.enum.some((option) => JSON.stringify(option) === JSON.stringify(value))) errors.push(`${path}: ${JSON.stringify(value)} is not one of ${JSON.stringify(schema.enum)}`)
+  if ('const' in schema && JSON.stringify(schema.const) !== JSON.stringify(value))
+    errors.push(`${path}: expected ${JSON.stringify(schema.const)}`)
+  if (Array.isArray(schema.enum) && !schema.enum.some((option) => JSON.stringify(option) === JSON.stringify(value)))
+    errors.push(`${path}: ${JSON.stringify(value)} is not one of ${JSON.stringify(schema.enum)}`)
   if (schema.type !== undefined) {
     const types = Array.isArray(schema.type) ? (schema.type as string[]) : [schema.type as string]
     if (!types.some((type) => matchesType(value, type))) return [`${path}: expected ${types.join(' or ')} but got ${typeOf(value)}`]
   }
   if (typeof value === 'string') {
-    if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value)) errors.push(`${path}: does not match ${schema.pattern}`)
+    if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value))
+      errors.push(`${path}: does not match ${schema.pattern}`)
     if (typeof schema.minLength === 'number' && value.length < schema.minLength) errors.push(`${path}: shorter than ${schema.minLength}`)
   }
   if (typeof value === 'number') {
@@ -49,7 +55,8 @@ export function validate(schema: Schema, value: unknown, root: Schema = schema, 
     for (const [key, child] of Object.entries(record)) {
       if (properties[key]) errors.push(...validate(properties[key], child, root, `${path}.${key}`))
       else if (schema.additionalProperties === false) errors.push(`${path}: unexpected property "${key}"`)
-      else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') errors.push(...validate(schema.additionalProperties as Schema, child, root, `${path}.${key}`))
+      else if (schema.additionalProperties && typeof schema.additionalProperties === 'object')
+        errors.push(...validate(schema.additionalProperties as Schema, child, root, `${path}.${key}`))
     }
   }
   return errors

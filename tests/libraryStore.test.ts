@@ -13,7 +13,14 @@ const { RateLimiter, safeEqual, isSameOriginRequest } = await import('../server/
 const { resolveStaticPath } = await import('../server/staticFiles')
 
 const libraryDir = path.join(tmpRoot, 'library')
-const collection = (name: string) => JSON.stringify({ info: { name }, item: [{ name: 'A', request: { url: 'x' } }, { name: 'F', item: [{ name: 'B', request: 'y' }] }] })
+const collection = (name: string) =>
+  JSON.stringify({
+    info: { name },
+    item: [
+      { name: 'A', request: { url: 'x' } },
+      { name: 'F', item: [{ name: 'B', request: 'y' }] },
+    ],
+  })
 
 beforeEach(() => {
   fs.rmSync(libraryDir, { recursive: true, force: true })
@@ -57,7 +64,10 @@ test('lists from cache and notices files removed outside the app', async () => {
   assert.equal((await store.listCollections()).length, 2)
   fs.rmSync(path.join(libraryDir, `${a.id}.json`))
   const remaining = await store.listCollections()
-  assert.deepEqual(remaining.map((item) => item.name), ['B'])
+  assert.deepEqual(
+    remaining.map((item) => item.name),
+    ['B']
+  )
 })
 
 test('skips corrupt or foreign files in the library directory', async () => {
@@ -65,7 +75,10 @@ test('skips corrupt or foreign files in the library directory', async () => {
   fs.writeFileSync(path.join(libraryDir, '11111111-1111-4111-8111-111111111111.json'), '{broken')
   fs.writeFileSync(path.join(libraryDir, 'notes.json'), '{}')
   store.resetLibraryCache()
-  assert.deepEqual((await store.listCollections()).map((item) => item.name), ['OK'])
+  assert.deepEqual(
+    (await store.listCollections()).map((item) => item.name),
+    ['OK']
+  )
 })
 
 test('prunes beyond LIBRARY_MAX_ITEMS keeping the newest', async () => {
@@ -74,7 +87,10 @@ test('prunes beyond LIBRARY_MAX_ITEMS keeping the newest', async () => {
     await store.saveCollection(collection(name), name)
     await new Promise((resolve) => setTimeout(resolve, 5))
   }
-  assert.deepEqual((await store.listCollections()).map((item) => item.name), ['c3', 'c2'])
+  assert.deepEqual(
+    (await store.listCollections()).map((item) => item.name),
+    ['c3', 'c2']
+  )
 })
 
 test('prunes collections older than LIBRARY_RETENTION_DAYS', async () => {

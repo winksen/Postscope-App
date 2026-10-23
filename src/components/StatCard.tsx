@@ -68,12 +68,7 @@ export function StatCard({
           <p className="text-2xl font-semibold tabular-nums tracking-tight">{displayValue}</p>
           {subtext && <p className="text-xs text-muted-foreground">{subtext}</p>}
           {trendLabel && (
-            <p
-              className={cn(
-                'text-xs font-medium',
-                trendPositive ? 'text-[hsl(var(--success-text))]' : 'text-[hsl(var(--warning-text))]'
-              )}
-            >
+            <p className={cn('text-xs font-medium', trendPositive ? 'text-[hsl(var(--success-text))]' : 'text-[hsl(var(--warning-text))]')}>
               {trendLabel}
             </p>
           )}

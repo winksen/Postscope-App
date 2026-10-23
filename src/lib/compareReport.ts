@@ -29,15 +29,23 @@ export function buildComparisonText(comparison: Comparison): string {
   const { before, after, scoreDelta, requests, findings } = comparison
   const lines: string[] = []
   lines.push(`PostScope comparison: ${before.name} -> ${after.name}`)
-  lines.push(`Score ${before.score} -> ${after.score} (${signed(scoreDelta.total)}), security ${signed(scoreDelta.security)}, hygiene ${signed(scoreDelta.hygiene)}`)
-  lines.push(`Requests ${before.totalRequests} -> ${after.totalRequests}: ${requests.added.length} added, ${requests.removed.length} removed, ${requests.changed.length} changed, ${requests.unchanged} unchanged`)
+  lines.push(
+    `Score ${before.score} -> ${after.score} (${signed(scoreDelta.total)}), security ${signed(scoreDelta.security)}, hygiene ${signed(scoreDelta.hygiene)}`
+  )
+  lines.push(
+    `Requests ${before.totalRequests} -> ${after.totalRequests}: ${requests.added.length} added, ${requests.removed.length} removed, ${requests.changed.length} changed, ${requests.unchanged} unchanged`
+  )
   lines.push(`Findings: ${findings.added.length} new, ${findings.resolved.length} resolved, ${findings.unchanged} unchanged`)
   if (findings.added.length) lines.push('', 'New findings', ...capped(findings.added, findingLabel, '  '))
   if (findings.resolved.length) lines.push('', 'Resolved findings', ...capped(findings.resolved, findingLabel, '  '))
   if (requests.added.length) lines.push('', 'Added requests', ...capped(requests.added, requestLabel, '  '))
   if (requests.removed.length) lines.push('', 'Removed requests', ...capped(requests.removed, requestLabel, '  '))
   if (requests.changed.length) {
-    lines.push('', 'Changed requests', ...capped(requests.changed, (change) => `${requestLabel(change.after)} (${change.fields.join(', ')})`, '  '))
+    lines.push(
+      '',
+      'Changed requests',
+      ...capped(requests.changed, (change) => `${requestLabel(change.after)} (${change.fields.join(', ')})`, '  ')
+    )
   }
   if (comparison.newHosts.length) lines.push('', `New hosts: ${comparison.newHosts.join(', ')}`)
   if (comparison.removedHosts.length) lines.push('', `Removed hosts: ${comparison.removedHosts.join(', ')}`)
@@ -74,17 +82,59 @@ export function buildComparisonMarkdown(comparison: Comparison): string {
     ),
     ''
   )
-  lines.push(`${findings.added.length} new, ${findings.resolved.length} resolved and ${findings.unchanged} unchanged finding occurrence(s).`, '')
-  lines.push(...bulletList('New findings', findings.added.map((finding) => escapeMarkdown(findingLabel(finding)))))
-  lines.push(...bulletList('Resolved findings', findings.resolved.map((finding) => escapeMarkdown(findingLabel(finding)))))
-  lines.push(...bulletList('Added requests', requests.added.map((request) => escapeMarkdown(requestLabel(request)))))
-  lines.push(...bulletList('Removed requests', requests.removed.map((request) => escapeMarkdown(requestLabel(request)))))
-  lines.push(...bulletList('Changed requests', requests.changed.map((change) => `${escapeMarkdown(requestLabel(change.after))} (${change.fields.join(', ')})`)))
-  lines.push(...bulletList('New hosts', comparison.newHosts.map((host) => `\`${host}\``)))
-  lines.push(...bulletList('New auth types', comparison.newAuthTypes.map((type) => `\`${type}\``)))
+  lines.push(
+    `${findings.added.length} new, ${findings.resolved.length} resolved and ${findings.unchanged} unchanged finding occurrence(s).`,
+    ''
+  )
+  lines.push(
+    ...bulletList(
+      'New findings',
+      findings.added.map((finding) => escapeMarkdown(findingLabel(finding)))
+    )
+  )
+  lines.push(
+    ...bulletList(
+      'Resolved findings',
+      findings.resolved.map((finding) => escapeMarkdown(findingLabel(finding)))
+    )
+  )
+  lines.push(
+    ...bulletList(
+      'Added requests',
+      requests.added.map((request) => escapeMarkdown(requestLabel(request)))
+    )
+  )
+  lines.push(
+    ...bulletList(
+      'Removed requests',
+      requests.removed.map((request) => escapeMarkdown(requestLabel(request)))
+    )
+  )
+  lines.push(
+    ...bulletList(
+      'Changed requests',
+      requests.changed.map((change) => `${escapeMarkdown(requestLabel(change.after))} (${change.fields.join(', ')})`)
+    )
+  )
+  lines.push(
+    ...bulletList(
+      'New hosts',
+      comparison.newHosts.map((host) => `\`${host}\``)
+    )
+  )
+  lines.push(
+    ...bulletList(
+      'New auth types',
+      comparison.newAuthTypes.map((type) => `\`${type}\``)
+    )
+  )
   return `${lines.join('\n').trimEnd()}\n`
 }
 
 export function buildComparisonJson(comparison: Comparison, appVersion?: string): string {
-  return JSON.stringify({ tool: 'PostScope', version: appVersion, reportVersion: COMPARISON_REPORT_VERSION, kind: 'comparison', ...comparison }, null, 2)
+  return JSON.stringify(
+    { tool: 'PostScope', version: appVersion, reportVersion: COMPARISON_REPORT_VERSION, kind: 'comparison', ...comparison },
+    null,
+    2
+  )
 }

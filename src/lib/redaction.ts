@@ -149,7 +149,12 @@ class Redactor {
     }
     if (Array.isArray(url.variable)) {
       for (const variable of url.variable) {
-        if (isRecord(variable) && typeof variable.key === 'string' && typeof variable.value === 'string' && isQuerySecret(variable.key, variable.value)) {
+        if (
+          isRecord(variable) &&
+          typeof variable.key === 'string' &&
+          typeof variable.value === 'string' &&
+          isQuerySecret(variable.key, variable.value)
+        ) {
           variable.value = `{{${toVariableName(variable.key)}}}`
           this.count += 1
         }
@@ -223,7 +228,8 @@ class Redactor {
       if (templated) {
         const before = this.count
         this.jsonValue(templated.value)
-        if (this.count !== before) body.graphql.variables = templated.restore(JSON.stringify(templated.value, null, detectIndent(variables)))
+        if (this.count !== before)
+          body.graphql.variables = templated.restore(JSON.stringify(templated.value, null, detectIndent(variables)))
       }
     }
   }

@@ -137,10 +137,7 @@ export function DropZone({
     onJsonText(pasteText.trim())
   }, [onJsonText, pasteText, validatePastedCollection])
 
-  const importBlocked =
-    canChoosePrivacyMode(loggingMode) &&
-    requiresUploadConsent(loggingMode, storageMode) &&
-    !uploadConsent
+  const importBlocked = canChoosePrivacyMode(loggingMode) && requiresUploadConsent(loggingMode, storageMode) && !uploadConsent
 
   const privacyDescription = getPrivacyModeDescription(loggingMode, storageMode)
   const remainingSavedCount = Math.max(savedCollections.length - 5, 0)
@@ -235,8 +232,8 @@ export function DropZone({
                     <CloudArrowUp className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
-                    <span className="font-medium">Mandatory logging.</span> Imported collections are
-                    automatically saved to the app storage for your team.
+                    <span className="font-medium">Mandatory logging.</span> Imported collections are automatically saved to the app storage
+                    for your team.
                   </p>
                 </div>
               </motion.div>
@@ -257,8 +254,8 @@ export function DropZone({
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="text-xs leading-snug text-foreground">
-                      <span className="font-medium">Upload warning.</span> Files are saved to this
-                      app&apos;s storage. Visible to your team, including URLs, headers, and tokens.
+                      <span className="font-medium">Upload warning.</span> Files are saved to this app&apos;s storage. Visible to your team,
+                      including URLs, headers, and tokens.
                     </p>
                     <div className="flex items-center gap-2.5">
                       <Checkbox
@@ -266,10 +263,7 @@ export function DropZone({
                         checked={uploadConsent}
                         onCheckedChange={(checked) => onUploadConsentChange(checked === true)}
                       />
-                      <Label
-                        htmlFor="upload-consent"
-                        className="cursor-pointer text-xs font-normal leading-snug text-muted-foreground"
-                      >
+                      <Label htmlFor="upload-consent" className="cursor-pointer text-xs font-normal leading-snug text-muted-foreground">
                         I accept: my collection will be stored on the app and may be viewed by my team.
                       </Label>
                     </div>
@@ -292,8 +286,8 @@ export function DropZone({
                     <ShieldCheck className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
-                    <span className="font-medium">Nothing stored.</span> Incognito mode: your data is
-                    never written to the app&apos;s storage.
+                    <span className="font-medium">Nothing stored.</span> Incognito mode: your data is never written to the app&apos;s
+                    storage.
                   </p>
                 </div>
               </motion.div>
@@ -306,23 +300,19 @@ export function DropZone({
           className={cn(
             'w-full max-w-3xl bg-card shadow-sm transition-all duration-300',
             'animate-fade-in-scale',
-            drag
-              ? 'bg-primary/[0.03] shadow-lg'
-              : 'hover:bg-card/95'
+            drag ? 'bg-primary/[0.03] shadow-lg' : 'hover:bg-card/95'
           )}
-
         >
           <CardHeader className="text-center">
-            <div
-              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted transition-transform duration-300"
-            >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted transition-transform duration-300">
               <FileCode className="h-7 w-7 text-primary" weight="fill" />
             </div>
             <CardTitle as="h1" className="text-2xl font-semibold">
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
-              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them for secrets, or drop two collections (older first) to compare them.
+              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them
+              for secrets, or drop two collections (older first) to compare them.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -395,20 +385,18 @@ export function DropZone({
                           drag && 'animate-pulse-glow'
                         )}
                       >
-                          <UploadSimple
-                            className={cn(
-                              'h-8 w-8 text-muted-foreground transition-all duration-300',
-                              drag && 'text-primary'
-                            )}
-                            weight="fill"
-                          />
+                        <UploadSimple
+                          className={cn('h-8 w-8 text-muted-foreground transition-all duration-300', drag && 'text-primary')}
+                          weight="fill"
+                        />
                       </div>
                       <p className="text-center text-sm text-muted-foreground">
                         {importBlocked ? (
                           <>Accept the upload warning above to import a collection.</>
                         ) : (
                           <>
-                            <span className="font-medium text-foreground">Drag & drop</span> your collection and optional environment files here
+                            <span className="font-medium text-foreground">Drag & drop</span> your collection and optional environment files
+                            here
                           </>
                         )}
                       </p>
@@ -459,9 +447,7 @@ export function DropZone({
                     className="min-h-48 w-full resize-y rounded-xl border border-transparent bg-card px-3 py-3 text-sm text-foreground shadow-[0_8px_22px_hsl(var(--background)/0.2)] outline-none transition-[border-color,background-color] duration-200 placeholder:text-muted-foreground hover:border-ring focus:border-ring disabled:cursor-not-allowed disabled:opacity-60 dark:shadow-none"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">
-                      Requires a valid Postman collection with `info` and `item`.
-                    </p>
+                    <p className="text-xs text-muted-foreground">Requires a valid Postman collection with `info` and `item`.</p>
                     <Button
                       type="button"
                       className="bg-foreground text-background hover:bg-foreground/90 hover:text-background"
@@ -476,24 +462,12 @@ export function DropZone({
             </AnimatePresence>
 
             {entryError && (
-              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive-text">
-                {entryError}
-              </div>
+              <div className="rounded-lg bg-destructive/10 px-3 py-2 text-center text-sm text-destructive-text">{entryError}</div>
             )}
             <p className="text-center text-xs text-muted-foreground">
-              Accepts{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                .postman_collection.json
-              </code>{' '}
-              plus optional{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                .postman_environment.json
-              </code>{' '}
-              and{' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                .postman_globals.json
-              </code>
-              .
+              Accepts <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">.postman_collection.json</code> plus optional{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">.postman_environment.json</code> and{' '}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">.postman_globals.json</code>.
             </p>
           </CardContent>
         </Card>

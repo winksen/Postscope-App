@@ -14,14 +14,25 @@ function collectionWithBigBody() {
   return {
     info: { name: 'Big body', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
     item: [
-      { name: 'Folder', item: [{ name: 'Upload', request: { method: 'POST', url: 'https://api.example.com/upload', body: { mode: 'raw', raw }, description: 'Uploads.' } }] },
+      {
+        name: 'Folder',
+        item: [
+          {
+            name: 'Upload',
+            request: { method: 'POST', url: 'https://api.example.com/upload', body: { mode: 'raw', raw }, description: 'Uploads.' },
+          },
+        ],
+      },
       { name: 'Small', request: { method: 'GET', url: 'https://api.example.com/small', description: 'Small.' } },
     ],
   }
 }
 
 test('collections without large bodies are returned as they are', () => {
-  const parsed = parseCollection({ info: { name: 'S', schema: 'x' }, item: [{ name: 'A', request: { method: 'GET', url: 'https://example.com/a' } }] })
+  const parsed = parseCollection({
+    info: { name: 'S', schema: 'x' },
+    item: [{ name: 'A', request: { method: 'GET', url: 'https://example.com/a' } }],
+  })
   assert.equal(compactParsed(parsed), parsed)
 })
 
@@ -43,11 +54,17 @@ test('large bodies are cut for display, flagged, and shared by requests and fold
 test('findings come from the full body, and the compact copy is much smaller to send', () => {
   const parsed = parseCollection(collectionWithBigBody())
   const fullFindings = runAudit(parsed)
-  assert.ok(fullFindings.some((finding) => finding.ruleId === 'HARDCODED_PASSWORD'), 'the full body reveals the password')
+  assert.ok(
+    fullFindings.some((finding) => finding.ruleId === 'HARDCODED_PASSWORD'),
+    'the full body reveals the password'
+  )
 
   const compact = compactParsed(parsed)
   const compactFindings = runAudit(compact)
-  assert.ok(!compactFindings.some((finding) => finding.ruleId === 'HARDCODED_PASSWORD'), 'which is why audits must not start from the compact copy')
+  assert.ok(
+    !compactFindings.some((finding) => finding.ruleId === 'HARDCODED_PASSWORD'),
+    'which is why audits must not start from the compact copy'
+  )
 
   const fullSize = v8.serialize(parsed).length
   const compactSize = v8.serialize(compact).length
@@ -62,5 +79,8 @@ test('comparison notices a change in a truncated body through its size', () => {
   upload.request.body.raw = upload.request.body.raw.replace(FAKE.password, `${FAKE.password}-rotated`)
   const after = compactParsed(parseCollection(changedJson))
   const comparison = compareCollections({ parsed: before, findings: [] }, { parsed: after, findings: [] })
-  assert.deepEqual(comparison.requests.changed.map((change) => change.fields), [['body']])
+  assert.deepEqual(
+    comparison.requests.changed.map((change) => change.fields),
+    [['body']]
+  )
 })
