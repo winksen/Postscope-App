@@ -7,7 +7,7 @@ For voice, punctuation, and overall visual personality, see [VISUAL_STYLE.md](./
 **Source of truth**
 
 - Tokens: `src/index.css` (`:root`)
-- Tailwind mapping: `tailwind.config.ts`
+- Tailwind mapping: the `@theme` block in `src/index.css` (Tailwind 4 has no `tailwind.config.ts`)
 - Components: `src/components/ui/*`
 - Reference layouts: `src/components/layout/*`, `src/pages/*`
 
@@ -19,7 +19,7 @@ For voice, punctuation, and overall visual personality, see [VISUAL_STYLE.md](./
 
 - **SaaS dashboard, minimal chrome:** Calm neutrals, one strong primary (blue), data-forward density without clutter.
 - **Composable, not rigid:** Prefer shadcn patterns: assemble `Card` + `Button` + primitives rather than one-off mega-components unless a feature truly needs it (e.g. `StatCard`).
-- **Light mode first:** `darkMode: ['class']` exists in Tailwind; tokens in `:root` are light. If dark mode ships later, add `.dark { … }` variables and test every semantic color.
+- **Light mode first:** dark mode is the `dark` class on `html` (`@custom-variant dark` in `src/index.css`); tokens in `:root` are light. If dark mode ships later, add `.dark { … }` variables and test every semantic color.
 
 ### Spacing & layout rules
 
@@ -261,7 +261,7 @@ Embed in `ScrollArea` if vertical space is constrained.
 
 ## 4. Typography system
 
-**Font:** Elms Sans (`font-sans` and `font-mono` in `tailwind.config.ts`; both point to Elms Sans with system fallbacks; font files are vendored under `public/fonts` for offline use).
+**Font:** Elms Sans (`--font-sans` and `--font-mono` in the `@theme` block of `src/index.css`; both point to Elms Sans with system fallbacks; font files are vendored under `public/fonts` for offline use).
 
 | Role | Classes | Notes |
 |------|---------|-------|
@@ -345,7 +345,17 @@ Usage in components: `hsl(var(--chart-1))` or `fill-[hsl(var(--chart-2))]` as in
 
 ### Borders & radius
 
-- Global radius: `--radius: 0.75rem` → Tailwind `rounded-lg` = `var(--radius)`.
+- Global radius: `--radius: 0.75rem` → Tailwind `rounded-lg` = `var(--radius)` (`--radius-lg`, `--radius-md` and `--radius-sm` in `@theme`).
+
+### Tailwind 4 notes
+
+The app moved from Tailwind 3 to 4 in V0.1.45. Rules that keep the look unchanged:
+
+- Utilities were renamed: `shadow-sm` is now `shadow-xs`, `outline-none` is `outline-hidden`, `backdrop-blur-sm` is `backdrop-blur-xs`, `bg-gradient-to-*` is `bg-linear-to-*`. Use the new names.
+- `space-y-*` and `space-x-*` put the margin on the previous sibling, where a child's own `mb-*` wins and a first child that is out of flow (a `sr-only` live region) takes no part in the spacing. Prefer `gap-*` on flex and grid containers (`CardHeader` does), and do not put `mt-*` on children of a `space-y` container expecting it to apply: it now does, where Tailwind 3 silently ignored it.
+- Line heights are lengths again (`--text-*--line-height` in `@theme`), because Tailwind 4's unitless ratios shrink small text nested in a larger parent (a `text-[11px]` line inside a `text-xs` card).
+- Colors with an opacity modifier (`bg-primary/10`) still resolve through the HSL variables; the `*-text` tokens are plain colors.
+- Check styling changes with `npm run test:visual` (see `playwright.visual.config.ts`): take snapshots on the old commit, run on the new one, and read the `*-diff.png` files.
 - Cards: `rounded-xl` in component.
 - Small controls: `rounded-md`.
 
@@ -519,6 +529,6 @@ export function ExampleDashboardPage() {
 
 When adding tokens or variants:
 
-1. Update **`src/index.css`** and **`tailwind.config.ts`** if the token should be themeable.
+1. Update **`src/index.css`** (the `:root` and `.dark` variables and the `@theme` mapping) if the token should be themeable.
 2. Extend **`ui/*`** with `cva` variants rather than one-off inline colors on every page.
 3. Add a short note in this doc under the relevant section.

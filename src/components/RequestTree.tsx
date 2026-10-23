@@ -124,7 +124,7 @@ function FolderNode({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary focus-visible:outline-none focus-visible:ring-0 group"
+        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left text-sm transition-all duration-200 hover:bg-muted/60 hover:text-primary focus-visible:outline-hidden focus-visible:ring-0 group"
       >
         <CaretRight className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         {open ? (

@@ -42,7 +42,7 @@ export function FeatureCard({
   return (
     <div
       className={cn(
-        'flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-5 text-center backdrop-blur-sm',
+        'flex flex-col items-center gap-3 rounded-xl border border-border/50 bg-card/60 p-5 text-center backdrop-blur-xs',
         'animate-fade-in transition-all duration-300 hover:bg-card'
       )}
       style={{ animationDelay: `${delay}ms` }}
@@ -78,7 +78,7 @@ export function MarketingHeader({ actions }: MarketingHeaderProps) {
     <header className="fixed left-0 right-0 top-0 z-10 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
       <Link
         to="/"
-        className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="PostScope home"
       >
         <div className="flex h-10 w-10 items-center justify-center text-muted-foreground">
@@ -105,7 +105,7 @@ export function MarketingCtaButton({
   variant?: 'default' | 'secondary'
 }) {
   return (
-    <Button variant={variant} size="sm" className="shadow-sm" asChild>
+    <Button variant={variant} size="sm" className="shadow-xs" asChild>
       <Link to={to}>{children}</Link>
     </Button>
   )

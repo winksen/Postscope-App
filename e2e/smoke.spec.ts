@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseCollection } from '../src/lib/parser'
+import { cleanCollection } from '../tests/fixtures'
 import { PAGES, SAMPLES, SAMPLES_DIR, collectProblems, goToPage, importFile } from './helpers'
 
 for (const sample of SAMPLES) {
@@ -79,4 +80,20 @@ test('secrets are masked in the page until they are revealed', async ({ page }) 
 
   await page.getByRole('button', { name: 'Reveal value' }).first().click()
   expect(await page.content(), 'revealing is an explicit action').toContain(secret)
+})
+
+test('a high score celebrates on the Score page without breaking the content security policy', async ({ page }) => {
+  const problems = collectProblems(page)
+  await importFile(page, {
+    name: 'clean.postman_collection.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(cleanCollection())),
+  })
+  await goToPage(page, 'Score')
+  await expect(page.locator('main h1').first()).toBeVisible()
+  // The confetti starts once the gauge passes 90 and runs for about two seconds on a canvas it creates itself.
+  await expect(page.locator('canvas').first()).toBeAttached({ timeout: 10_000 })
+  await page.waitForTimeout(2500)
+  expect(problems.filter((problem) => /content security policy|Refused to/i.test(problem))).toEqual([])
+  expect(problems).toEqual([])
 })

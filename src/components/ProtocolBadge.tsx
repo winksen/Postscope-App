@@ -4,11 +4,11 @@ import { protocolLabel, type RequestProtocol } from '@/lib/requestProtocol'
 
 const PALETTE: Record<RequestProtocol, string> = {
   http: 'bg-muted/80 text-muted-foreground border-border/60',
-  graphql: 'bg-fuchsia-700 text-white border-transparent shadow-sm shadow-fuchsia-700/20',
-  grpc: 'bg-indigo-700 text-white border-transparent shadow-sm shadow-indigo-700/20',
-  websocket: 'bg-teal-700 text-white border-transparent shadow-sm shadow-teal-700/20',
-  mcp: 'bg-orange-700 text-white border-transparent shadow-sm shadow-orange-700/20',
-  sse: 'bg-cyan-700 text-white border-transparent shadow-sm shadow-cyan-700/20',
+  graphql: 'bg-fuchsia-700 text-white border-transparent shadow-xs shadow-fuchsia-700/20',
+  grpc: 'bg-indigo-700 text-white border-transparent shadow-xs shadow-indigo-700/20',
+  websocket: 'bg-teal-700 text-white border-transparent shadow-xs shadow-teal-700/20',
+  mcp: 'bg-orange-700 text-white border-transparent shadow-xs shadow-orange-700/20',
+  sse: 'bg-cyan-700 text-white border-transparent shadow-xs shadow-cyan-700/20',
 }
 
 interface ProtocolBadgeProps {

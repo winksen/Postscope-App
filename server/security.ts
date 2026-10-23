@@ -14,16 +14,18 @@ import {
 
 /**
  * Content Security Policy for the production bundle. The app ships no inline scripts; inline styles
- * are needed by Radix/Recharts/framer-motion. `blob:` workers are used by the confetti effect.
+ * are needed by Radix/Recharts/framer-motion. The analysis worker is a same-origin module, and the confetti effect
+ * draws on the main thread (`canvas-confetti` is used without `useWorker`), so neither `blob:` workers nor `blob:`
+ * images are allowed. Report downloads are `blob:` links with a `download` attribute, which no directive covers.
  */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data:",
   "font-src 'self' data:",
   "connect-src 'self'",
-  "worker-src 'self' blob:",
+  "worker-src 'self'",
   "manifest-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",

@@ -68,7 +68,7 @@ export function RequestSearchModal({ open, requests, initialQuery = '', onOpenCh
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] w-[min(68rem,calc(100vw-3rem))] max-w-none gap-0 overflow-hidden p-0">
-        <DialogHeader className="space-y-3 border-b border-border bg-gradient-to-r from-muted/50 to-transparent p-6 pb-4 text-left">
+        <DialogHeader className="space-y-3 border-b border-border bg-linear-to-r from-muted/50 to-transparent p-6 pb-4 text-left">
           <DialogDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Search requests
           </DialogDescription>

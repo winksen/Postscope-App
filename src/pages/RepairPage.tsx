@@ -117,11 +117,11 @@ function FixRow({ fix, selected, onToggle }: { fix: RepairFix; selected: boolean
           <div className="grid gap-2 lg:grid-cols-2">
             <div className="min-w-0 rounded-lg bg-muted/45 px-3 py-2">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Before</p>
-              <p className="break-words text-xs text-muted-foreground">{fix.beforeSnippet || 'Not available'}</p>
+              <p className="wrap-break-word text-xs text-muted-foreground">{fix.beforeSnippet || 'Not available'}</p>
             </div>
             <div className="min-w-0 rounded-lg bg-card px-3 py-2 shadow-[0_8px_22px_hsl(var(--background)/0.2)] dark:shadow-none">
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">After</p>
-              <p className="break-words text-xs text-foreground">{fix.afterSnippet || 'Manual guidance only'}</p>
+              <p className="wrap-break-word text-xs text-foreground">{fix.afterSnippet || 'Manual guidance only'}</p>
             </div>
           </div>
         )}

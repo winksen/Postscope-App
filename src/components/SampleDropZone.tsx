@@ -38,7 +38,7 @@ export function SampleDropZone({ onSelectSample, loading = false, analyzePath = 
       />
 
       <div className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-24">
-        <Card className="w-full max-w-3xl border-border shadow-sm animate-fade-in-scale">
+        <Card className="w-full max-w-3xl border-border shadow-xs animate-fade-in-scale">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
               <Flask className="h-7 w-7 text-primary" weight="fill" />
@@ -49,9 +49,6 @@ export function SampleDropZone({ onSelectSample, loading = false, analyzePath = 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p role="status" aria-live="polite" className="sr-only">
-              {loading ? 'Opening the sample...' : ''}
-            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               {SAMPLE_COLLECTIONS.map((sample) => {
                 const isLoading = loading && loadingId === sample.id
@@ -90,13 +87,17 @@ export function SampleDropZone({ onSelectSample, loading = false, analyzePath = 
             <p className="text-center text-xs text-muted-foreground">
               Demo collections ship with the app. No upload or team storage involved.
             </p>
+            {/* Last child, so it takes no part in the spacing between the blocks above it. */}
+            <p role="status" aria-live="polite" className="sr-only">
+              {loading ? 'Opening the sample...' : ''}
+            </p>
           </CardContent>
         </Card>
 
         <div className="mt-6 animate-fade-in">
           <Button
             variant="secondary"
-            className="bg-foreground text-background shadow-sm hover:bg-foreground/90 hover:text-background"
+            className="bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background"
             asChild
           >
             <Link to={analyzePath}>

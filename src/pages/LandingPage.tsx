@@ -38,13 +38,13 @@ export function LandingPage() {
             Understand your <span className="text-orange-400">Postman</span> collections <span className="text-primary">in Seconds</span>
           </h1>
 
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg animate-fade-in">
+          <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg sm:leading-7 animate-fade-in">
             PostScope audits API collections locally: security risks, structural debt, and coverage gaps, without uploading your data to any
             server.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3 animate-fade-in">
-            <Button size="lg" className="gap-2 shadow-sm" asChild>
+            <Button size="lg" className="gap-2 shadow-xs" asChild>
               <Link to="/analyze">
                 Analyze a collection
                 <ArrowRight className="h-4 w-4" />
@@ -75,7 +75,7 @@ export function LandingPage() {
             {STEPS.map(({ step, title, description, icon: Icon }, index) => (
               <Card
                 key={step}
-                className="border-border/50 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:bg-card animate-fade-in"
+                className="border-border/50 bg-card/60 backdrop-blur-xs transition-all duration-300 hover:bg-card animate-fade-in"
                 style={{ animationDelay: `${index * 120}ms` }}
               >
                 <CardHeader className="pb-3">
@@ -96,7 +96,7 @@ export function LandingPage() {
         </section>
 
         <section className="mx-auto mt-24 max-w-3xl">
-          <Card className="overflow-hidden border-border/50 bg-card/70 shadow-sm backdrop-blur-sm">
+          <Card className="overflow-hidden border-border/50 bg-card/70 shadow-xs backdrop-blur-xs">
             <CardContent className="flex flex-col items-center gap-6 p-8 text-center sm:p-10">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                 <Stethoscope className="h-7 w-7 text-primary" weight="fill" />
@@ -107,7 +107,7 @@ export function LandingPage() {
                   Drop a Postman collection and get security findings, request maps, and a health score, all processed on your device.
                 </p>
               </div>
-              <Button size="lg" className="gap-2 shadow-sm" asChild>
+              <Button size="lg" className="gap-2 shadow-xs" asChild>
                 <Link to="/analyze">
                   Open the analyzer
                   <ArrowRight className="h-4 w-4" />

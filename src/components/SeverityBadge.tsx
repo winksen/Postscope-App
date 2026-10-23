@@ -13,8 +13,8 @@ export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
       variant={variant}
       className={cn(
         'text-[10px] uppercase transition-all duration-200',
-        severity === 'critical' && 'shadow-sm shadow-destructive/20',
-        severity === 'warning' && 'shadow-sm shadow-[hsl(var(--warning))]/20',
+        severity === 'critical' && 'shadow-xs shadow-destructive/20',
+        severity === 'warning' && 'shadow-xs shadow-[hsl(var(--warning))]/20',
         className
       )}
     >

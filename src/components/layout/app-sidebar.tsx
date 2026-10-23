@@ -74,7 +74,7 @@ export function AppSidebar({
         <Link
           to="/"
           className={cn(
-            'flex min-w-0 items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'flex min-w-0 items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
             collapsed && 'justify-center'
           )}
           aria-label="PostScope home"

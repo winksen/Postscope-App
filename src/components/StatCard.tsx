@@ -73,7 +73,7 @@ export function StatCard({
             </p>
           )}
           {details && details.length > 0 && (
-            <ul className="mt-3 space-y-1.5 pt-3">
+            <ul className="mt-1 space-y-1.5 pt-3">
               {details.map((row) => (
                 <li key={`${row.label}-${row.value}`} className="flex items-baseline justify-between gap-3 text-xs">
                   <span className="min-w-0 truncate text-muted-foreground">{row.label}</span>
