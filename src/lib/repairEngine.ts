@@ -289,8 +289,12 @@ function firstAffectedRequest(finding: Finding, parsed: ParsedCollection): Parse
   return parsed.requests.find((request) => finding.affected.includes(request.id))
 }
 
-function headerSnippet(request: ParsedRequest | undefined, matcher: (header: { key: string; value: string }) => boolean): string | undefined {
-  const header = request?.headers.find(matcher)
+function headerSnippet(
+  request: ParsedRequest | undefined,
+  matcher: (header: { key: string; value: string }) => boolean,
+  includeDisabled = false
+): string | undefined {
+  const header = request?.headers.find(matcher) ?? (includeDisabled ? request?.disabledHeaders?.find(matcher) : undefined)
   if (!header) return undefined
   return `${header.key}: ${header.value ? '***' : '""'}`
 }
@@ -300,7 +304,7 @@ function authVariablesForTargets(targets: RepairTarget[], parsed: ParsedCollecti
   const keys = new Set<string>()
   for (const request of parsed.requests) {
     if (!targetIds.has(request.id)) continue
-    for (const header of request.headers) {
+    for (const header of [...request.headers, ...(request.disabledHeaders ?? [])]) {
       if (isVariableValue(header.value)) continue
       const lower = header.key.toLowerCase()
       if (lower === 'cookie') keys.add('sessionCookie')
@@ -361,7 +365,7 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
     const beforeSnippet = headerSnippet(affectedRequest, (header) => {
       const lower = header.key.toLowerCase()
       return lower === 'authorization' || lower === 'proxy-authorization' || lower === 'cookie' || TOKEN_HEADER.test(lower)
-    })
+    }, true)
     const afterSnippet = beforeSnippet?.toLowerCase().includes('basic') ? 'Authorization: Basic {{basicAuthToken}}' : 'Authorization: Bearer {{token}}'
     return {
       ...base,
@@ -384,7 +388,7 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
       description: 'Replaces literal API key header values with {{apiKey}} and defines the variable if needed.',
       risk: 'low',
       selectedByDefault: true,
-      beforeSnippet: headerSnippet(affectedRequest, (header) => API_KEY_REGEX.test(header.key)),
+      beforeSnippet: headerSnippet(affectedRequest, (header) => API_KEY_REGEX.test(header.key), true),
       afterSnippet: 'x-api-key: {{apiKey}}',
       variablesToEnsure: [{ key: 'apiKey', value: '' }],
     }
@@ -675,7 +679,7 @@ function patchAuthorizationHeader(header: PostmanHeader): { changed: boolean; va
 export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
   if (fix.kind === 'hardcodedAuthToken') {
     return applyHeaderPatch(collection, fix, (header) => {
-      if (header.disabled || isVariableValue(header.value)) return { changed: false, variables: [] }
+      if (isVariableValue(header.value)) return { changed: false, variables: [] }
       const lower = header.key.toLowerCase()
       if (lower === 'authorization' || lower === 'proxy-authorization') return patchAuthorizationHeader(header)
       if (TOKEN_HEADER.test(lower) && isLikelySecretValue(header.value)) {
@@ -695,7 +699,7 @@ export function patchHeaders(collection: unknown, fix: RepairFix): PatchResult {
 
   if (fix.kind === 'hardcodedApiKey') {
     return applyHeaderPatch(collection, fix, (header) => {
-      if (header.disabled || !API_KEY_REGEX.test(header.key) || isVariableValue(header.value)) {
+      if (!API_KEY_REGEX.test(header.key) || isVariableValue(header.value)) {
         return { changed: false, variables: [] }
       }
       header.value = '{{apiKey}}'
@@ -862,7 +866,7 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
 
     if (rule === 'HARDCODED_PASSWORD' && Array.isArray(request.header)) {
       for (const header of request.header) {
-        if (!isRecord(header) || header.disabled || typeof header.key !== 'string' || typeof header.value !== 'string') continue
+        if (!isRecord(header) || typeof header.key !== 'string' || typeof header.value !== 'string') continue
         if (HEADER_PASSWORD_KEY.test(header.key) && !isVariableValue(header.value)) {
           const name = toVariableName(header.key, 'password')
           header.value = `{{${name}}}`
@@ -878,7 +882,7 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
         const fields = body[mode]
         if (!Array.isArray(fields)) continue
         for (const field of fields) {
-          if (!isRecord(field) || field.disabled || field.type === 'file' || typeof field.key !== 'string' || typeof field.value !== 'string') continue
+          if (!isRecord(field) || field.type === 'file' || typeof field.key !== 'string' || typeof field.value !== 'string') continue
           if (classifyBodySecret(field.key, field.value) === rule) {
             const name = toVariableName(field.key)
             field.value = `{{${name}}}`
@@ -953,7 +957,7 @@ function patchQuerySecrets(collection: unknown, fix: RepairFix): PatchResult {
     } else if (isRecord(request.url)) {
       const url = request.url as PostmanUrl
       for (const param of Array.isArray(url.query) ? url.query : []) {
-        if (!isRecord(param) || param.disabled || typeof param.key !== 'string' || typeof param.value !== 'string') continue
+        if (!isRecord(param) || typeof param.key !== 'string' || typeof param.value !== 'string') continue
         if (!isQuerySecret(param.key, param.value)) continue
         const name = toVariableName(param.key)
         const replacement = `{{${name}}}`

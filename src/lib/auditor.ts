@@ -155,34 +155,42 @@ function plural(count: number, word: string): string {
 // Secrets in headers and bodies
 // ---------------------------------------------------------------------------
 
+/** Appended to evidence locations for entries that are switched off in Postman but still ship in the export. */
+const DISABLED_SUFFIX = ' (disabled)'
+
 function checkHeaders(req: ParsedRequest, out: FindingCollector): void {
-  for (const h of req.headers) {
+  checkHeaderList(req, req.headers, '', out)
+  checkHeaderList(req, req.disabledHeaders ?? [], DISABLED_SUFFIX, out)
+}
+
+function checkHeaderList(req: ParsedRequest, headers: KeyValue[], suffix: string, out: FindingCollector): void {
+  for (const h of headers) {
     const key = h.key.trim()
     const lower = key.toLowerCase()
     const literal = !isVariableOrEmpty(h.value)
     if (!literal) continue
 
     if (HEADER_PASSWORD_KEY.test(key)) {
-      out.add('HARDCODED_PASSWORD', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+      out.add('HARDCODED_PASSWORD', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(h.value) })
     }
 
     const isAuthorization = lower === 'authorization' || lower === 'proxy-authorization'
     if (isAuthorization) {
       const value = h.value.trim()
       if (AUTH_HEADER_SCHEME.test(value) || (!/\s/.test(value) && value.length >= 16)) {
-        out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}`, preview: evidencePreview(value) })
+        out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(value) })
       }
     } else if (TOKEN_HEADER.test(lower) && isLikelySecretValue(h.value)) {
-      out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+      out.add('HARDCODED_TOKEN', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(h.value) })
     } else if (lower === 'cookie') {
       const cookie = h.value.match(SESSION_COOKIE)
       if (cookie && isLikelySecretValue(cookie[2]) && cookie[2].trim().length >= 8) {
-        out.add('HARDCODED_TOKEN', req.id, { location: `cookie ${cookie[1]}`, preview: evidencePreview(cookie[2]) })
+        out.add('HARDCODED_TOKEN', req.id, { location: `cookie ${cookie[1]}${suffix}`, preview: evidencePreview(cookie[2]) })
       }
     }
 
     if (API_KEY_HEADER.test(key)) {
-      out.add('HARDCODED_API_KEY', req.id, { location: `header ${key}`, preview: evidencePreview(h.value) })
+      out.add('HARDCODED_API_KEY', req.id, { location: `header ${key}${suffix}`, preview: evidencePreview(h.value) })
     }
   }
 }
@@ -233,6 +241,9 @@ function tryParseJson(text: string | undefined): unknown {
 }
 
 function checkBody(req: ParsedRequest, out: FindingCollector): void {
+  for (const field of req.disabledBodyFields ?? []) {
+    checkSecretField(req, field.key, field.value, `body field ${field.key}${DISABLED_SUFFIX}`, out)
+  }
   if (req.bodyFields?.length) {
     for (const field of req.bodyFields) checkSecretField(req, field.key, field.value, `body field ${field.key}`, out)
     return
@@ -316,6 +327,11 @@ function checkQueryAndUrl(req: ParsedRequest, out: FindingCollector): void {
       out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}`, preview: evidencePreview(param.value) })
     }
   }
+  for (const param of req.disabledQueryParams ?? []) {
+    if (isQuerySecret(param.key, param.value)) {
+      out.add('SECRET_IN_QUERY', req.id, { location: `query ${param.key.trim()}${DISABLED_SUFFIX}`, preview: evidencePreview(param.value) })
+    }
+  }
 
   const credentials = req.url.match(URL_CREDENTIALS)
   if (credentials && !isVariableOrEmpty(credentials[2])) {
@@ -368,11 +384,13 @@ function checkScripts(parsed: ParsedCollection, out: FindingCollector): void {
   for (const req of parsed.requests) {
     if (req.scripts?.prerequest) scanScript(req.scripts.prerequest, 'pre-request script', req.id, out)
     if (req.scripts?.test) scanScript(req.scripts.test, 'test script', req.id, out)
+    if (req.scripts?.disabledPrerequest) scanScript(req.scripts.disabledPrerequest, `pre-request script${DISABLED_SUFFIX}`, req.id, out)
+    if (req.scripts?.disabledTest) scanScript(req.scripts.disabledTest, `test script${DISABLED_SUFFIX}`, req.id, out)
   }
   for (const script of parsed.scripts ?? []) {
     const owner = script.owner === 'collection' ? 'collection' : `folder "${script.owner}"`
     const kind = script.listen === 'prerequest' ? 'pre-request script' : script.listen === 'test' ? 'test script' : `${script.listen} script`
-    scanScript(script.source, `${owner} ${kind}`, undefined, out)
+    scanScript(script.source, `${owner} ${kind}${script.disabled ? DISABLED_SUFFIX : ''}`, undefined, out)
   }
 }
 
@@ -440,6 +458,13 @@ function checkSavedResponses(req: ParsedRequest, out: FindingCollector): void {
         preview: evidencePreview(requestHeader.value),
       })
     }
+    const disabledRequestHeader = checkHeaderListForSecrets(response.disabledRequestHeaders ?? [])
+    if (disabledRequestHeader) {
+      out.add('SECRET_IN_SAVED_RESPONSE', req.id, {
+        location: `${label} original request header ${disabledRequestHeader.key}${DISABLED_SUFFIX}`,
+        preview: evidencePreview(disabledRequestHeader.value),
+      })
+    }
 
     if (response.requestAuthType && response.requestAuthFields?.length) {
       for (const field of secretFieldsFor(response.requestAuthType)) {
@@ -499,6 +524,9 @@ function checkKnownPatterns(parsed: ParsedCollection, out: FindingCollector): vo
     const locations: Array<[string, string | undefined]> = [
       ['URL', req.url],
       ...req.headers.map((h): [string, string] => [`header ${h.key}`, h.value]),
+      ...(req.disabledHeaders ?? []).map((h): [string, string] => [`header ${h.key}${DISABLED_SUFFIX}`, h.value]),
+      ...(req.disabledQueryParams ?? []).map((p): [string, string] => [`query ${p.key}${DISABLED_SUFFIX}`, p.value]),
+      ...(req.disabledBodyFields ?? []).map((f): [string, string] => [`body field ${f.key}${DISABLED_SUFFIX}`, f.value]),
       ['body', req.bodyRaw],
       ...(req.authFields ?? []).map((field): [string, string] => [`${req.auth} auth ${field.key}`, field.value]),
     ]

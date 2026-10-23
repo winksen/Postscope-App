@@ -124,6 +124,15 @@ function parseQueryParams(rawUrl: string): Array<{ key: string; value: string }>
   }
 }
 
+/** Marks entries that are switched off in Postman. They are not sent, but they still ship in the export. */
+function DisabledBadge() {
+  return (
+    <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px] font-medium text-muted-foreground">
+      Disabled
+    </Badge>
+  )
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -466,11 +475,20 @@ export function RequestsPage({
 
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Query params</p>
-                      {selectedQueryParams.length > 0 ? (
+                      {selectedQueryParams.length > 0 || (selected.disabledQueryParams?.length ?? 0) > 0 ? (
                         <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 sm:grid-cols-2">
                           {selectedQueryParams.map((param) => (
                             <li key={`${param.key}-${param.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs">
                               <span className="min-w-0 truncate text-foreground">{param.key}</span>
+                              <span className="min-w-0 truncate text-muted-foreground">{param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}</span>
+                            </li>
+                          ))}
+                          {(selected.disabledQueryParams ?? []).map((param) => (
+                            <li key={`disabled-${param.key}-${param.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-70">
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span className="min-w-0 truncate text-foreground">{param.key}</span>
+                                <DisabledBadge />
+                              </span>
                               <span className="min-w-0 truncate text-muted-foreground">{param.value ? <SecretValue name={param.key} value={param.value} /> : '-'}</span>
                             </li>
                           ))}
@@ -482,7 +500,7 @@ export function RequestsPage({
 
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Headers</p>
-                      {selected.headers.length > 0 ? (
+                      {selected.headers.length > 0 || (selected.disabledHeaders?.length ?? 0) > 0 ? (
                         <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 lg:grid-cols-2">
                           {selected.headers.map((header) => (
                             <li key={`${header.key}-${header.value}`} className="group flex min-w-0 items-center justify-between gap-2 text-xs">
@@ -492,11 +510,39 @@ export function RequestsPage({
                               <CopyButton text={`${header.key}: ${header.value}`} />
                             </li>
                           ))}
+                          {(selected.disabledHeaders ?? []).map((header) => (
+                            <li key={`disabled-${header.key}-${header.value}`} className="group flex min-w-0 items-center justify-between gap-2 text-xs opacity-70">
+                              <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                                <DisabledBadge />
+                                <span className="min-w-0 truncate">
+                                  <span className="text-foreground">{header.key}</span>: <SecretValue name={header.key} value={header.value} />
+                                </span>
+                              </span>
+                              <CopyButton text={`${header.key}: ${header.value}`} />
+                            </li>
+                          ))}
                         </ul>
                       ) : (
                         <p className="text-sm text-muted-foreground">No headers.</p>
                       )}
                     </div>
+
+                    {(selected.disabledBodyFields?.length ?? 0) > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Disabled body fields</p>
+                        <ul className="grid gap-1 rounded-lg bg-muted/35 p-3 sm:grid-cols-2">
+                          {(selected.disabledBodyFields ?? []).map((field) => (
+                            <li key={`disabled-${field.key}-${field.value}`} className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-70">
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span className="min-w-0 truncate text-foreground">{field.key}</span>
+                                <DisabledBadge />
+                              </span>
+                              <span className="min-w-0 truncate text-muted-foreground">{field.value ? <SecretValue name={field.key} value={field.value} /> : '-'}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <div className="group flex items-center justify-between">

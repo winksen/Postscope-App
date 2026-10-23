@@ -67,12 +67,82 @@ test('variables with dashes are not reported as hardcoded tokens', () => {
   assert.ok(affectedNames('HARDCODED_TOKEN').includes('Create user'))
 })
 
-test('pagination tokens and disabled fields are ignored', () => {
+test('pagination tokens are ignored and disabled fields are labelled', () => {
   const { byRule } = audit(kitchenSinkCollection())
   const queryEvidence = byRule.get('SECRET_IN_QUERY')?.evidence?.map((e) => e.location) ?? []
   assert.deepEqual(queryEvidence, ['query api_key'])
-  const secretEvidence = JSON.stringify(byRule.get('HARDCODED_SECRET')?.evidence)
-  assert.ok(!secretEvidence.includes('disabled_secret'))
+  const secretEvidence = byRule.get('HARDCODED_SECRET')?.evidence?.map((e) => e.location) ?? []
+  assert.ok(secretEvidence.includes('body field disabled_secret (disabled)'))
+})
+
+function disabledCollection(): Record<string, unknown> {
+  return {
+    info: { name: 'Disabled entries' },
+    variable: [{ key: 'baseUrl', value: 'https://api.example.com' }, { key: 'a', value: '1' }, { key: 'b', value: '2' }, { key: 'c', value: '3' }],
+    item: [
+      {
+        name: 'Leaky request',
+        event: [
+          { listen: 'prerequest', disabled: true, script: { exec: [`pm.environment.set("accessToken", "${FAKE.refreshToken}")`] } },
+        ],
+        request: {
+          method: 'POST',
+          auth: { type: 'noauth' },
+          description: 'Has only disabled credentials.',
+          header: [
+            { key: 'Authorization', value: `Bearer ${FAKE.bearer}`, disabled: true },
+            { key: 'X-Empty', value: '', disabled: true },
+            { key: 'Content-Type', value: 'application/json' },
+          ],
+          url: {
+            raw: '{{baseUrl}}/login',
+            host: ['{{baseUrl}}'],
+            path: ['login'],
+            query: [{ key: 'api_key', value: FAKE.apiKey, disabled: true }],
+          },
+          body: {
+            mode: 'urlencoded',
+            urlencoded: [
+              { key: 'username', value: 'admin' },
+              { key: 'password', value: FAKE.password, disabled: true },
+            ],
+          },
+        },
+        response: [
+          {
+            name: 'Example',
+            originalRequest: { method: 'POST', header: [{ key: 'X-API-Key', value: FAKE.apiKey, disabled: true }], url: '{{baseUrl}}/login' },
+            body: '{}',
+          },
+        ],
+      },
+    ],
+  }
+}
+
+test('disabled headers, query params, form fields and scripts are audited and labelled', () => {
+  const { byRule, affectedNames } = audit(disabledCollection())
+  const locations = (ruleId: string) => (byRule.get(ruleId as Finding['ruleId'])?.evidence ?? []).map((e) => e.location)
+  assert.deepEqual(locations('HARDCODED_TOKEN'), ['header Authorization (disabled)'])
+  assert.deepEqual(locations('SECRET_IN_QUERY'), ['query api_key (disabled)'])
+  assert.deepEqual(locations('HARDCODED_PASSWORD'), ['body field password (disabled)'])
+  assert.ok(locations('SECRET_IN_SCRIPT').some((location) => location === 'pre-request script (disabled): sets accessToken'))
+  assert.ok(locations('SECRET_IN_SAVED_RESPONSE').some((location) => location.endsWith('original request header X-API-Key (disabled)')))
+  assert.deepEqual(affectedNames('HARDCODED_TOKEN'), ['Leaky request'])
+})
+
+test('disabled entries do not suppress auth or hygiene checks', () => {
+  const { affectedNames } = audit(disabledCollection())
+  assert.deepEqual(affectedNames('MISSING_AUTH'), ['Leaky request'])
+  assert.deepEqual(affectedNames('EMPTY_HEADERS'), [])
+})
+
+test('disabled placeholders and variables raise nothing', () => {
+  const json = disabledCollection() as { item: Array<{ request: { header: unknown[] } }> }
+  json.item[0].request.header = [{ key: 'Authorization', value: 'Bearer {{token}}', disabled: true }]
+  const { byRule } = audit({ ...json, item: [{ ...json.item[0], event: [], response: [], request: { ...json.item[0].request, url: '{{baseUrl}}/x', body: undefined } }] })
+  assert.ok(!byRule.has('HARDCODED_TOKEN'))
+  assert.ok(!byRule.has('SECRET_IN_QUERY'))
 })
 
 test('inherited auth suppresses MISSING_AUTH and flags inherited credentials', () => {

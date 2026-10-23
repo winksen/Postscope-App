@@ -100,3 +100,31 @@ test('manual fixes are reported as skipped when selected', () => {
   assert.equal(applied.length, 0)
   assert.match(skipped[0].reason, /Manual-review/)
 })
+
+test('repair patches secrets in disabled headers, query params and form fields', () => {
+  const original = {
+    info: { name: 'Disabled' },
+    variable: [{ key: 'baseUrl', value: 'https://x.test' }],
+    item: [
+      {
+        name: 'R',
+        request: {
+          method: 'POST',
+          auth: { type: 'noauth' },
+          description: 'd',
+          header: [{ key: 'Authorization', value: `Bearer ${FAKE.bearer}`, disabled: true }],
+          url: { raw: '{{baseUrl}}/p', host: ['{{baseUrl}}'], path: ['p'], query: [{ key: 'api_key', value: FAKE.apiKey, disabled: true }] },
+          body: { mode: 'urlencoded', urlencoded: [{ key: 'password', value: FAKE.password, disabled: true }] },
+        },
+      },
+    ],
+  }
+  const { plan } = analyze(original)
+  const { fixedJson } = applyRepairPlan(original, plan.defaultSelectedFixIds, plan)
+  const serialized = JSON.stringify(fixedJson)
+  for (const secret of [FAKE.bearer, FAKE.apiKey, FAKE.password]) assert.ok(!serialized.includes(secret))
+  const request = (fixedJson as { item: Array<{ request: { header: Array<{ disabled?: boolean; value: string }> } }> }).item[0].request
+  assert.equal(request.header[0].disabled, true)
+  assert.equal(request.header[0].value, 'Bearer {{token}}')
+  assert.deepEqual(runAudit(parseCollection(fixedJson)).filter((finding) => finding.category === 'secrets'), [])
+})

@@ -114,3 +114,40 @@ test('guards against pathological nesting depth', () => {
   assert.equal(parsed.totalRequests, 0)
   assert.ok(parsed.parseWarnings?.some((warning) => warning.includes('deeper than')))
 })
+
+test('keeps disabled headers, query params, form fields and events next to the active ones', () => {
+  const parsed = parseCollection({
+    info: { name: 'Disabled' },
+    event: [{ listen: 'test', disabled: true, script: { exec: ['console.log(1)'] } }],
+    item: [
+      {
+        name: 'R',
+        event: [
+          { listen: 'prerequest', script: { exec: ['active()'] } },
+          { listen: 'prerequest', disabled: true, script: { exec: ['inactive()'] } },
+        ],
+        request: {
+          method: 'POST',
+          header: [
+            { key: 'A', value: '1' },
+            { key: 'B', value: '2', disabled: true },
+          ],
+          url: { raw: 'https://x.test/p?a=1', query: [{ key: 'a', value: '1' }, { key: 'b', value: '2', disabled: true }] },
+          body: { mode: 'formdata', formdata: [{ key: 'f', value: 'v' }, { key: 'g', value: 'w', disabled: true }, { key: 'file', type: 'file', disabled: true }] },
+        },
+        response: [{ name: 'Ex', originalRequest: { header: [{ key: 'H', value: 'x', disabled: true }], url: 'https://x.test' } }],
+      },
+    ],
+  })
+  const [request] = parsed.requests
+  assert.deepEqual(request.headers, [{ key: 'A', value: '1' }])
+  assert.deepEqual(request.disabledHeaders, [{ key: 'B', value: '2' }])
+  assert.deepEqual(request.queryParams, [{ key: 'a', value: '1' }])
+  assert.deepEqual(request.disabledQueryParams, [{ key: 'b', value: '2' }])
+  assert.deepEqual(request.bodyFields, [{ key: 'f', value: 'v' }])
+  assert.deepEqual(request.disabledBodyFields, [{ key: 'g', value: 'w' }])
+  assert.equal(request.scripts?.prerequest, 'active()')
+  assert.equal(request.scripts?.disabledPrerequest, 'inactive()')
+  assert.deepEqual(request.savedResponses?.[0].disabledRequestHeaders, [{ key: 'H', value: 'x' }])
+  assert.equal(parsed.scripts?.[0].disabled, true)
+})
