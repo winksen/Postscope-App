@@ -29,6 +29,8 @@ mindmap
       auditor
         27 rules
         evidence + policy
+      jsonBody (templated JSON)
+      rawBody (XML / pair scanners)
       secretPatterns
       scorer
       repairEngine
@@ -129,6 +131,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 - `sanitizeAuditOptions` normalizes untrusted policy input (localStorage, server env).
 - `KNOWN_SECRET_PATTERN` only reports requests no keyword rule already flagged, to avoid double counting.
 - **Disabled entries** (Postman keeps them in the export) go through the same secret rules as active ones; evidence locations end with ` (disabled)`. `MISSING_AUTH`, `EMPTY_HEADERS` and the other hygiene checks only look at active entries, so a disabled `Authorization` header never counts as protection.
+- **Body scanning:** JSON bodies are parsed with `parseTemplatedJson` (`jsonBody.ts`), which swaps unquoted `{{var}}` tokens for quoted `{{token}}` strings, parses, and can `restore` the original tokens after re-serializing (linear, string-aware, tokens limited to 200 chars). Bodies that are not JSON go through `scanRawBodyFields` (`rawBody.ts`): `key=value` pairs, `<password>literal</password>` XML elements (namespaces allowed) and `"key": "value"` fragments. Every candidate is classified by `classifyBodySecret`, so evidence is precise (`raw body Password`). The old whole-body keyword heuristic was removed.
 - Shared helpers exported for the repair and redaction engines: `classifyBodySecret`, `isQuerySecret`, `findLeakedCollectionVariables`, `AUTH_HEADER_SCHEME`, `TOKEN_HEADER`, `SESSION_COOKIE`, `plaintextOrigin`, `resolveLeadingVariable`.
 
 | Category | Rules |
@@ -166,7 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | `hardcodedApiKey` | API key headers → `{{apiKey}}` |
 | `basicAuthCredentials` | Finds the **effective** auth owner (request/folder/collection) and patches it once |
 | `authHelperSecrets` | Walks collection, folder, and request auth; secret fields → `{{token}}`, `{{clientSecret}}`, … |
-| `bodySecrets` | Password headers, JSON bodies (indentation preserved), urlencoded/form fields → `{{fieldName}}` (disabled entries included, they stay disabled) |
+| `bodySecrets` | Password headers, JSON bodies (indentation preserved, unquoted `{{vars}}` kept), XML/form-like raw bodies (value replaced in place), urlencoded/form fields → `{{fieldName}}` (disabled entries included, they stay disabled) |
 | `querySecrets` | Raw URL and `query[]` kept in sync |
 | `secretVariables` | Clears leaked collection variable values |
 | `insecureHttp` (high risk) | `http`→`https`, `ws`→`wss`, including the collection variable behind a leading `{{baseUrl}}` |
@@ -175,7 +178,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 ### 2.6 Redaction (`redaction.ts`)
 
-`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
+`redactCollection(json) → { json, redactedCount }` returns a sanitized deep copy. Request-side credentials become `{{variables}}` (runnable after setting values); scripts, saved responses, and free text get `{{REDACTED}}`; collection variable values are emptied. Raw bodies are edited structurally when they are JSON (indentation and unquoted variables preserved) and field by field otherwise (XML elements, `key=value` pairs). It is idempotent. Disabled headers, query params, form fields and events are scrubbed like active ones. Used by the "Sanitized copy" export, the CLI `--sanitize`, and server-side `LIBRARY_REDACT_SECRETS`.
 
 ### 2.7 Reports (`reportExport.ts`)
 
@@ -311,6 +314,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | File | Covers |
 |---|---|
 | `parser.test.ts` | Validation, malformed input, ID scheme, inheritance, headers/query/body/scripts/responses, depth guard |
+| `jsonBody.test.ts` | Templated JSON parse/restore, hostile input, indentation, raw body scanner ranges |
 | `secretPatterns.test.ts` | Provider patterns, sensitive keys, placeholders, masking, variable helpers |
 | `auditor.test.ts` | Every rule family, stable ids, ordering, masked evidence, false-positive guards, policy options |
 | `repairEngine.test.ts` | Plan defaults, applying fixes, inherited auth, body/query/variable/HTTPS/TLS patches |
@@ -356,3 +360,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 |---|---|
 | V0.1.25 | Version alignment (`0.1.25`), changelog, `release:check`, module-relative version lookup, README and architecture refresh |
 | V0.1.26 | Disabled headers, query params, form fields, scripts and saved request headers are audited, repaired and sanitized; Requests page shows them with a Disabled badge |
+| V0.1.27 | `jsonBody.ts` (templated JSON parse/restore) and `rawBody.ts` (XML, pair and fragment scanners) used by the auditor, redaction and repair; raw body keyword heuristic removed |

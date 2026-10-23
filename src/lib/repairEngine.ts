@@ -12,6 +12,8 @@ import type { PostmanAuth, PostmanCollection, PostmanHeader, PostmanItem, Postma
 import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsFor } from './authSchemes'
 import { isLikelySecretValue } from './secretPatterns'
 import { toVariableName } from './variables'
+import { detectIndent, parseTemplatedJson } from './jsonBody'
+import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
 
 export type RepairFixKind =
   | 'hardcodedBaseUrl'
@@ -818,12 +820,6 @@ function patchAuthHelperSecrets(collection: unknown): PatchResult {
   return { changed, skipped: [], variables: [...variables.values()] }
 }
 
-function detectIndent(raw: string): number | string {
-  const match = raw.match(/\n([ \t]+)\S/)
-  if (!match) return raw.includes('\n') ? 2 : 0
-  return match[1].includes('\t') ? '\t' : match[1].length
-}
-
 function replaceJsonSecrets(value: unknown, rule: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET', variables: Map<string, RepairVariable>, depth = 0): number {
   if (depth > 50 || value === null || typeof value !== 'object') return 0
   let changed = 0
@@ -892,15 +888,26 @@ function patchBodySecrets(collection: unknown, fix: RepairFix): PatchResult {
         }
       }
       if (typeof body.raw === 'string' && (!body.mode || body.mode === 'raw')) {
-        try {
-          const json = JSON.parse(body.raw) as unknown
-          const replaced = replaceJsonSecrets(json, rule, variables)
+        const templated = parseTemplatedJson(body.raw)
+        if (templated) {
+          const replaced = replaceJsonSecrets(templated.value, rule, variables)
           if (replaced > 0) {
-            body.raw = JSON.stringify(json, null, detectIndent(body.raw))
+            body.raw = templated.restore(JSON.stringify(templated.value, null, detectIndent(body.raw)))
             changedForRequest += replaced
           }
-        } catch {
-          // Raw bodies that are not strict JSON (or contain unquoted {{vars}}) are left untouched.
+        } else {
+          // Not JSON (XML/SOAP, form-like text): replace the matching field values in place.
+          const replacements = scanRawBodyFields(body.raw)
+            .filter((field) => classifyBodySecret(field.key, field.value) === rule)
+            .map((field) => {
+              const name = toVariableName(field.key)
+              variables.set(name, { key: name, value: '' })
+              return { field, value: `{{${name}}}` }
+            })
+          if (replacements.length > 0) {
+            body.raw = replaceRawBodyFields(body.raw, replacements)
+            changedForRequest += replacements.length
+          }
         }
       }
     }

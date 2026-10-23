@@ -3,6 +3,8 @@ import { AUTH_FIELD_VARIABLES, isInheritedAuth, normalizeAuthType, secretFieldsF
 import { isLikelySecretValue, isSensitiveHeader, isSensitiveKey, redactSecretsInText } from './secretPatterns'
 import { toVariableName } from './variables'
 import { cloneJson } from './repairEngine'
+import { detectIndent, parseTemplatedJson } from './jsonBody'
+import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
 
 /** Marker for places that cannot hold a usable variable (saved responses, scripts, free text). */
 export const REDACTED = '{{REDACTED}}'
@@ -153,6 +155,21 @@ class Redactor {
     }
   }
 
+  /** Raw body text: JSON (with or without unquoted variables) is edited structurally, anything else field by field. */
+  rawText(raw: string): string {
+    const templated = parseTemplatedJson(raw)
+    if (templated) {
+      const before = this.count
+      this.jsonValue(templated.value)
+      return this.count === before ? raw : templated.restore(JSON.stringify(templated.value, null, detectIndent(raw)))
+    }
+    const replacements = scanRawBodyFields(raw)
+      .filter((field) => classifyBodySecret(field.key, field.value))
+      .map((field) => ({ field, value: `{{${toVariableName(field.key)}}}` }))
+    this.count += replacements.length
+    return this.text(replacements.length ? replaceRawBodyFields(raw, replacements) : raw)
+  }
+
   body(body: unknown): void {
     if (!isRecord(body)) return
     for (const mode of ['urlencoded', 'formdata'] as const) {
@@ -167,24 +184,14 @@ class Redactor {
       }
     }
     const raw = body.raw
-    if (typeof raw === 'string' && raw.trim()) {
-      try {
-        const json = JSON.parse(raw) as unknown
-        const before = this.count
-        this.jsonValue(json)
-        if (this.count !== before) body.raw = JSON.stringify(json, null, raw.includes('\n') ? 2 : 0)
-      } catch {
-        body.raw = this.text(raw)
-      }
-    }
+    if (typeof raw === 'string' && raw.trim()) body.raw = this.rawText(raw)
     if (isRecord(body.graphql) && typeof body.graphql.variables === 'string') {
-      try {
-        const json = JSON.parse(body.graphql.variables) as unknown
+      const variables = body.graphql.variables
+      const templated = parseTemplatedJson(variables)
+      if (templated) {
         const before = this.count
-        this.jsonValue(json)
-        if (this.count !== before) body.graphql.variables = JSON.stringify(json, null, 2)
-      } catch {
-        /* not JSON */
+        this.jsonValue(templated.value)
+        if (this.count !== before) body.graphql.variables = templated.restore(JSON.stringify(templated.value, null, detectIndent(variables)))
       }
     }
   }

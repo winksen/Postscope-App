@@ -21,7 +21,7 @@ const SECRET_RULES = new Set([
   'KNOWN_SECRET_PATTERN',
 ])
 
-test('sanitized copy contains no credentials and no secret findings except legacy raw text', () => {
+test('sanitized copy contains no credentials and no secret findings', () => {
   const { json, redactedCount } = redactCollection(kitchenSinkCollection())
   assert.ok(redactedCount > 10)
   const serialized = JSON.stringify(json)
@@ -29,8 +29,7 @@ test('sanitized copy contains no credentials and no secret findings except legac
   assert.ok(!serialized.includes('hunter2pass'))
 
   const remaining = runAudit(parseCollection(json)).filter((finding) => SECRET_RULES.has(finding.ruleId))
-  // The non-JSON "secret keyword" body is a keyword heuristic without a value to redact.
-  assert.deepEqual(remaining.map((finding) => finding.ruleId), ['HARDCODED_SECRET'])
+  assert.deepEqual(remaining.map((finding) => finding.ruleId), [])
 })
 
 test('redaction is idempotent and does not mutate input', () => {
@@ -109,4 +108,30 @@ test('sanitized copy scrubs credentials in disabled headers, query params, form 
   for (const secret of [FAKE.bearer, FAKE.apiKey, FAKE.password, FAKE.refreshToken]) assert.ok(!serialized.includes(secret))
   const findings = runAudit(parseCollection(json))
   assert.deepEqual(findings.filter((finding) => SECRET_RULES.has(finding.ruleId)).map((finding) => finding.ruleId), [])
+})
+
+test('sanitized copy keeps unquoted variables, indentation and XML structure in raw bodies', () => {
+  const json = {
+    info: { name: 'Bodies' },
+    item: [
+      {
+        name: 'JSON with variable',
+        request: { method: 'POST', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{\n\t"id": {{userId}},\n\t"password": "${FAKE.password}"\n}` } },
+      },
+      {
+        name: 'SOAP',
+        request: {
+          method: 'POST',
+          url: '{{baseUrl}}/soap',
+          body: { mode: 'raw', raw: `<s:Envelope><wsse:Password Type="x">${FAKE.password}</wsse:Password><user>{{user}}</user></s:Envelope>` },
+        },
+      },
+    ],
+  }
+  const { json: sanitized, redactedCount } = redactCollection(json)
+  assert.equal(redactedCount, 2)
+  const [first, second] = (sanitized as { item: Array<{ request: { body: { raw: string } } }> }).item
+  assert.equal(first.request.body.raw, '{\n\t"id": {{userId}},\n\t"password": "{{password}}"\n}')
+  assert.equal(second.request.body.raw, '<s:Envelope><wsse:Password Type="x">{{Password}}</wsse:Password><user>{{user}}</user></s:Envelope>')
+  assert.ok(!JSON.stringify(sanitized).includes(FAKE.password))
 })

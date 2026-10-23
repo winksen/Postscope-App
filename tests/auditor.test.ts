@@ -196,3 +196,33 @@ test('every rule has complete metadata', () => {
     assert.ok(rule.title && rule.description && rule.recommendation, rule.id)
   }
 })
+
+test('JSON bodies with unquoted variables still reveal literal secrets', () => {
+  const { affectedNames, byRule } = audit({
+    info: { name: 'Templated' },
+    item: [
+      { name: 'Unquoted', request: { method: 'POST', url: '{{baseUrl}}/a', body: { mode: 'raw', raw: `{"id": {{userId}}, "password": "${FAKE.password}"}` } } },
+      { name: 'Only variables', request: { method: 'POST', url: '{{baseUrl}}/b', body: { mode: 'raw', raw: '{"id": {{userId}}, "password": {{password}}, "n": "{{x}}"}' } } },
+      { name: 'Nested', request: { method: 'POST', url: '{{baseUrl}}/c', body: { mode: 'raw', raw: `{"a": [{{one}}, {"client_secret": "${FAKE.clientSecret}"}], "b": {{two}}}` } } },
+    ],
+  })
+  assert.deepEqual(affectedNames('HARDCODED_PASSWORD'), ['Unquoted'])
+  assert.deepEqual(affectedNames('HARDCODED_SECRET'), ['Nested'])
+  assert.equal(byRule.get('HARDCODED_PASSWORD')?.evidence?.[0].location, 'body password')
+})
+
+test('XML, form-like and fragment raw bodies are scanned field by field', () => {
+  const { affectedNames, byRule } = audit({
+    info: { name: 'Raw bodies' },
+    item: [
+      { name: 'SOAP', request: { method: 'POST', url: 'https://x.test/s', body: { mode: 'raw', raw: `<wsse:UsernameToken><wsse:Password Type="PasswordText">${FAKE.password}</wsse:Password></wsse:UsernameToken>` } } },
+      { name: 'SOAP variable', request: { method: 'POST', url: 'https://x.test/s', body: { mode: 'raw', raw: '<Password>{{pw}}</Password><Name>Bob</Name>' } } },
+      { name: 'Pairs', request: { method: 'POST', url: 'https://x.test/t', body: { mode: 'raw', raw: `grant_type=client_credentials&client_secret=${FAKE.clientSecret}&scope=read` } } },
+      { name: 'Fragment', request: { method: 'POST', url: 'https://x.test/f', body: { mode: 'raw', raw: `// note\n{"password": "${FAKE.password}", }` } } },
+      { name: 'Plain text', request: { method: 'POST', url: 'https://x.test/p', body: { mode: 'raw', raw: 'this mentions a secret but has no value' } } },
+    ],
+  })
+  assert.deepEqual(affectedNames('HARDCODED_PASSWORD'), ['SOAP', 'Fragment'])
+  assert.deepEqual(affectedNames('HARDCODED_SECRET'), ['Pairs'])
+  assert.deepEqual(byRule.get('HARDCODED_PASSWORD')?.evidence?.map((e) => e.location), ['raw body Password', 'raw body password'])
+})
