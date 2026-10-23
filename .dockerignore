@@ -3,6 +3,7 @@
 node_modules
 dist
 dist-ssr
+dist-node
 coverage
 logs
 data

@@ -3,6 +3,13 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.1.39
+
+- Added a standalone postscope command that runs without the TypeScript toolchain
+- Added a GitHub Action and CI examples for GitLab and Azure DevOps
+- Added directory and glob scanning to the CLI
+- Reduced the Docker image size by compiling the server
+
 ## V0.1.38
 
 - Enhanced SARIF output with line and column locations in the collection file

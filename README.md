@@ -41,7 +41,7 @@ Collection analysis never leaves the browser. An optional Node server hosts the 
 | Icons | Phosphor Icons (`@phosphor-icons/react`) |
 | Analysis | Pure TypeScript engine in `src/lib`, run in a Web Worker |
 | Server | Node.js `>=20.6` HTTP server (`server/`), no web framework |
-| CLI | `cli/postscope.ts`, run through `tsx` |
+| CLI | `cli/postscope.ts`: run through `tsx` in development, compiled with esbuild to `dist-node/cli.js` (plain `node`) for CI and Docker |
 | Tests | `node:test` through `tsx` |
 | Utilities | `clsx`, `tailwind-merge`, `class-variance-authority` |
 
@@ -51,7 +51,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 
 - [docs/VISUAL_STYLE.md](docs/VISUAL_STYLE.md): voice, punctuation, colors, typography, and layout personality
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): component patterns and Tailwind conventions
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): architecture, threat model and operations
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/CI.md](docs/CI.md): architecture, threat model, operations and CI integration (GitHub Action, GitLab, Azure DevOps, pre-commit)
 - [docs/schemas/postscope-report.v2.schema.json](docs/schemas/postscope-report.v2.schema.json): JSON Schema of the JSON report
 - [docs/mindmap/](docs/mindmap): functional and technical mindmaps (the source of truth for how the code is organized)
 - [mindmap/ROADMAP.md](mindmap/ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md): planned and shipped releases
@@ -127,10 +127,12 @@ None are required for local development or a static production build. The Node s
 | `npm run dev` | Start Vite dev server on **port 3010** with hot reload |
 | `npm run build` | Typecheck the app and server, then produce the production bundle in `dist/` |
 | `npm run typecheck` | Typecheck the app (`tsconfig.json`) and the server (`tsconfig.server.json`) |
-| `npm run start` | Run the Node server (serves `dist/` and the `/api` endpoints) |
+| `npm run start` | Run the Node server from source (serves `dist/` and the `/api` endpoints) |
+| `npm run build:node` | Compile the server and CLI to `dist-node/` (plain JavaScript, no dependencies at run time) |
+| `npm run start:node` | Run the compiled server |
 | `npm run preview` | Serve the production build locally on **port 3010** |
 | `npm test` | Run every `tests/*.test.ts` suite with the Node test runner |
-| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
+| `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports folders and globs, `--format junit`, `--auto-env`, `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
 | `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
 | `npm run release:check` | Verify that package, Docker and compose versions match the changelog |
 
@@ -144,9 +146,10 @@ Postscope-App/
 ├── vite.config.ts          # Vite + React plugin, @ alias
 ├── tailwind.config.ts, postcss.config.js
 ├── Dockerfile, compose.yaml
-├── cli/postscope.ts        # CLI entry (npm run scan)
+├── cli/                    # postscope.ts (CLI entry) and inputs.ts (folders, globs, sibling environments)
+├── action.yml              # GitHub composite action
 ├── server/                 # Node server: static hosting, /api, team library, hardening
-├── scripts/                # Test runner, release check, demo collection generator
+├── scripts/                # Test runner, release check, node build, demo collection generator
 ├── tests/                  # node:test suites and fixtures
 ├── docs/                   # Architecture, security, deployment, style guides, mindmaps
 ├── mindmap/ROADMAP.md      # Release plan

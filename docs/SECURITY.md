@@ -36,6 +36,7 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 | Leaking secrets when sharing a collection or report | UI / CLI | "Sanitized copy" export and `--sanitize` replace credentials with `{{variables}}`; reports contain masked evidence only |
 | Long-lived secrets in a team library | Library | Optional server-side redaction (`LIBRARY_REDACT_SECRETS=true`), retention (`LIBRARY_RETENTION_DAYS`), and caps (`LIBRARY_MAX_ITEMS`, `LIBRARY_MAX_TOTAL_MB`) |
 | Running as root in containers | Docker | Image runs as the unprivileged `node` user; compose drops all capabilities and sets `no-new-privileges` |
+| Large dependency surface in the runtime image | Docker | The server is compiled to one JavaScript file with no third-party code at run time; the image ships no `node_modules`, no build tools and no TypeScript sources |
 
 ### Out of scope
 
