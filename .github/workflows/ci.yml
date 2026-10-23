@@ -19,8 +19,8 @@ jobs:
       matrix:
         node: [20, 22]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -42,7 +42,7 @@ jobs:
         run: npm run bench -- --check --report bench-report.json
       - name: Upload performance report
         if: matrix.node == 20 && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-report
           path: bench-report.json
@@ -61,7 +61,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload the browser test report
         if: matrix.node == 20 && failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -74,7 +74,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build the image
         run: docker build --tag postscope:ci .
       - name: Runs as an unprivileged user
