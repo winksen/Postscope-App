@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.0
+
+- Added rule packs so groups of rules can be enabled per team or project
+- Added the identity finding category with its own score
+- Added compliance references to every rule
+
 ## V0.1.45
 
 - Security fixes: cleared build tool advisories by moving to Tailwind CSS 4

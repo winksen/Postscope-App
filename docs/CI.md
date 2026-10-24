@@ -40,6 +40,7 @@ Useful options (all in `postscope --help`):
 | `--min-score N` | Exit code 1 when a collection scores below N |
 | `--baseline file` / `--write-baseline file` | Fail only on findings that are new compared with a committed baseline |
 | `--config file` | Project config (`.postscope.json`), otherwise the nearest one above each collection is used |
+| `--packs auto\|none\|PACK,-PACK` | Rule packs. `auto` (default) turns the identity packs on when the collection shows identity signals; list packs (`iam-am`, `iam-iga`, `iam-pam`, `iam-platform`) to force them on, prefix with `-` to force them off |
 | `--auto-env` | Also analyze `*.postman_environment.json` and `*.postman_globals.json` stored next to each collection |
 | `--format text\|json\|sarif\|markdown\|html\|junit` | Report format; `--output file` writes it to a file |
 
@@ -70,7 +71,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.1.45
+        uses: winksen/Postscope-App@v0.2.0
         with:
           path: collections
           fail-on: critical
@@ -215,7 +216,7 @@ postscope diff old.json new.json --format markdown --output postscope-diff.md --
 | `--fail-on-new critical\|warning\|info\|none` | Exit code 1 when a finding at or above this severity is new (default `critical`) |
 | `--format text\|json\|markdown` | `markdown` is meant for a pull request comment or job summary; `json` is versioned (`reportVersion`, `kind: "comparison"`) |
 | `--output file` | Write the comparison to a file |
-| `--config`, `--no-config`, `--disable`, `--severity` | Same rule policy as `scan`, applied to both versions |
+| `--config`, `--no-config`, `--disable`, `--severity`, `--packs` | Same rule policy as `scan`, applied to both versions |
 
 Comparison output never contains secret values or URL query strings. Exit codes: `0` passed, `1` new findings, `2` usage or input error (a missing file, not exactly two collections).
 
@@ -241,5 +242,5 @@ On a pull request, compare the base branch with the head:
 1. Run once locally: `postscope scan collections --fail-on none` and read the report.
 2. Fix what is cheap (secrets first), or accept the rest: `postscope scan collections --write-baseline postscope-baseline.json` records today's findings as a baseline. Commit it.
 3. Use `--baseline postscope-baseline.json` in CI. The pipeline now fails only on new findings.
-4. Put team rules in `.postscope.json`: disabled rules, severity overrides, score weights, and suppressions with a reason and an optional expiry. Review changes to that file like any other security policy change.
+4. Put team rules in `.postscope.json`: disabled rules, severity overrides, score weights, rule packs, and suppressions with a reason and an optional expiry. Review changes to that file like any other security policy change.
 5. Refresh the baseline when findings are fixed so they cannot come back unnoticed.

@@ -298,7 +298,7 @@ test('the project config is validated strictly', () => {
     disabledRules: ['get_with_body'],
     severityOverrides: { INSECURE_HTTP: 'critical' },
     weights: { critical: 30 },
-    rulePacks: ['future'],
+    rulePacks: { enabled: ['iam-am'] },
     suppressions: [{ ruleId: 'missing_auth', request: 'Public/**', location: 'POST', reason: ' Public ', expires: '2027-02-28' }],
   })
   assert.deepEqual(good.errors, [])

@@ -50,11 +50,12 @@ interface RepairPageProps {
   onResetRepairs: () => Promise<void>
 }
 
-const CATEGORY_ORDER: Finding['category'][] = ['secrets', 'variables', 'auth', 'hygiene']
+const CATEGORY_ORDER: Finding['category'][] = ['secrets', 'variables', 'auth', 'identity', 'hygiene']
 const CATEGORY_LABELS: Record<Finding['category'], string> = {
   secrets: 'Secrets',
   variables: 'Variables',
   auth: 'Auth',
+  identity: 'Identity',
   hygiene: 'Hygiene',
 }
 

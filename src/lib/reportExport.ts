@@ -1,7 +1,7 @@
 import type { Finding } from './auditor'
 import type { ParsedCollection, ParsedRequest } from './parser'
 import type { ScoreBreakdown } from './scorer'
-import { RULES, RULE_LIST } from './rules'
+import { RULES, RULE_LIST, type RuleReferences } from './rules'
 import { SEVERITY_ORDER } from './severity'
 import { findingOccurrences, occurrenceFingerprint } from './occurrences'
 import type { SuppressedFinding } from './suppressions'
@@ -71,6 +71,18 @@ export function reportMimeType(format: ReportFormat): string {
   return 'application/json'
 }
 
+/** Framework control ids as SARIF tags, such as `NIST-800-53:IA-5` or `CIS-v8:5.2`. */
+export function frameworkTags(rule: { references?: RuleReferences }): string[] {
+  const references = rule.references
+  if (!references) return []
+  return [
+    ...(references.nist80053 ?? []).map((id) => `NIST-800-53:${id}`),
+    ...(references.iso27001 ?? []).map((id) => `ISO-27001:${id}`),
+    ...(references.cisV8 ?? []).map((id) => `CIS-v8:${id}`),
+    ...(references.rfc ?? []).map((id) => `RFC:${id}`),
+  ]
+}
+
 function severityCounts(findings: Finding[]): Record<Finding['severity'], number> {
   return {
     critical: findings.filter((finding) => finding.severity === 'critical').length,
@@ -113,6 +125,8 @@ export function buildJsonReport(ctx: ReportContext): string {
         recommendation: finding.recommendation,
         cwe: finding.cwe,
         owasp: finding.owasp,
+        pack: RULES[finding.ruleId].pack,
+        references: RULES[finding.ruleId].references,
         affected: finding.affected.map((id) => ({ id, label: labels.get(id) ?? id })),
         evidence: finding.evidence ?? [],
         occurrences: findingOccurrences(finding).map(({ fingerprint, requestId, location }) => ({ fingerprint, requestId, location })),
@@ -270,7 +284,14 @@ export function buildSarifReport(ctx: ReportContext): string {
                   help: { text: rule.recommendation },
                   defaultConfiguration: { level: sarifLevel(severity) },
                   properties: {
-                    tags: ['security', rule.category, ...(rule.cwe ? [rule.cwe] : [])],
+                    tags: [
+                      'security',
+                      rule.category,
+                      `pack:${rule.pack}`,
+                      ...rule.tags,
+                      ...(rule.cwe ? [rule.cwe] : []),
+                      ...frameworkTags(rule),
+                    ],
                     'security-severity': SECURITY_SEVERITY[severity],
                   },
                 }

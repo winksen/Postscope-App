@@ -140,6 +140,8 @@ All modules are pure TypeScript with relative imports only, so the same code run
 
 ### 2.2 Rule engine (`auditor.ts`, `rules.ts`, `severity.ts`)
 
+- **Rule packs and compliance metadata** (`rulePacks.ts`, `ruleMetadata.ts`): every `RuleDefinition` has a `pack` (`core`, `iam-am`, `iam-iga`, `iam-pam`, `iam-platform`), `tags` and optional `references` (`nist80053`, `iso27001`, `cisV8`, `rfc`). The core metadata lives in `ruleMetadata.ts` so the original rule definitions stay untouched. `AuditOptions.rulePacks` is `{ enabled?, disabled? }`; `resolveEnabledPacks(settings, identityDetected)` runs `core`, every pack forced on, and every optional pack when `detectIdentitySignals` (`iam/signals.ts`: oauth2 helpers, identity hosts and paths) is true, minus packs forced off (off wins). `FindingCollector.build` skips rules of packs that did not run and `AuditResult.packs` lists the packs that ran. Settings come from `AUDIT_RULE_PACKS`, `--packs`, `.postscope.json` `rulePacks` and the Rules dialog (Auto, Always on, Off per pack); `parseRulePacks` parses `iam-am,-iam-pam`, `auto` and `none`.
+- **Identity category and score:** `FindingCategory` gains `identity` (after `auth`, before `hygiene`). It counts toward the security score, and `ScoreBreakdown.categories.identity` is present only when at least one identity finding exists, so collections without identity content never show a perfect identity score.
 - `rules.ts` is the registry: id, title, description, recommendation, default severity, category, CWE, OWASP. Titles of the original rules are unchanged.
 - `runAudit(parsed, options?)` feeds a `FindingCollector`: each rule records affected request IDs and **masked evidence** (`{ requestId?, location, preview }`, de-duplicated, max 100 per finding).
 - `build(options)` applies `disabledRules` and `severityOverrides`, then sorts by severity (stable, registry order).
@@ -166,6 +168,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
+| identity | Rules of the identity packs (`iam-am`, `iam-iga`, `iam-pam`, `iam-platform`); the packs arrive release by release from V0.2.2 and run when identity signals are detected |
 | hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY`, `UNUSED_COLLECTION_VARIABLE`, `SUPPRESSION_EXPIRED`, `SUPPRESSION_INVALID` |
 
 ### 2.3 Secret detection (`secretPatterns.ts`, `authSchemes.ts`)
@@ -404,6 +407,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `HEALTH_EXPOSE_VERSION` | `true` | `false` removes `version` from `/api/health` (public endpoint) |
 | `AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES` | empty | Team rule policy |
 | `SCORE_WEIGHTS` | `critical=20,warning=8,info=2` | Points per severity for the score (any subset, 0 to 100 each) |
+| `AUDIT_RULE_PACKS` | `auto` | Rule packs: `auto`, `none`, or a list such as `iam-am,-iam-pam` |
 | `LOG_LEVEL`, `LOG_FORMAT`, `ACCESS_LOG` | `info`, `text`, `false` | Logging |
 
 ## 7. Tooling
@@ -448,6 +452,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `rulePacks.test.ts` | Pack parsing and resolution, identity signal detection, pack settings in config, server policy and CLI, compliance references on every security rule, identity score omission, pack and framework tags in JSON and SARIF reports |
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
 | `libraryEncryption.test.ts` | Key parsing and resolution, envelope round trip and tamper rejection, encrypted store behavior, keyed dedupe hash, migration and rotation, proxy user, audit entries |
 | `server.test.ts` | Traversal, deep-link navigations get the app shell, headers/CSP, gzip/ETag, config/health, id validation, CSRF, size limits, dedupe, redaction, public mode, rate limit, Basic auth lockout |
@@ -519,3 +524,5 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.1.43 | Page-level code splitting (`lazyPage`, one `react` vendor chunk), `VirtualList` and a flat ARIA request tree (`requestTree.ts`, `RequestTreeView`), worker `audit` messages with a per-slot cache and compact results (`compactResult.ts`), `scripts/bench.mjs` with `bench-baseline.json` and a CI budget step |
 | V0.1.44 | ESLint flat config and Prettier (one-time reformat), `check:style` em dash check, Playwright smoke, navigation, accessibility and large-collection tests (`e2e/`), CI: lint, format, style, browser tests, blocking runtime audit, Docker build and `/api/health` smoke job, CodeQL, Dependabot |
 | V0.1.45 | Tailwind CSS 4 (CSS-first `@theme`, `@tailwindcss/vite`, `tw-animate-css`; `tailwind.config.ts`, PostCSS, autoprefixer and `tailwindcss-animate` removed), dependency refresh (Radix, framer-motion, Recharts 2.15, tailwind-merge, Vite 6.4.5, tsx, types), unused `avatar` and `collapsible` wrappers and packages removed, CSP without `blob:` sources, `npm run test:visual`, performance baseline updated (CSS 10 KB to 14 KB gzip) |
+
+| V0.2.0 | Rule packs (`rulePacks.ts`, `AUDIT_RULE_PACKS`, `--packs`, `.postscope.json` `rulePacks`, pack toggles in the Rules dialog), `identity` finding category and optional identity score, tags and compliance references (NIST SP 800-53, ISO/IEC 27001, CIS v8, RFC) on every security rule, pack and references in JSON reports and SARIF tags, identity signal detection (`iam/signals.ts`) |

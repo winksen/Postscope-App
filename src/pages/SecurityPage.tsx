@@ -29,7 +29,7 @@ interface SecurityPageProps {
 }
 
 const SEVERITIES = ['all', 'critical', 'warning', 'info'] as const
-const CATEGORIES = ['all', 'secrets', 'variables', 'auth'] as const
+const CATEGORIES = ['all', 'secrets', 'variables', 'auth', 'identity'] as const
 
 function findingMatchesQuery(f: Finding, q: string, requests: ParsedCollection['requests']): boolean {
   if (!q.trim()) return true

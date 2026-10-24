@@ -30,7 +30,7 @@ export interface ScorePenalty {
 export interface ScoreBreakdown {
   /** Headline score: `round(0.85 * security + 0.15 * hygiene)`. */
   total: number
-  /** Secrets, variables and auth findings only. */
+  /** Secrets, variables, auth and identity findings only. */
   security: number
   /** Maintainability findings only. */
   hygiene: number
@@ -38,6 +38,8 @@ export interface ScoreBreakdown {
     secrets: number
     variables: number
     auth: number
+    /** Only present when the collection has identity findings or an identity profile. */
+    identity?: number
     hygiene: number
   }
   grade: 'A' | 'B' | 'C' | 'D' | 'F'
@@ -89,7 +91,12 @@ function summary(score: number, findings: Finding[]): string {
   return `Review findings and apply recommendations to improve collection health.`
 }
 
-export function calculateScore(_parsed: ParsedCollection, findings: Finding[], weights: ScoreWeights = activeWeights): ScoreBreakdown {
+/** The identity category is scored only when there is something to score: an identity finding. */
+function hasIdentityScope(_parsed: ParsedCollection, findings: Finding[]): boolean {
+  return findings.some((finding) => finding.category === 'identity')
+}
+
+export function calculateScore(parsed: ParsedCollection, findings: Finding[], weights: ScoreWeights = activeWeights): ScoreBreakdown {
   const penalties: ScorePenalty[] = findings
     .map((finding) => ({
       ruleId: finding.ruleId,
@@ -114,6 +121,7 @@ export function calculateScore(_parsed: ParsedCollection, findings: Finding[], w
       secrets: clampScore(sum((penalty) => penalty.category === 'secrets')),
       variables: clampScore(sum((penalty) => penalty.category === 'variables')),
       auth: clampScore(sum((penalty) => penalty.category === 'auth')),
+      ...(hasIdentityScope(parsed, findings) ? { identity: clampScore(sum((penalty) => penalty.category === 'identity')) } : {}),
       hygiene,
     },
     grade: grade(total),

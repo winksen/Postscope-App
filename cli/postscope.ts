@@ -22,6 +22,7 @@ import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
+import { parseRulePacks, type RulePackSettings } from '../src/lib/rulePacks'
 import { compareCollections, newFindingsAtOrAbove } from '../src/lib/compare'
 import { buildComparisonJson, buildComparisonMarkdown, buildComparisonText } from '../src/lib/compareReport'
 import { readPackageVersion } from '../server/appVersion'
@@ -70,6 +71,9 @@ Options:
       --min-score <0-100>                  Exit 1 when any collection scores below this value
       --disable <RULE,RULE>                Disable rules (see --list-rules)
       --severity <RULE=level,...>          Override rule severities (critical, warning, info)
+      --packs <auto|none|PACK,-PACK,...>   Rule packs: auto (default) turns the identity packs on when the collection shows identity
+                                           signals; list packs to force them on, prefix with - to force them off, none switches them
+                                           all off (packs: iam-am, iam-iga, iam-pam, iam-platform)
       --config <file>                      Project config (default: the nearest .postscope.json above the input file)
       --no-config                          Ignore any .postscope.json
       --baseline <file>                    Report and fail only on findings that are not in this baseline file
@@ -108,6 +112,7 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
   }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
+  let rulePacks: RulePackSettings | undefined
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -163,6 +168,12 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
           overrides[rule.toUpperCase()] = level
         }
         break
+      case '--packs': {
+        const parsed = parseRulePacks(value())
+        if (parsed.errors.length) throw new UsageError(`Invalid --packs: ${parsed.errors.join('; ')}`)
+        rulePacks = parsed.settings
+        break
+      }
       case '--config':
         options.config = value()
         break
@@ -207,7 +218,7 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
   const known = new Set<string>(RULE_LIST.map((rule) => rule.id))
   const unknownRules = [...disabled, ...Object.keys(overrides)].filter((rule) => !known.has(rule))
   if (unknownRules.length) throw new UsageError(`Unknown rule id(s): ${unknownRules.join(', ')}`)
-  options.audit = sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides })
+  options.audit = sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides, rulePacks })
 
   if (!options.inputs.length) throw new UsageError('Provide at least one collection file.')
   if (options.baseline && options.writeBaseline) throw new UsageError('Use either --baseline or --write-baseline, not both.')
@@ -259,6 +270,7 @@ function mergeAuditOptions(cli: AuditOptions, config: ProjectConfig | undefined)
   const merged = sanitizeAuditOptions({
     disabledRules: [...new Set([...(config.disabledRules ?? []), ...(cli.disabledRules ?? [])])],
     severityOverrides: { ...config.severityOverrides, ...cli.severityOverrides },
+    rulePacks: cli.rulePacks ?? config.rulePacks,
   })
   return { ...merged, suppressions: config.suppressions }
 }
@@ -601,7 +613,9 @@ export function main(argv: string[]): number {
   }
   if (options === 'rules') {
     for (const rule of RULE_LIST)
-      process.stdout.write(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.category.padEnd(9)} ${rule.title}\n`)
+      process.stdout.write(
+        `${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.category.padEnd(9)} ${rule.pack.padEnd(12)} ${rule.title}\n`
+      )
     return 0
   }
 

@@ -60,6 +60,7 @@
             "secrets": { "$ref": "#/definitions/score100" },
             "variables": { "$ref": "#/definitions/score100" },
             "auth": { "$ref": "#/definitions/score100" },
+            "identity": { "$ref": "#/definitions/score100" },
             "hygiene": { "$ref": "#/definitions/score100" }
           },
           "additionalProperties": false
@@ -140,7 +141,18 @@
   "definitions": {
     "score100": { "type": "integer", "minimum": 0, "maximum": 100 },
     "severity": { "enum": ["critical", "warning", "info"] },
-    "category": { "enum": ["secrets", "variables", "auth", "hygiene"] },
+    "category": { "enum": ["secrets", "variables", "auth", "identity", "hygiene"] },
+    "pack": { "enum": ["core", "iam-am", "iam-iga", "iam-pam", "iam-platform"] },
+    "references": {
+      "type": "object",
+      "properties": {
+        "nist80053": { "type": "array", "items": { "type": "string" } },
+        "iso27001": { "type": "array", "items": { "type": "string" } },
+        "cisV8": { "type": "array", "items": { "type": "string" } },
+        "rfc": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
     "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "affected": {
       "type": "object",
@@ -160,6 +172,8 @@
         "recommendation": { "type": "string" },
         "cwe": { "type": "string", "pattern": "^CWE-\\d+$" },
         "owasp": { "type": "string" },
+        "pack": { "$ref": "#/definitions/pack" },
+        "references": { "$ref": "#/definitions/references" },
         "affected": { "type": "array", "items": { "$ref": "#/definitions/affected" } },
         "evidence": {
           "type": "array",

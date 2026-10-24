@@ -1,4 +1,8 @@
 import type { FindingCategory, Severity } from './severity'
+import type { RulePackId } from './rulePacks'
+import { coreMetadataFor, type RuleReferences } from './ruleMetadata'
+
+export type { RuleReferences }
 
 export type RuleId =
   | 'HARDCODED_PASSWORD'
@@ -46,9 +50,17 @@ export interface RuleDefinition {
   cwe?: string
   /** OWASP API Security Top 10 (2023) mapping where one applies. */
   owasp?: string
+  /** Rule pack the rule belongs to; `core` rules always run. */
+  pack: RulePackId
+  /** Short labels used to group and filter rules in reports. */
+  tags: string[]
+  /** Compliance references (NIST SP 800-53, ISO/IEC 27001, CIS v8, RFC). */
+  references?: RuleReferences
 }
 
-const definitions: RuleDefinition[] = [
+type BaseDefinition = Omit<RuleDefinition, 'pack' | 'tags' | 'references'> & Partial<Pick<RuleDefinition, 'pack' | 'tags' | 'references'>>
+
+const baseDefinitions: BaseDefinition[] = [
   // Critical: secrets
   {
     id: 'HARDCODED_PASSWORD',
@@ -352,6 +364,16 @@ const definitions: RuleDefinition[] = [
     category: 'hygiene',
   },
 ]
+
+const definitions: RuleDefinition[] = baseDefinitions.map((definition) => {
+  const metadata = coreMetadataFor(definition.id)
+  return {
+    ...definition,
+    pack: definition.pack ?? 'core',
+    tags: definition.tags ?? metadata.tags,
+    references: definition.references ?? metadata.references,
+  }
+})
 
 export const RULES: Record<RuleId, RuleDefinition> = Object.fromEntries(
   definitions.map((definition) => [definition.id, definition])

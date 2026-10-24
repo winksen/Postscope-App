@@ -96,27 +96,27 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 
 | Version | Tag | Track | Type | Title | Commit |
 |---|---|---|---|---|---|
-| V0.1.25 | `v0.1.25` | A1 | Chore, Docs, Bug | Version alignment, changelog, release tags, stale docs | `68d478a` |
-| V0.1.26 | `v0.1.26` | A1 | Security, Bug | Audit disabled headers, query params and form fields | `d693acc` |
-| V0.1.27 | `v0.1.27` | A1 | Bug | Variable-tolerant body parsing | `85e530d` |
-| V0.1.28 | `v0.1.28` | A1 | Security, Bug | Descriptions, item variables, path variables, saved request bodies | `7e41077` |
-| V0.1.29 | `v0.1.29` | A1 | Bug | URL and auth rule accuracy | `b971633` |
-| V0.1.30 | `v0.1.30` | A1 | Bug, Enhancement | Script credential detection gaps | `b0e64da` |
-| V0.1.31 | `v0.1.31` | A1 | Security | Trusted proxy and lockout hardening | `807e12f` |
-| V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes | `61b576f` |
-| V0.1.33 | `v0.1.33` | A2 | Enhancement | Secret pattern expansion and Basic token decoding | `bff360d` |
-| V0.1.34 | `v0.1.34` | A2 | Feature | Postman environments and globals | `f5c3110` |
-| V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules | `00911f8` |
-| V0.1.36 | `v0.1.36` | A2 | Enhancement | Scoring model v2 | `a50f91e` |
-| V0.1.37 | `v0.1.37` | A3 | Feature | Config file, baselines and suppressions | `53e2814` |
-| V0.1.38 | `v0.1.38` | A3 | Enhancement | Precise SARIF locations, report schema, HTML report | `ae025e7` |
-| V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server | `a5c4b6f` |
-| V0.1.40 | `v0.1.40` | A4 | Security, Feature | Library encryption at rest, audit log, proxy identity | `9d6f5d0` |
-| V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift | `1df0a2c` |
-| V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | `6a2acfa` |
-| V0.1.43 | `v0.1.43` | A5 | Enhancement | Performance: code splitting, virtualization, budgets | `1f86c00` |
-| V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests | `0f6e5b8` |
-| V0.1.45 | `v0.1.45` | A6 | Security, Chore | Tailwind CSS 4 migration and dependency refresh | |
+| V0.1.25 | `v0.1.25` | A1 | Chore, Docs, Bug | Version alignment, changelog, release tags, stale docs | `960c53e` |
+| V0.1.26 | `v0.1.26` | A1 | Security, Bug | Audit disabled headers, query params and form fields | `caafdce` |
+| V0.1.27 | `v0.1.27` | A1 | Bug | Variable-tolerant body parsing | `9526edb` |
+| V0.1.28 | `v0.1.28` | A1 | Security, Bug | Descriptions, item variables, path variables, saved request bodies | `2dfc3bd` |
+| V0.1.29 | `v0.1.29` | A1 | Bug | URL and auth rule accuracy | `de691a0` |
+| V0.1.30 | `v0.1.30` | A1 | Bug, Enhancement | Script credential detection gaps | `22cd1b0` |
+| V0.1.31 | `v0.1.31` | A1 | Security | Trusted proxy and lockout hardening | `fefcc3e` |
+| V0.1.32 | `v0.1.32` | A1 | Bug | Repair, redaction and report fixes | `a414512` |
+| V0.1.33 | `v0.1.33` | A2 | Enhancement | Secret pattern expansion and Basic token decoding | `7c3de25` |
+| V0.1.34 | `v0.1.34` | A2 | Feature | Postman environments and globals | `ed05494` |
+| V0.1.35 | `v0.1.35` | A2 | Feature | Variable integrity rules | `15fd7f0` |
+| V0.1.36 | `v0.1.36` | A2 | Enhancement | Scoring model v2 | `8adccbc` |
+| V0.1.37 | `v0.1.37` | A3 | Feature | Config file, baselines and suppressions | `9ac17cf` |
+| V0.1.38 | `v0.1.38` | A3 | Enhancement | Precise SARIF locations, report schema, HTML report | `bc8ddff` |
+| V0.1.39 | `v0.1.39` | A3 | Feature, Chore | Standalone CLI, GitHub Action, compiled server | `fd8fe06` |
+| V0.1.40 | `v0.1.40` | A4 | Security, Feature | Library encryption at rest, audit log, proxy identity | `e4d04d8` |
+| V0.1.41 | `v0.1.41` | A4 | Feature | Collection comparison and drift | `2308b68` |
+| V0.1.42 | `v0.1.42` | A5 | Enhancement | Deep links and accessibility | `8a995e8` |
+| V0.1.43 | `v0.1.43` | A5 | Enhancement | Performance: code splitting, virtualization, budgets | `8bcb7f2` |
+| V0.1.44 | `v0.1.44` | A6 | Chore | Lint, format, CI hardening, browser smoke tests | `ba72975` |
+| V0.1.45 | `v0.1.45` | A6 | Security, Chore | Tailwind CSS 4 migration and dependency refresh | `e6c0151` |
 | V0.2.0 | `v0.2.0` | B0 | Feature | Rule packs, identity category, compliance metadata | |
 | V0.2.1 | `v0.2.1` | B0 | Feature | Identity context extraction and platform fingerprinting | |
 | V0.2.2 | `v0.2.2` | B1 AM | Feature | OAuth 2.0 and OIDC flow rules | |

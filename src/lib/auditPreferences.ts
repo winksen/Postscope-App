@@ -29,5 +29,5 @@ export function effectiveAuditOptions(serverPolicy: AuditOptions, userPreference
 }
 
 export function isCustomized(options: AuditOptions): boolean {
-  return (options.disabledRules?.length ?? 0) > 0 || Object.keys(options.severityOverrides ?? {}).length > 0
+  return (options.disabledRules?.length ?? 0) > 0 || Object.keys(options.severityOverrides ?? {}).length > 0 || !!options.rulePacks
 }

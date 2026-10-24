@@ -164,7 +164,9 @@ After applying, PostScope re-analyzes the repaired collection, shows the real sc
 
 ### Rule settings
 
-The sliders icon in the header opens **Rules**: turn any rule off or change its severity. Changes re-run the audit instantly and are remembered in the browser. Operators can ship **team defaults** (`AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES`); "Reset to defaults" returns to them.
+The sliders icon in the header opens **Rules**: turn any rule off or change its severity. Changes re-run the audit instantly and are remembered in the browser. Operators can ship **team defaults** (`AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES`, `AUDIT_RULE_PACKS`); "Reset to defaults" returns to them.
+
+Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
 
 ### Export
 
@@ -202,6 +204,7 @@ Available in `hybrid` and `on` modes.
 | `--min-score N` | Exit code 1 when a collection scores below N (headline score; thresholds chosen before V0.1.36 may need adjusting) |
 | `--weights critical=N,warning=N,info=N` | Override the points deducted per finding severity |
 | `--disable`, `--severity` | Same rule policy controls as the UI |
+| `--packs auto|none|PACK,-PACK` | Rule packs: `auto` (default), a list of packs to force on, `-pack` to force one off, `none` for no identity packs |
 | `--sanitize out.json` | Write a sanitized copy; sanitized environment copies are written next to it as `<name>.sanitized.postman_environment.json` |
 | `-e, --environment file.json` | Analyze a Postman environment export with the collections (repeatable) |
 | `--globals file.json` | Analyze a Postman globals export with the collections (repeatable) |
@@ -224,6 +227,7 @@ A `.postscope.json` found in the scanned file's folder or any parent (or passed 
   "disabledRules": ["GET_WITH_BODY"],
   "severityOverrides": { "INSECURE_HTTP": "critical" },
   "weights": { "critical": 20, "warning": 8, "info": 2 },
+  "rulePacks": { "enabled": ["iam-am"], "disabled": ["iam-pam"] },
   "suppressions": [
     { "ruleId": "MISSING_AUTH", "request": "Public/**", "reason": "Public endpoints by design", "expires": "2027-01-31" }
   ]

@@ -1,4 +1,5 @@
 import { isRuleId } from './rules'
+import { isRulePackId, RULE_PACKS, sanitizeRulePacks, type RulePackSettings } from './rulePacks'
 import { isSeverity, type ScoreWeights, type Severity, SEVERITY_ORDER, sanitizeScoreWeights } from './severity'
 import { isValidDate, type ConfigSuppression } from './suppressions'
 
@@ -9,8 +10,8 @@ export interface ProjectConfig {
   disabledRules?: string[]
   severityOverrides?: Record<string, Severity>
   weights?: ScoreWeights
-  /** Reserved for rule packs; accepted so config files stay valid when packs arrive. */
-  rulePacks?: unknown
+  /** Rule pack selection: `{ "enabled": ["iam-am"], "disabled": ["iam-pam"] }`. Packs in neither list follow `auto`. */
+  rulePacks?: RulePackSettings
   suppressions?: ConfigSuppression[]
 }
 
@@ -68,7 +69,28 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
     }
   }
 
-  if (raw.rulePacks !== undefined) config.rulePacks = raw.rulePacks
+  if (raw.rulePacks !== undefined) {
+    const packs = raw.rulePacks
+    if (!packs || typeof packs !== 'object' || Array.isArray(packs))
+      errors.push('"rulePacks" must be an object such as {"enabled": ["iam-am"], "disabled": ["iam-pam"]}')
+    else {
+      for (const [key, value] of Object.entries(packs as Record<string, unknown>)) {
+        if (key !== 'enabled' && key !== 'disabled') {
+          errors.push(`"rulePacks" has unknown key "${key}"`)
+          continue
+        }
+        if (!Array.isArray(value)) {
+          errors.push(`"rulePacks.${key}" must be an array of pack ids`)
+          continue
+        }
+        for (const id of value) {
+          if (!isRulePackId(id)) errors.push(`"rulePacks.${key}" has unknown pack "${String(id)}"`)
+          else if (!RULE_PACKS[id].optional) errors.push(`"rulePacks.${key}" cannot list "${id}": it is always on`)
+        }
+      }
+      config.rulePacks = sanitizeRulePacks(packs)
+    }
+  }
 
   if (raw.suppressions !== undefined) {
     if (!Array.isArray(raw.suppressions)) errors.push('"suppressions" must be an array')

@@ -11,7 +11,18 @@ import { Badge } from '@/components/ui/badge'
 import { SeverityBadge } from '@/components/SeverityBadge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, DownloadSimple, Gauge, Key, Lightbulb, Link, Lock, Sparkle, WarningCircle } from '@phosphor-icons/react'
+import {
+  CheckCircle,
+  DownloadSimple,
+  Gauge,
+  IdentificationCard,
+  Key,
+  Lightbulb,
+  Link,
+  Lock,
+  Sparkle,
+  WarningCircle,
+} from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 function getProgressTone(value: number): string {
@@ -34,6 +45,7 @@ const CATEGORY_ICONS = {
   secrets: Key,
   variables: Link,
   auth: Lock,
+  identity: IdentificationCard,
   hygiene: Sparkle,
 }
 
@@ -41,6 +53,7 @@ const CATEGORY_LABELS: Record<keyof ScoreBreakdown['categories'], string> = {
   secrets: 'Secrets',
   variables: 'Variables',
   auth: 'Auth',
+  identity: 'Identity',
   hygiene: 'Hygiene',
 }
 

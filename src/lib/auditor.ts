@@ -1,5 +1,7 @@
 import type { ParsedCollection, ParsedRequest, ParsedScopedVariable, KeyValue } from './parser'
 import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
+import { resolveEnabledPacks, sanitizeRulePacks, type RulePackId, type RulePackSettings } from './rulePacks'
+import { detectIdentitySignals } from './iam/signals'
 import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
 import { secretFieldsFor } from './authSchemes'
 import { parseTemplatedJson } from './jsonBody'
@@ -61,6 +63,8 @@ export interface AuditOptions {
   suppressions?: readonly ConfigSuppression[]
   /** Clock used to decide whether a suppression has expired. Defaults to now. */
   now?: Date
+  /** Rule pack selection. Optional packs not listed follow `auto`: on when the collection shows identity signals. */
+  rulePacks?: RulePackSettings
 }
 
 const MAX_EVIDENCE_PER_FINDING = 100
@@ -147,7 +151,7 @@ class FindingCollector {
     return ids
   }
 
-  build(options: AuditOptions = {}): Finding[] {
+  build(options: AuditOptions = {}, enabledPacks?: ReadonlySet<RulePackId>): Finding[] {
     const disabled = new Set(options.disabledRules ?? [])
     const overrides = options.severityOverrides ?? {}
     const findings: Finding[] = []
@@ -155,6 +159,7 @@ class FindingCollector {
     for (const rule of RULE_LIST) {
       const hits = this.hits.get(rule.id)
       if (!hits || disabled.has(rule.id)) continue
+      if (enabledPacks && !enabledPacks.has(rule.pack)) continue
       const override = overrides[rule.id]
       findings.push({
         id: rule.id,
@@ -990,7 +995,7 @@ function runInfoChecks(parsed: ParsedCollection, out: FindingCollector): void {
 /** Normalizes untrusted option input (localStorage, server config) into a safe AuditOptions object. */
 export function sanitizeAuditOptions(input: unknown): AuditOptions {
   if (!input || typeof input !== 'object') return {}
-  const raw = input as { disabledRules?: unknown; severityOverrides?: unknown }
+  const raw = input as { disabledRules?: unknown; severityOverrides?: unknown; rulePacks?: unknown }
   const disabledRules = Array.isArray(raw.disabledRules) ? raw.disabledRules.filter(isRuleId) : []
   const severityOverrides: Partial<Record<RuleId, Severity>> = {}
   if (raw.severityOverrides && typeof raw.severityOverrides === 'object') {
@@ -998,7 +1003,8 @@ export function sanitizeAuditOptions(input: unknown): AuditOptions {
       if (isRuleId(ruleId) && isSeverity(severity) && severity !== RULES[ruleId].severity) severityOverrides[ruleId] = severity
     }
   }
-  return { disabledRules, severityOverrides }
+  const rulePacks = sanitizeRulePacks(raw.rulePacks)
+  return { disabledRules, severityOverrides, ...(rulePacks ? { rulePacks } : {}) }
 }
 
 export interface AuditResult {
@@ -1006,6 +1012,8 @@ export interface AuditResult {
   findings: Finding[]
   /** Occurrences hidden by a reviewed suppression, kept for reports. */
   suppressed: SuppressedFinding[]
+  /** Rule packs that ran: `core` plus the identity packs that were forced on or switched on by identity signals. */
+  packs: RulePackId[]
 }
 
 function sortFindings(findings: Finding[]): Finding[] {
@@ -1017,6 +1025,8 @@ function sortFindings(findings: Finding[]): Finding[] {
 
 export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions = {}): AuditResult {
   const out = new FindingCollector()
+  const enabledPacks = resolveEnabledPacks(options.rulePacks, detectIdentitySignals(parsed))
+  const packs = [...enabledPacks]
 
   for (const req of parsed.requests) {
     checkHeaders(req, out)
@@ -1036,12 +1046,12 @@ export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions
   checkVariableIntegrity(parsed, out)
   runInfoChecks(parsed, out)
 
-  const { active, suppressed, notices } = applySuppressions(parsed, out.build(options), options)
-  if (notices.length === 0) return { findings: active, suppressed }
+  const { active, suppressed, notices } = applySuppressions(parsed, out.build(options, enabledPacks), options)
+  if (notices.length === 0) return { findings: active, suppressed, packs }
 
   const noticeCollector = new FindingCollector()
   for (const notice of notices) noticeCollector.add(notice.ruleId, undefined, { location: notice.location })
-  return { findings: sortFindings([...active, ...noticeCollector.build(options)]), suppressed }
+  return { findings: sortFindings([...active, ...noticeCollector.build(options, enabledPacks)]), suppressed, packs }
 }
 
 export function runAudit(parsed: ParsedCollection, options: AuditOptions = {}): Finding[] {

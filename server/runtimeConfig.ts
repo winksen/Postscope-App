@@ -4,6 +4,7 @@ import { log } from './logger'
 import { resolveEncryptionState, type EncryptionState } from './libraryCrypto'
 import { sanitizeAuditOptions, type AuditOptions } from '../src/lib/auditor'
 import { isSeverity, parseScoreWeights, type ScoreWeights } from '../src/lib/severity'
+import { parseRulePacks } from '../src/lib/rulePacks'
 
 /**
  * Optional hardening and operations settings. Every value is read lazily from the environment
@@ -143,6 +144,7 @@ export function getAllowedOrigins(): string[] {
  * Team audit policy defaults sent to every browser:
  * AUDIT_DISABLED_RULES=GET_WITH_BODY,INSECURE_HTTP
  * AUDIT_SEVERITY_OVERRIDES=INSECURE_HTTP=critical,MISSING_AUTH=info
+ * AUDIT_RULE_PACKS=auto (default), none, or a list such as iam-am,-iam-pam (a leading - switches a pack off)
  */
 export function getAuditPolicy(): AuditOptions {
   const disabledRules = (env('AUDIT_DISABLED_RULES') ?? '')
@@ -159,7 +161,9 @@ export function getAuditPolicy(): AuditOptions {
     }
     severityOverrides[rule.toUpperCase()] = severity.toLowerCase()
   }
-  const sanitized = sanitizeAuditOptions({ disabledRules, severityOverrides })
+  const packs = parseRulePacks(env('AUDIT_RULE_PACKS'))
+  if (packs.errors.length) warnOnce('AUDIT_RULE_PACKS', `Ignoring invalid AUDIT_RULE_PACKS entries: ${packs.errors.join('; ')}.`)
+  const sanitized = sanitizeAuditOptions({ disabledRules, severityOverrides, rulePacks: packs.settings })
   const unknown = disabledRules.filter((rule) => !sanitized.disabledRules?.includes(rule as never))
   if (unknown.length) warnOnce('AUDIT_DISABLED_RULES', `Unknown rule ids in AUDIT_DISABLED_RULES: ${unknown.join(', ')}`)
   return sanitized

@@ -8,7 +8,7 @@ export const PAGE_IDS = ['overview', 'requests', 'security', 'hygiene', 'repair'
 export type PageId = (typeof PAGE_IDS)[number]
 
 export const FILTER_SEVERITIES = ['critical', 'warning', 'info'] as const
-export const FILTER_CATEGORIES = ['secrets', 'variables', 'auth'] as const
+export const FILTER_CATEGORIES = ['secrets', 'variables', 'auth', 'identity'] as const
 
 export interface AppLocation {
   page: PageId

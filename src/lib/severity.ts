@@ -1,5 +1,5 @@
 export type Severity = 'critical' | 'warning' | 'info'
-export type FindingCategory = 'secrets' | 'variables' | 'auth' | 'hygiene'
+export type FindingCategory = 'secrets' | 'variables' | 'auth' | 'identity' | 'hygiene'
 
 /** Points deducted for one finding of each severity before the affected-request scaling (scoring model v2). */
 export interface ScoreWeights {
@@ -15,7 +15,7 @@ export const SEVERITY_PENALTY: Record<Severity, number> = DEFAULT_SCORE_WEIGHTS
 
 export const SEVERITY_ORDER: Severity[] = ['critical', 'warning', 'info']
 
-export const CATEGORY_ORDER: FindingCategory[] = ['secrets', 'variables', 'auth', 'hygiene']
+export const CATEGORY_ORDER: FindingCategory[] = ['secrets', 'variables', 'auth', 'identity', 'hygiene']
 
 export function isSeverity(value: unknown): value is Severity {
   return value === 'critical' || value === 'warning' || value === 'info'
