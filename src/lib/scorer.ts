@@ -1,5 +1,6 @@
 import type { Finding } from './auditor'
 import type { ParsedCollection } from './parser'
+import { isEmptyProfile } from './iam/types'
 import {
   DEFAULT_SCORE_WEIGHTS,
   findingAffectedCount,
@@ -91,9 +92,9 @@ function summary(score: number, findings: Finding[]): string {
   return `Review findings and apply recommendations to improve collection health.`
 }
 
-/** The identity category is scored only when there is something to score: an identity finding. */
-function hasIdentityScope(_parsed: ParsedCollection, findings: Finding[]): boolean {
-  return findings.some((finding) => finding.category === 'identity')
+/** The identity category is scored only when there is something to score: an identity finding or a detected profile. */
+function hasIdentityScope(parsed: ParsedCollection, findings: Finding[]): boolean {
+  return findings.some((finding) => finding.category === 'identity') || !isEmptyProfile(parsed.identity)
 }
 
 export function calculateScore(parsed: ParsedCollection, findings: Finding[], weights: ScoreWeights = activeWeights): ScoreBreakdown {

@@ -2,6 +2,7 @@ import type { Finding } from './auditor'
 import type { ParsedCollection, ParsedRequest } from './parser'
 import type { ScoreBreakdown } from './scorer'
 import { RULES, RULE_LIST, type RuleReferences } from './rules'
+import { identityReportSection } from './iam/report'
 import { SEVERITY_ORDER } from './severity'
 import { findingOccurrences, occurrenceFingerprint } from './occurrences'
 import type { SuppressedFinding } from './suppressions'
@@ -116,6 +117,7 @@ export function buildJsonReport(ctx: ReportContext): string {
       },
       score: ctx.score,
       summary: severityCounts(ctx.findings),
+      identity: identityReportSection(ctx.parsed.identity),
       findings: ctx.findings.map((finding) => ({
         ruleId: finding.ruleId,
         severity: finding.severity,

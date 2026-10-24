@@ -2,6 +2,8 @@ import type { ParsedCollection, ParsedRequest, ParsedScopedVariable, KeyValue } 
 import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
 import { resolveEnabledPacks, sanitizeRulePacks, type RulePackId, type RulePackSettings } from './rulePacks'
 import { detectIdentitySignals } from './iam/signals'
+import { buildIdentityProfile } from './iam/profile'
+import { isEmptyProfile } from './iam/types'
 import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
 import { secretFieldsFor } from './authSchemes'
 import { parseTemplatedJson } from './jsonBody'
@@ -1025,8 +1027,14 @@ function sortFindings(findings: Finding[]): Finding[] {
 
 export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions = {}): AuditResult {
   const out = new FindingCollector()
-  const enabledPacks = resolveEnabledPacks(options.rulePacks, detectIdentitySignals(parsed))
+  const identityDetected = detectIdentitySignals(parsed)
+  const enabledPacks = resolveEnabledPacks(options.rulePacks, identityDetected)
   const packs = [...enabledPacks]
+
+  // The profile depends on the selected environment (hosts behind variables), so every audit builds it again.
+  const identity = identityDetected || enabledPacks.size > 1 ? buildIdentityProfile(parsed) : undefined
+  if (identity && !isEmptyProfile(identity)) parsed.identity = identity
+  else delete parsed.identity
 
   for (const req of parsed.requests) {
     checkHeaders(req, out)

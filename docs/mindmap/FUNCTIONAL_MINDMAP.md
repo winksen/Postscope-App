@@ -168,6 +168,10 @@ The sliders icon in the header opens **Rules**: turn any rule off or change its 
 
 Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
 
+### Identity detection
+
+When a collection looks like it deals with identity (OAuth helpers, `/oauth2/` or `/scim/` paths, identity platform hosts, vault or PAM APIs), PostScope builds an **identity profile** from the export alone: which platforms it talks to (Okta, Microsoft Entra ID, Auth0, Ping Identity, ForgeRock, Keycloak, SailPoint, Saviynt, One Identity, Omada, CyberArk, BeyondTrust, Delinea, HashiCorp Vault, AWS IAM, Azure and Google Cloud IAM, each with a confidence), what each identity request does (token, authorize, SCIM, role assignment, credential retrieval and so on), the OAuth clients with their grant, client authentication method, PKCE state, redirect URIs and scopes, and the literal tokens it holds. Client ids and tokens are always masked. The profile is part of the JSON report. Nothing is sent anywhere: PostScope never calls the identity platform.
+
 ### Export
 
 The download icon in the header offers:

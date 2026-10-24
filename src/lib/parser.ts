@@ -5,6 +5,7 @@ import { extractVariableNames } from './variables'
 import { MAX_DESCRIPTION_LENGTH } from './descriptions'
 import { itemPointer } from './jsonPositions'
 import type { ParsedEnvironment } from './environment'
+import type { IdentityProfile } from './iam/types'
 
 export type { RequestProtocol }
 
@@ -160,6 +161,8 @@ export interface ParsedCollection {
   scripts?: ParsedScript[]
   /** Non-fatal problems found while reading a malformed export. */
   parseWarnings?: string[]
+  /** Identity platforms, endpoints and OAuth clients of the collection. Set by the audit, and only when identity signals exist. */
+  identity?: IdentityProfile
 }
 
 /** Nesting deeper than this is almost certainly malformed and is skipped to protect the call stack. */
