@@ -1,9 +1,10 @@
 import type { ParsedCollection, ParsedRequest, ParsedScopedVariable, KeyValue } from './parser'
 import { RULES, RULE_LIST, isRuleId, type RuleId } from './rules'
 import { resolveEnabledPacks, sanitizeRulePacks, type RulePackId, type RulePackSettings } from './rulePacks'
+import { isLocalHost } from './localHost'
 import { detectIdentitySignals } from './iam/signals'
 import { buildIdentityProfile } from './iam/profile'
-import { isEmptyProfile } from './iam/types'
+import { runIdentityChecks } from './iam/checks'
 import { isSeverity, severityRank, type FindingCategory, type Severity } from './severity'
 import { secretFieldsFor } from './authSchemes'
 import { parseTemplatedJson } from './jsonBody'
@@ -754,17 +755,7 @@ function checkKnownPatterns(parsed: ParsedCollection, out: FindingCollector): vo
 // Warnings: URLs, auth, transport
 // ---------------------------------------------------------------------------
 
-export function isLocalHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '')
-  return (
-    host === 'localhost' ||
-    host === '::1' ||
-    host === '0.0.0.0' ||
-    host === 'host.docker.internal' ||
-    /^127(\.\d{1,3}){3}$/.test(host) ||
-    /\.(localhost|test|example|invalid)$/.test(host)
-  )
-}
+export { isLocalHost }
 
 export function resolveLeadingVariable(url: string, parsed: ParsedCollection): string {
   const match = url.match(URL_VARIABLE_PREFIX)
@@ -1033,7 +1024,7 @@ export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions
 
   // The profile depends on the selected environment (hosts behind variables), so every audit builds it again.
   const identity = identityDetected || enabledPacks.size > 1 ? buildIdentityProfile(parsed) : undefined
-  if (identity && !isEmptyProfile(identity)) parsed.identity = identity
+  if (identity) parsed.identity = identity
   else delete parsed.identity
 
   for (const req of parsed.requests) {
@@ -1052,6 +1043,7 @@ export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions
 
   runWarningChecks(parsed, out)
   checkVariableIntegrity(parsed, out)
+  if (parsed.identity) runIdentityChecks(parsed, parsed.identity, out, enabledPacks)
   runInfoChecks(parsed, out)
 
   const { active, suppressed, notices } = applySuppressions(parsed, out.build(options, enabledPacks), options)

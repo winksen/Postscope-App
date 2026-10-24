@@ -29,11 +29,17 @@ function hostOf(url: string): string {
   return match?.[1] ?? ''
 }
 
+/** OAuth parameters that appear in the URL or the form body of an authorize, token or callback request. */
+const OAUTH_URL_PARAMETER = /[?&#](?:response_type|grant_type|client_id|access_token|id_token)=/i
+const OAUTH_FORM_FIELD = /^(?:response_type|grant_type|client_id|client_assertion)$/i
+
 /** True when the collection looks like it deals with identity platforms (OAuth, OIDC, SCIM, SAML, vaults, admin APIs). */
 export function detectIdentitySignals(parsed: ParsedCollection): boolean {
   if ((parsed.authTypes.oauth2 ?? 0) > 0) return true
   return parsed.requests.some((request) => {
     if (IDENTITY_HOST.test(hostOf(request.url))) return true
+    if (OAUTH_URL_PARAMETER.test(request.url)) return true
+    if (request.bodyFields?.some((field) => OAUTH_FORM_FIELD.test(field.key.trim()))) return true
     return IDENTITY_PATH.some((pattern) => pattern.test(request.url))
   })
 }

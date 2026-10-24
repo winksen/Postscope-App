@@ -34,6 +34,10 @@ function resolveLeading(url: string, parsed: ParsedCollection): { url: string; v
 
 export function normalizePath(path: string): string {
   const bare = path.split(/[?#]/)[0]
+  if (!bare.includes('{{') && !bare.includes('/:') && !bare.includes('//')) {
+    const trimmed = bare.length > 1 ? bare.replace(/\/+$/, '') : bare
+    return trimmed.startsWith('/') ? trimmed || '/' : `/${trimmed}`
+  }
   const segments = bare
     .split('/')
     .filter((segment, index) => segment !== '' || index === 0)
@@ -82,6 +86,10 @@ export function safeDecode(value: string): string {
  * Parameters a request sends in its query, form body or top-level JSON body, keyed by lowercase name. Disabled
  * entries are left out. Later sources never overwrite earlier ones, so the query string wins over the body.
  */
+/** Body fields that identity checks read. A JSON or form body without any of them is not parsed at all. */
+const RELEVANT_BODY_KEY =
+  /(?:^|["&{\s,])(?:grant_type|response_type|client_id|client_secret|client_assertion(?:_type)?|scope|redirect_uri|code_verifier|code_challenge(?:_method)?|code|state|nonce|action|token|username|password|audience|resource|actor_token|subject_token)["\s]*[=:]/i
+
 export function requestParams(request: ParsedRequest): Map<string, string> {
   const params = new Map<string, string>()
   const put = (key: string, value: string) => {
@@ -98,7 +106,7 @@ export function requestParams(request: ParsedRequest): Map<string, string> {
   }
   for (const entry of request.bodyFields ?? []) put(entry.key, entry.value)
   const raw = request.bodyRaw?.trim()
-  if (raw && raw.length < 64_000) {
+  if (raw && raw.length < 64_000 && RELEVANT_BODY_KEY.test(raw)) {
     if (raw.startsWith('{')) {
       try {
         const json = JSON.parse(raw) as Record<string, unknown>

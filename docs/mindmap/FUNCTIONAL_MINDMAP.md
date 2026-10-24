@@ -127,6 +127,14 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
 | Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, Entra ID, Okta, Vault, Postman, Atlassian, Shopify, Grafana, Hugging Face, Databricks, PyPI, Square, … |
+| Critical | OAuth or OpenID Connect endpoint over plain HTTP | A token, introspection or revocation endpoint called with `http://` (identity packs) |
+| Critical | Token or authorization code in a URL | `#access_token=…`, `?code=…` with a literal value, including saved example requests (identity packs) |
+| Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
+| Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
+| Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
+| Warning | Over-broad OAuth scope | `*`, `admin`, `okta.users.manage`, `Directory.ReadWrite.All`, Google `cloud-platform`, `.default` on a public client, … |
+| Info | Authorize request without state | No `state`, no PKCE and no OpenID `nonce` |
+| Info | Client secret sent in the body | `client_secret_post` where `client_secret_basic` or `private_key_jwt` is available |
 | Warning | High-entropy literal in a credential field | A long random-looking value in a field such as `X-Webhook-Secret` or `signing_key` that no other rule recognized |
 | Warning | Hardcoded base URL / environment URL | `https://api.prod.example.com/…` instead of `{{baseUrl}}`; environment names are matched in the host (`prod`, `staging`, `uat`, `qa`, `dev`, `sandbox`, ...), not in path segments |
 | Warning | Potentially unprotected mutation request | `POST` without auth (inherited auth, API key headers, cookies, query credentials and scripts that set `Authorization` are respected) |

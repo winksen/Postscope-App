@@ -1,10 +1,12 @@
 import type { FindingCategory, Severity } from './severity'
 import type { RulePackId } from './rulePacks'
+import { IAM_RULE_DEFINITIONS } from './iam/rules'
+import type { IamRuleId } from './iam/ruleIds'
 import { coreMetadataFor, type RuleReferences } from './ruleMetadata'
 
 export type { RuleReferences }
 
-export type RuleId =
+export type CoreRuleId =
   | 'HARDCODED_PASSWORD'
   | 'HARDCODED_TOKEN'
   | 'HARDCODED_API_KEY'
@@ -38,6 +40,8 @@ export type RuleId =
   | 'GET_WITH_BODY'
   | 'SUPPRESSION_EXPIRED'
   | 'SUPPRESSION_INVALID'
+
+export type RuleId = CoreRuleId | IamRuleId
 
 export interface RuleDefinition {
   id: RuleId
@@ -365,7 +369,7 @@ const baseDefinitions: BaseDefinition[] = [
   },
 ]
 
-const definitions: RuleDefinition[] = baseDefinitions.map((definition) => {
+const coreDefinitions: RuleDefinition[] = baseDefinitions.map((definition) => {
   const metadata = coreMetadataFor(definition.id)
   return {
     ...definition,
@@ -374,6 +378,9 @@ const definitions: RuleDefinition[] = baseDefinitions.map((definition) => {
     references: definition.references ?? metadata.references,
   }
 })
+
+/** Core rules first (their order is a public contract), then the identity packs in release order. */
+const definitions: RuleDefinition[] = [...coreDefinitions, ...IAM_RULE_DEFINITIONS]
 
 export const RULES: Record<RuleId, RuleDefinition> = Object.fromEntries(
   definitions.map((definition) => [definition.id, definition])

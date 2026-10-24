@@ -157,7 +157,7 @@ function requestClient(
   const redirect = params.get('redirect_uri')
   const endpointUrl = `${url.host ?? ''}${url.path}`
   return {
-    key: clientId ? `request:${platform ?? ''}:${clientId}` : `request:${request.id}`,
+    key: clientId ? `request:${platform ?? ''}:${clientId}:${grant}` : `request:${request.id}`,
     source: 'request',
     owner: request.id,
     requestIds: [request.id],
@@ -238,7 +238,8 @@ function collectTokens(request: ParsedRequest, tokens: IdentityToken[]): void {
  */
 export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile {
   const profile = emptyIdentityProfile()
-  const { platforms, byRequest } = fingerprintPlatforms(parsed)
+  const urls = new Map<string, SplitUrl>(parsed.requests.map((request) => [request.id, splitUrl(request.url, parsed)]))
+  const { platforms, byRequest } = fingerprintPlatforms(parsed, urls)
   profile.platforms = platforms
 
   const clients = new Map<string, OAuthClient>()
@@ -253,7 +254,7 @@ export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile 
   }
 
   for (const request of parsed.requests) {
-    const url = splitUrl(request.url, parsed)
+    const url = urls.get(request.id) ?? splitUrl(request.url, parsed)
     const params = requestParams(request)
     const platform = byRequest.get(request.id)?.[0]?.id
     const endpointClass = classifyEndpoint(endpointContext(request, url, params, platform))

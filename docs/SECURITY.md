@@ -70,6 +70,7 @@ The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 | Basic Authorization | The base64 value is decoded; only a literal password is reported, so `Basic` tokens that encode `{{variables}}` are not false positives |
 | Credential-named fields | Long random-looking literals (20+ characters, high entropy) in sensitive header, query, form and JSON field names that no other rule recognized (`HIGH_ENTROPY_LITERAL`) |
 | Disabled entries | Headers, query params, form fields and scripts switched off in Postman are still in the export, so they go through the same secret rules (evidence is labelled `(disabled)`) |
+| OAuth 2.0 and OpenID Connect (`iam-am` pack) | Implicit and password grants, authorization code flows without PKCE or with `plain`, unsafe `redirect_uri` values (http to remote hosts, wildcards, user info, nested URLs), missing `state`, token, introspection and revocation endpoints over http, literal tokens and codes in query strings and fragments (including saved example requests), wildcard and administrative scopes, client secrets in the body. Evidence is masked and the pack runs only when the collection shows identity signals |
 | Transport | `http://` / `ws://` to non-local hosts (including a `{{baseUrl}}` that resolves to one), `strictSSL: false` |
 
 Placeholders (`<string>`, `changeme`, `your-api-key`, `demo-…`) and variable references (`{{token}}`, `{{auth-token}}`) are not reported.

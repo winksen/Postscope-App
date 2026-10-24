@@ -282,6 +282,34 @@ export const PLATFORM_FINGERPRINTS: PlatformFingerprint[] = [
   },
 ]
 
+function union(patterns: RegExp[]): RegExp {
+  return new RegExp(patterns.map((pattern) => `(?:${pattern.source})`).join('|'), 'i')
+}
+
+/**
+ * One combined pattern per signal kind. A request that matches none of them cannot match any platform, which spares
+ * the per-platform loop for almost every request of a collection that is not about identity. Variable names are left
+ * out on purpose: with a weight of 0.15 they can never reach the detection threshold without another signal.
+ */
+const ANY_HOST = union(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => fingerprint.hosts))
+const ANY_PATH = union(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => [...fingerprint.strongPaths, ...fingerprint.paths]))
+const ANY_TOKEN = union(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => fingerprint.tokens.map((token) => token.pattern)))
+const SIGNAL_HEADER = new RegExp(
+  `^(?:${[...new Set(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => fingerprint.headers.map((header) => header.name.source.replace(/^\^|\$$/g, ''))))].join('|')})$`,
+  'i'
+)
+const SIGNAL_PORTS = new Set(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => fingerprint.ports))
+const SIGNAL_AUTH = new Set(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => fingerprint.authTypes))
+
+function hasAnySignal(request: ParsedRequest, url: SplitUrl): boolean {
+  if (url.host && ANY_HOST.test(url.host)) return true
+  if (ANY_PATH.test(url.path)) return true
+  if (url.port && SIGNAL_PORTS.has(url.port)) return true
+  if (SIGNAL_AUTH.has(request.auth)) return true
+  if (request.headers.some((header) => SIGNAL_HEADER.test(header.key.trim()))) return true
+  return tokenSources(request).some((text) => ANY_TOKEN.test(text))
+}
+
 export interface RequestPlatformMatch {
   id: PlatformId
   score: number
@@ -295,6 +323,7 @@ function tokenSources(request: ParsedRequest): string[] {
 /** Scores every platform for one request. Only matches at or above the detection threshold are returned. */
 export function fingerprintRequest(request: ParsedRequest, url: SplitUrl): RequestPlatformMatch[] {
   const matches: RequestPlatformMatch[] = []
+  if (!hasAnySignal(request, url)) return matches
   const variableNames = extractVariableNames(request.url)
   const tokenTexts = tokenSources(request)
   for (const fingerprint of PLATFORM_FINGERPRINTS) {
@@ -325,14 +354,17 @@ export function fingerprintRequest(request: ParsedRequest, url: SplitUrl): Reque
 }
 
 /** Detects the identity platforms a collection talks to. Several platforms per collection are normal. */
-export function fingerprintPlatforms(parsed: ParsedCollection): {
+export function fingerprintPlatforms(
+  parsed: ParsedCollection,
+  urls?: ReadonlyMap<string, SplitUrl>
+): {
   platforms: DetectedPlatform[]
   byRequest: Map<string, RequestPlatformMatch[]>
 } {
   const byRequest = new Map<string, RequestPlatformMatch[]>()
   const found = new Map<PlatformId, { best: number; signals: Set<string>; requestIds: string[]; count: number; hosts: Set<string> }>()
   for (const request of parsed.requests) {
-    const url = splitUrl(request.url, parsed)
+    const url = urls?.get(request.id) ?? splitUrl(request.url, parsed)
     const matches = fingerprintRequest(request, url)
     if (!matches.length) continue
     byRequest.set(request.id, matches)

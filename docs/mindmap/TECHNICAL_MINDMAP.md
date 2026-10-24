@@ -169,7 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
-| identity | Rules of the identity packs (`iam-am`, `iam-iga`, `iam-pam`, `iam-platform`); the packs arrive release by release from V0.2.2 and run when identity signals are detected |
+| identity (`iam-am`, V0.2.2) | `OAUTH_TOKEN_ENDPOINT_HTTP`, `OAUTH_TOKEN_IN_URL` (critical), `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT`, `OAUTH_PKCE_MISSING`, `OAUTH_PKCE_PLAIN`, `OAUTH_REDIRECT_URI_UNSAFE`, `OAUTH_BROAD_SCOPE` (warning), `OAUTH_STATE_MISSING`, `OAUTH_CLIENT_SECRET_POST` (info). The other identity packs follow in later releases |
 | hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY`, `UNUSED_COLLECTION_VARIABLE`, `SUPPRESSION_EXPIRED`, `SUPPRESSION_INVALID` |
 
 ### 2.3 Secret detection (`secretPatterns.ts`, `authSchemes.ts`)
@@ -252,6 +252,24 @@ Reports receive `suppressed` and `baselined` in `ReportContext`: JSON adds `occu
 | `endpoints.ts` | `classifyEndpoint(context)` returns one class (`oauth.token`, `oauth.authorize`, `oauth.par`, `oauth.device`, `oauth.introspect`, `oauth.revoke`, `oidc.*`, `saml.*`, `scim.*`, `iga.*`, `admin.*`, `pam.*`, `vault.*`, `cloud-iam.*` or `unknown`) from the method, normalized path, host and parameter names; the first matching rule wins and values are never read. AWS actions come from `Action=` or `X-Amz-Target` |
 | `profile.ts` | OAuth clients from oauth2 auth helpers (`grant_type`, `challengeAlgorithm`, `client_authentication`, `scope`, `redirect_uri`, token and auth URLs; inherited helpers are one client per owner) and from authorize, token, PAR and device requests (`response_type`, `grant_type`, `client_id`, `client_secret`, `client_assertion`, `code_challenge(_method)`, `code_verifier`, `redirect_uri`, `scope`). Authorize and token requests with the same client id merge. `pkce` is `S256`, `plain` (a challenge without a method is plain, RFC 7636), `present`, `absent` or `not-applicable`. Literal tokens in `Authorization`, `X-Vault-Token`, auth helpers and collection variables are inventoried by kind (`jwt`, `okta-ssws`, `vault-token`, `ps-auth`, `entra-client-secret`, `bearer-opaque`) with masked previews |
 | JSON report | `identityReportSection` adds an `identity` object (platforms, endpoint counts and list, OAuth clients, scopes, grants, token previews) described by the schema; it is absent when the profile is empty |
+
+### 2.7.2 Identity rules (`iam/rules.ts`, `iam/ruleIds.ts`, `iam/checks.ts`, `iam/oauth.ts`)
+
+Identity rule definitions live in `iam/rules.ts` and their ids in `iam/ruleIds.ts` (`IAM_RULE_IDS`), which `rules.ts` folds into `RuleId`, so the registry and the `RuleId` type stay in step (a test checks both lists). `runIdentityChecks(parsed, profile, out, packs)` runs after the core checks and only when the audit built a profile; each pack's checks only read the profile and the requests, through the small `FindingSink` interface that `FindingCollector` implements. Every identity rule uses category `identity`, has a pack, tags, CWE and OWASP where one applies, and NIST SP 800-53, ISO/IEC 27001 and RFC references.
+
+| Rule | How it decides |
+|---|---|
+| `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT` | OAuth client grant from `response_type` (`token`, or `id_token` without `code`) or `grant_type`, and from the oauth2 helper (`implicit`, `password_credentials`) |
+| `OAUTH_PKCE_MISSING` | Authorization code client with PKCE `absent` and client authentication `none` (no secret). A merged authorize and token pair with `code_verifier` counts as protected; confidential clients are skipped |
+| `OAUTH_PKCE_PLAIN` | `code_challenge_method=plain`, a challenge without a method (RFC 7636 default), or helper `challengeAlgorithm: plain` |
+| `OAUTH_REDIRECT_URI_UNSAFE` | `unsafeRedirectReason`: wildcard, user info, `http:` to a non-local host (`isLocalHost` now lives in `localHost.ts`), or a URL in `url`, `redirect`, `next`, `return`, `continue`, `dest`, `target`, `goto` parameters. Evidence drops the query string |
+| `OAUTH_STATE_MISSING` | Authorize or PAR request with `response_type` but no `state`, no `code_challenge` and no OpenID `nonce` |
+| `OAUTH_TOKEN_ENDPOINT_HTTP` | `oauth.token`, `oauth.introspect`, `oauth.revoke` endpoints whose resolved scheme is `http` and host is not local. It adds to `INSECURE_HTTP` for the same request |
+| `OAUTH_TOKEN_IN_URL` | `access_token`, `id_token` or `code` with a literal value in the query or fragment of a request URL or a saved example's original request; skipped when `SECRET_IN_QUERY` already reported the same location |
+| `OAUTH_BROAD_SCOPE` | `broadScopeReason`: generic wildcard and `admin`, `:admin`, `.manage` endings, Entra, Okta, Auth0 and Google catalogs, `*.ReadWrite.All`, and `.default` on clients without a secret |
+| `OAUTH_CLIENT_SECRET_POST` | Client authentication `client_secret_post` (a `client_secret` body field, or helper `client_authentication: body`) |
+
+Request-level clients report their requests as affected. A helper defined on the collection or a folder is collection-level evidence (`oauth2 helper grant (collection)`) so one inherited helper does not mark every request. Clients are merged by platform, client id and grant, so the same client id used with two flows stays two clients. `detectIdentitySignals` also looks at OAuth parameters in URLs and form bodies, and the audit attaches the profile whenever identity is detected, even when it is empty.
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -465,6 +483,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamOAuth.test.ts` | One fixture per OAuth rule with safe counterparts (code flow with S256, confidential clients, localhost redirects, variables), helpers at collection, folder and request level, scope catalog, redirect reasons, no duplicate with `SECRET_IN_QUERY`, pack, override and score behavior, no secrets in identity findings |
 | `iamProfile.test.ts` | Platform recognition for all 17 platforms, false-positive guards, variable and environment host resolution, endpoint classification table, URL normalization, OAuth clients (helper and requests, PKCE states, merging, masking), token inventory without secrets, empty profile for non-identity collections, profile and identity score in the audit, schema-valid JSON identity section, hostile input |
 | `rulePacks.test.ts` | Pack parsing and resolution, identity signal detection, pack settings in config, server policy and CLI, compliance references on every security rule, identity score omission, pack and framework tags in JSON and SARIF reports |
 | `scorer.test.ts` | Penalty formula and caps, collection-level counts, monotonicity, security/hygiene split, weights, breakdown |
@@ -541,3 +560,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 
 | V0.2.0 | Rule packs (`rulePacks.ts`, `AUDIT_RULE_PACKS`, `--packs`, `.postscope.json` `rulePacks`, pack toggles in the Rules dialog), `identity` finding category and optional identity score, tags and compliance references (NIST SP 800-53, ISO/IEC 27001, CIS v8, RFC) on every security rule, pack and references in JSON reports and SARIF tags, identity signal detection (`iam/signals.ts`) |
 | V0.2.1 | Identity module `src/lib/iam/` (platform fingerprints for 17 platforms, endpoint classification, OAuth client, scope, grant and token inventories with masked values), profile attached to `parsed.identity` by the audit, identity score present when a profile exists, `identity` section in the JSON report and schema |
+| V0.2.2 | `iam-am` OAuth 2.0 and OpenID Connect rules (`iam/oauth.ts`: implicit and password grants, PKCE missing and plain, unsafe redirect URIs, missing state, token endpoints over http, tokens and codes in URLs, broad scopes, client secret in the body), identity rule registry (`iam/rules.ts`, `iam/ruleIds.ts`, `iam/checks.ts`, `FindingSink`), `localHost.ts`, identity signals from OAuth parameters, performance baseline updated (the identity profile adds about 50% to parse and audit time on the OAuth-heavy 6000-request benchmark and 12 KB gzip to the worker; collections without identity signals skip it) |
