@@ -127,8 +127,13 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
 | Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, Entra ID, Okta, Vault, Postman, Atlassian, Shopify, Grafana, Hugging Face, Databricks, PyPI, Square, … |
+| Critical | Unsigned JWT | A stored token with `alg: none` (identity packs) |
 | Critical | OAuth or OpenID Connect endpoint over plain HTTP | A token, introspection or revocation endpoint called with `http://` (identity packs) |
 | Critical | Token or authorization code in a URL | `#access_token=…`, `?code=…` with a literal value, including saved example requests (identity packs) |
+| Warning | Long-lived or non-expiring access token | A stored JWT with no `exp`, or `exp - iat` over 24 hours |
+| Warning | Personal data or privilege claims in a stored token | `email`, `name`, `phone_number`, `roles`, `groups`, `entitlements` in a token that is saved in the collection, with values masked |
+| Warning | ID token sent as a bearer token | A token with `nonce` or `at_hash` in an `Authorization: Bearer` header to an API |
+| Info | Expired token still stored | A JWT whose `exp` is in the past |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
@@ -175,6 +180,10 @@ After applying, PostScope re-analyzes the repaired collection, shows the real sc
 The sliders icon in the header opens **Rules**: turn any rule off or change its severity. Changes re-run the audit instantly and are remembered in the browser. Operators can ship **team defaults** (`AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES`, `AUDIT_RULE_PACKS`); "Reset to defaults" returns to them.
 
 Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
+
+### Token inspector
+
+When a request holds a JWT (in a header, an auth helper, a query parameter, a body or a saved example), its details dialog gets a **Token** tab. It shows the header (`alg`, `typ`, key id), the issuer host, the expiry and lifetime, and every claim with a masked value: emails as `j•••@•••`, lists as `[3 values]`, identifiers cut to four characters. The signature is never shown and never checked, and the token is decoded in your browser.
 
 ### Identity detection
 

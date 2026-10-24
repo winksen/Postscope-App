@@ -33,12 +33,17 @@ function hostOf(url: string): string {
 const OAUTH_URL_PARAMETER = /[?&#](?:response_type|grant_type|client_id|access_token|id_token)=/i
 const OAUTH_FORM_FIELD = /^(?:response_type|grant_type|client_id|client_assertion)$/i
 
+/** A JWT in a header or auth helper: stored tokens are identity material even when nothing else in the collection is. */
+const JWT_SHAPE = /eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\./
+
 /** True when the collection looks like it deals with identity platforms (OAuth, OIDC, SCIM, SAML, vaults, admin APIs). */
 export function detectIdentitySignals(parsed: ParsedCollection): boolean {
   if ((parsed.authTypes.oauth2 ?? 0) > 0) return true
   return parsed.requests.some((request) => {
     if (IDENTITY_HOST.test(hostOf(request.url))) return true
     if (OAUTH_URL_PARAMETER.test(request.url)) return true
+    if (request.headers.some((header) => JWT_SHAPE.test(header.value)) || request.authFields?.some((field) => JWT_SHAPE.test(field.value)))
+      return true
     if (request.bodyFields?.some((field) => OAUTH_FORM_FIELD.test(field.key.trim()))) return true
     return IDENTITY_PATH.some((pattern) => pattern.test(request.url))
   })

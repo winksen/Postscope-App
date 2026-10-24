@@ -11,6 +11,12 @@ export const IAM_RULE_IDS = [
   'OAUTH_TOKEN_IN_URL',
   'OAUTH_BROAD_SCOPE',
   'OAUTH_CLIENT_SECRET_POST',
+  // iam-am: JWT inspection (V0.2.3)
+  'JWT_ALG_NONE',
+  'JWT_LONG_LIVED',
+  'JWT_SENSITIVE_CLAIMS',
+  'ID_TOKEN_AS_BEARER',
+  'JWT_EXPIRED_STORED',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

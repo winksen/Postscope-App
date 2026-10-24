@@ -169,7 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
-| identity (`iam-am`, V0.2.2) | `OAUTH_TOKEN_ENDPOINT_HTTP`, `OAUTH_TOKEN_IN_URL` (critical), `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT`, `OAUTH_PKCE_MISSING`, `OAUTH_PKCE_PLAIN`, `OAUTH_REDIRECT_URI_UNSAFE`, `OAUTH_BROAD_SCOPE` (warning), `OAUTH_STATE_MISSING`, `OAUTH_CLIENT_SECRET_POST` (info). The other identity packs follow in later releases |
+| identity (`iam-am`, V0.2.2 and V0.2.3) | `OAUTH_TOKEN_ENDPOINT_HTTP`, `OAUTH_TOKEN_IN_URL`, `JWT_ALG_NONE` (critical), `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER` (warning), `JWT_EXPIRED_STORED` (info), `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT`, `OAUTH_PKCE_MISSING`, `OAUTH_PKCE_PLAIN`, `OAUTH_REDIRECT_URI_UNSAFE`, `OAUTH_BROAD_SCOPE` (warning), `OAUTH_STATE_MISSING`, `OAUTH_CLIENT_SECRET_POST` (info). The other identity packs follow in later releases |
 | hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY`, `UNUSED_COLLECTION_VARIABLE`, `SUPPRESSION_EXPIRED`, `SUPPRESSION_INVALID` |
 
 ### 2.3 Secret detection (`secretPatterns.ts`, `authSchemes.ts`)
@@ -270,6 +270,20 @@ Identity rule definitions live in `iam/rules.ts` and their ids in `iam/ruleIds.t
 | `OAUTH_CLIENT_SECRET_POST` | Client authentication `client_secret_post` (a `client_secret` body field, or helper `client_authentication: body`) |
 
 Request-level clients report their requests as affected. A helper defined on the collection or a folder is collection-level evidence (`oauth2 helper grant (collection)`) so one inherited helper does not mark every request. Clients are merged by platform, client id and grant, so the same client id used with two flows stays two clients. `detectIdentitySignals` also looks at OAuth parameters in URLs and form bodies, and the audit attaches the profile whenever identity is detected, even when it is empty.
+
+### 2.7.3 JWT inspection (`iam/jwt.ts`, `iam/jwtChecks.ts`, `components/TokenInspector.tsx`)
+
+`inspectJwt(token, now)` base64url-decodes the header and payload (`atob` plus `TextDecoder`, so it runs in the browser, the worker and Node), refuses tokens over 16 KB, never verifies a signature and returns only derived data: algorithm, type, masked key id, issuer host, expiry, lifetime, whether the token looks like an ID token (`nonce`, `at_hash`, `c_hash` or `typ` ID) or a refresh token (`typ` Refresh or Offline), the personal and privilege claim names, and every claim with a masked preview (`maskClaim`: emails `j•••@•••`, phone numbers keep two digits, arrays `[N values]`, identifiers four characters, scopes listed because they are metadata). `collectJwts(parsed)` finds JWT-shaped values (at most five per value, 200 per collection) in request headers (including disabled ones), request-level auth helpers, query, form and raw bodies, saved examples (body, headers, original request headers and auth), folder and collection auth helpers (scanned once, not per request) and variables.
+
+| Rule | Decision |
+|---|---|
+| `JWT_ALG_NONE` (critical) | Header `alg` is `none` in any case |
+| `JWT_LONG_LIVED` (warning) | No `exp`, or `exp - iat` over 24 hours; ID tokens and refresh tokens are skipped because their lifetime is a different matter |
+| `JWT_SENSITIVE_CLAIMS` (warning) | Any personal claim (`email`, `name`, `phone_number`, `address`, `upn`, ...) or privilege claim (`roles`, `groups`, `wids`, `entitlements`, `permissions`, `realm_access`, ...). `scp` and `scope` are shown in the inspector but do not raise the rule |
+| `ID_TOKEN_AS_BEARER` (warning) | An ID-token-shaped JWT in an `Authorization: Bearer` header or bearer auth helper of a request that is not an `oidc.userinfo` endpoint |
+| `JWT_EXPIRED_STORED` (info) | `exp` is before `AuditOptions.now` (default now) |
+
+`runIdentityChecks` now takes a context with the clock. A JWT in a header or auth helper is also an identity signal, so the packs switch on for collections that only store a token. The request details dialog adds Details and Token tabs only when the request holds a JWT.
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -483,6 +497,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamJwt.test.ts` | Decoding and masking, oversized and malformed tokens, bounded matches, one fixture per JWT rule with safe counterparts, tokens in helpers, variables, saved examples and disabled headers, collection helper scanned once, identity signal, clock option, pack and severity settings, no token or personal value in findings |
 | `iamOAuth.test.ts` | One fixture per OAuth rule with safe counterparts (code flow with S256, confidential clients, localhost redirects, variables), helpers at collection, folder and request level, scope catalog, redirect reasons, no duplicate with `SECRET_IN_QUERY`, pack, override and score behavior, no secrets in identity findings |
 | `iamProfile.test.ts` | Platform recognition for all 17 platforms, false-positive guards, variable and environment host resolution, endpoint classification table, URL normalization, OAuth clients (helper and requests, PKCE states, merging, masking), token inventory without secrets, empty profile for non-identity collections, profile and identity score in the audit, schema-valid JSON identity section, hostile input |
 | `rulePacks.test.ts` | Pack parsing and resolution, identity signal detection, pack settings in config, server policy and CLI, compliance references on every security rule, identity score omission, pack and framework tags in JSON and SARIF reports |
@@ -561,3 +576,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.0 | Rule packs (`rulePacks.ts`, `AUDIT_RULE_PACKS`, `--packs`, `.postscope.json` `rulePacks`, pack toggles in the Rules dialog), `identity` finding category and optional identity score, tags and compliance references (NIST SP 800-53, ISO/IEC 27001, CIS v8, RFC) on every security rule, pack and references in JSON reports and SARIF tags, identity signal detection (`iam/signals.ts`) |
 | V0.2.1 | Identity module `src/lib/iam/` (platform fingerprints for 17 platforms, endpoint classification, OAuth client, scope, grant and token inventories with masked values), profile attached to `parsed.identity` by the audit, identity score present when a profile exists, `identity` section in the JSON report and schema |
 | V0.2.2 | `iam-am` OAuth 2.0 and OpenID Connect rules (`iam/oauth.ts`: implicit and password grants, PKCE missing and plain, unsafe redirect URIs, missing state, token endpoints over http, tokens and codes in URLs, broad scopes, client secret in the body), identity rule registry (`iam/rules.ts`, `iam/ruleIds.ts`, `iam/checks.ts`, `FindingSink`), `localHost.ts`, identity signals from OAuth parameters, performance baseline updated (the identity profile adds about 50% to parse and audit time on the OAuth-heavy 6000-request benchmark and 12 KB gzip to the worker; collections without identity signals skip it) |
+| V0.2.3 | JWT inspection (`iam/jwt.ts`, `iam/jwtChecks.ts`: `JWT_ALG_NONE`, `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER`, `JWT_EXPIRED_STORED`), masked claims, `TokenInspector` and the Token tab in the request details, stored JWTs as identity signal, clock in the identity check context |

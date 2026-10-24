@@ -71,7 +71,12 @@ test('identity rules are registered with the identity category, a pack and refer
     assert.match(definition.pack, /^iam-/)
     assert.ok(RULES[definition.id], `${definition.id} is in the registry`)
     assert.ok(definition.tags.length > 0 && (definition.references?.nist80053?.length ?? 0) > 0)
-    assert.ok(!/[—–]/.test(`${definition.title}${definition.description}${definition.recommendation}`), 'no dash characters')
+    assert.ok(
+      !new RegExp(`[${String.fromCharCode(0x2014)}${String.fromCharCode(0x2013)}]`).test(
+        `${definition.title}${definition.description}${definition.recommendation}`
+      ),
+      'no dash characters'
+    )
   }
   assert.equal(RULES.OAUTH_TOKEN_ENDPOINT_HTTP.severity, 'critical')
   assert.equal(RULES.OAUTH_TOKEN_IN_URL.severity, 'critical')

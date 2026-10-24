@@ -9,9 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { MaskedText, SecretValue } from './SecretValue'
+import { TokenInspector, type InspectedToken } from './TokenInspector'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { collectRequestJwts, inspectJwt } from '@/lib/iam/jwt'
 
 interface RequestAnalysisModalProps {
   request: ParsedRequest | null
@@ -40,6 +43,120 @@ function CopyButton({ text }: { text: string }) {
 export function RequestAnalysisModal({ request, findings, onClose }: RequestAnalysisModalProps) {
   const score = request ? requestHealthScore(findings) : 0
   const hasAuth = request && request.auth !== 'noauth'
+  const tokens = useMemo<InspectedToken[]>(() => {
+    if (!request) return []
+    const now = new Date()
+    return collectRequestJwts(request).flatMap((occurrence) => {
+      const inspection = inspectJwt(occurrence.token, now)
+      return inspection ? [{ occurrence, inspection }] : []
+    })
+  }, [request])
+
+  const details = request ? (
+    <>
+      {request.folderPath.length > 0 && (
+        <div className="group">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Folder</p>
+            <CopyButton text={request.folderPath.join(' / ')} />
+          </div>
+          <p className="mt-1 text-sm text-primary">{request.folderPath.join(' / ')}</p>
+        </div>
+      )}
+
+      <div className="group">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">URL</p>
+          <CopyButton text={request.url} />
+        </div>
+        <p className="mt-1 break-all text-sm text-muted-foreground">{request.url}</p>
+      </div>
+
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {request.hasDescription ? (
+            <span className="inline-flex items-center gap-1 text-[hsl(var(--success-text))]">
+              <Check className="h-3.5 w-3.5" /> Present
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[hsl(var(--warning-text))]">
+              <LockOpen className="h-3.5 w-3.5" /> Missing
+            </span>
+          )}
+        </p>
+      </div>
+
+      {request.headers.length > 0 && (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Headers</p>
+          <ul className="mt-2 space-y-1 rounded-lg border border-border bg-muted/40 p-3 text-xs">
+            {request.headers.map((h) => (
+              <li key={h.key} className="break-all text-muted-foreground group flex items-center justify-between gap-2">
+                <span>
+                  <span className="text-primary">{h.key}</span>
+                  <span className="text-muted-foreground">: </span>
+                  <SecretValue name={h.key} value={h.value} />
+                </span>
+                <CopyButton text={`${h.key}: ${h.value}`} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {request.bodyRaw && (
+        <div className="group">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Body</p>
+            <CopyButton text={request.bodyRaw} />
+          </div>
+          <div className="mt-2">
+            <MaskedText
+              text={request.bodyRaw}
+              className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+            />
+          </div>
+        </div>
+      )}
+
+      <Separator />
+
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Security findings ({findings.length})</p>
+        {findings.length === 0 ? (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4">
+            <Check className="h-5 w-5 text-[hsl(var(--success-text))]" />
+            <p className="text-sm text-[hsl(var(--success-text))]">No issues flagged for this request.</p>
+          </div>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {findings.map((f) => (
+              <li
+                key={f.id}
+                className={cn(
+                  'rounded-xl border p-4 transition-all duration-200',
+                  f.severity === 'critical'
+                    ? 'border-destructive/20 bg-destructive/5'
+                    : f.severity === 'warning'
+                      ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
+                      : 'border-border bg-card'
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <SeverityBadge severity={f.severity} />
+                  <span className="text-[10px] text-muted-foreground">{f.category.toUpperCase()}</span>
+                </div>
+                <p className="mt-2 text-sm font-medium">{f.title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{f.description}</p>
+                <p className="mt-2 text-xs italic text-muted-foreground">{f.recommendation}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  ) : null
 
   return (
     <Dialog open={!!request} onOpenChange={(open) => !open && onClose()}>
@@ -68,108 +185,23 @@ export function RequestAnalysisModal({ request, findings, onClose }: RequestAnal
           </DialogHeader>
 
           <ScrollArea className="max-h-[calc(85vh-8rem)]">
-            <div className="space-y-5 p-6">
-              {request.folderPath.length > 0 && (
-                <div className="group">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Folder</p>
-                    <CopyButton text={request.folderPath.join(' / ')} />
-                  </div>
-                  <p className="mt-1 text-sm text-primary">{request.folderPath.join(' / ')}</p>
-                </div>
+            <div className="p-6">
+              {tokens.length > 0 ? (
+                <Tabs defaultValue="details">
+                  <TabsList>
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="token">Token</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="details" className="mt-4 space-y-5">
+                    {details}
+                  </TabsContent>
+                  <TabsContent value="token" className="mt-4">
+                    <TokenInspector tokens={tokens} />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div className="space-y-5">{details}</div>
               )}
-
-              <div className="group">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">URL</p>
-                  <CopyButton text={request.url} />
-                </div>
-                <p className="mt-1 break-all text-sm text-muted-foreground">{request.url}</p>
-              </div>
-
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {request.hasDescription ? (
-                    <span className="inline-flex items-center gap-1 text-[hsl(var(--success-text))]">
-                      <Check className="h-3.5 w-3.5" /> Present
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[hsl(var(--warning-text))]">
-                      <LockOpen className="h-3.5 w-3.5" /> Missing
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              {request.headers.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Headers</p>
-                  <ul className="mt-2 space-y-1 rounded-lg border border-border bg-muted/40 p-3 text-xs">
-                    {request.headers.map((h) => (
-                      <li key={h.key} className="break-all text-muted-foreground group flex items-center justify-between gap-2">
-                        <span>
-                          <span className="text-primary">{h.key}</span>
-                          <span className="text-muted-foreground">: </span>
-                          <SecretValue name={h.key} value={h.value} />
-                        </span>
-                        <CopyButton text={`${h.key}: ${h.value}`} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {request.bodyRaw && (
-                <div className="group">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Body</p>
-                    <CopyButton text={request.bodyRaw} />
-                  </div>
-                  <div className="mt-2">
-                    <MaskedText
-                      text={request.bodyRaw}
-                      className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <Separator />
-
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Security findings ({findings.length})</p>
-                {findings.length === 0 ? (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-[hsl(var(--success))]/20 bg-[hsl(var(--success))]/5 p-4">
-                    <Check className="h-5 w-5 text-[hsl(var(--success-text))]" />
-                    <p className="text-sm text-[hsl(var(--success-text))]">No issues flagged for this request.</p>
-                  </div>
-                ) : (
-                  <ul className="mt-3 space-y-3">
-                    {findings.map((f) => (
-                      <li
-                        key={f.id}
-                        className={cn(
-                          'rounded-xl border p-4 transition-all duration-200',
-                          f.severity === 'critical'
-                            ? 'border-destructive/20 bg-destructive/5'
-                            : f.severity === 'warning'
-                              ? 'border-[hsl(var(--warning))]/20 bg-[hsl(var(--warning))]/5'
-                              : 'border-border bg-card'
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <SeverityBadge severity={f.severity} />
-                          <span className="text-[10px] text-muted-foreground">{f.category.toUpperCase()}</span>
-                        </div>
-                        <p className="mt-2 text-sm font-medium">{f.title}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">{f.description}</p>
-                        <p className="mt-2 text-xs italic text-muted-foreground">{f.recommendation}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
             </div>
           </ScrollArea>
         </DialogContent>

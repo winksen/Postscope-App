@@ -1043,7 +1043,7 @@ export function runAuditDetailed(parsed: ParsedCollection, options: AuditOptions
 
   runWarningChecks(parsed, out)
   checkVariableIntegrity(parsed, out)
-  if (parsed.identity) runIdentityChecks(parsed, parsed.identity, out, enabledPacks)
+  if (parsed.identity) runIdentityChecks(parsed, parsed.identity, out, enabledPacks, { now: options.now ?? new Date() })
   runInfoChecks(parsed, out)
 
   const { active, suppressed, notices } = applySuppressions(parsed, out.build(options, enabledPacks), options)
