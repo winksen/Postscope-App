@@ -17,6 +17,11 @@ export const IAM_RULE_IDS = [
   'JWT_SENSITIVE_CLAIMS',
   'ID_TOKEN_AS_BEARER',
   'JWT_EXPIRED_STORED',
+  // iam-am: SAML, sessions and revocation (V0.2.4)
+  'SAML_ASSERTION_CAPTURED',
+  'SAML_IDP_METADATA_HTTP',
+  'SESSION_COOKIE_FLAGS',
+  'TOKEN_REVOCATION_NOT_COVERED',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

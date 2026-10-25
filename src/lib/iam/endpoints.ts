@@ -43,6 +43,12 @@ const rules: Array<[EndpointClass, Test]> = [
   ['oauth.revoke', (c) => /\/(?:revoke|revocation)(?:\.oauth2)?$/i.test(c.path) && (oauthContext(c) || c.params.has('token'))],
   ['oidc.userinfo', (c) => /\/userinfo(?:\.openid)?$/i.test(c.path)],
   [
+    'session.terminate',
+    (c) =>
+      /\/(?:revokesigninsessions|revokesessions)$|\/users\/[^/]+\/logout$/i.test(c.path) ||
+      (c.method === 'DELETE' && /\/(?:users\/[^/]+\/)?sessions(?:\/[^/]+)?$/i.test(c.path)),
+  ],
+  [
     'oidc.logout',
     (c) =>
       /\/(?:end_?session|openid-connect\/logout|oidc\/logout|v2\/logout|oauth2\/(?:[^/]+\/)*logout|connect\/endsession)$/i.test(c.path) ||
@@ -65,7 +71,7 @@ const rules: Array<[EndpointClass, Test]> = [
   [
     'saml.sso',
     (c) =>
-      /\/saml2?\/(?:sso|login|metadata|idp)\b|\/idp\/profile\/saml2|\/saml\/(?:signin|logout)\b|\/app\/[^/]+\/[^/]+\/sso\/saml$/i.test(
+      /\/adfs\/ls\b|\/federationmetadata\/|\/saml2?\/(?:sso|login|metadata|idp)\b|\/idp\/profile\/saml2|\/saml\/(?:signin|logout)\b|\/app\/[^/]+\/[^/]+\/sso\/saml$|\/[^/]+\/saml2$/i.test(
         c.path
       ),
   ],

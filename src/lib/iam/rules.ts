@@ -222,4 +222,61 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['jwt', 'tokens', 'hygiene'],
     references: { nist80053: ['IA-5'], iso27001: ['A.5.17'], cisV8: ['5.2'], rfc: ['7519'] },
   },
+  // iam-am: SAML, sessions and revocation
+  {
+    id: 'SAML_ASSERTION_CAPTURED',
+    title: 'SAML assertion captured in the collection',
+    description:
+      'A SAMLResponse in a request or saved example decodes to a SAML assertion. An assertion is a signed statement of who a user is, and it can be replayed until it expires.',
+    recommendation:
+      'Remove the SAMLResponse value from the collection and from saved examples. Capture assertions only in a throwaway test tenant.',
+    severity: 'critical',
+    category: 'identity',
+    pack: 'iam-am',
+    cwe: 'CWE-522',
+    owasp: 'API2:2023 Broken Authentication',
+    tags: ['saml', 'federation', 'tokens'],
+    references: { nist80053: ['IA-5', 'IA-8'], iso27001: ['A.5.17', 'A.8.5'], cisV8: ['5.2'] },
+  },
+  {
+    id: 'SAML_IDP_METADATA_HTTP',
+    title: 'SAML endpoint over plain HTTP',
+    description:
+      'A SAML single sign-on, assertion consumer or metadata URL uses http. Metadata fetched over http can be replaced to redirect sign-ins or swap signing keys.',
+    recommendation: 'Use https for every SAML URL and metadata download.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-am',
+    cwe: 'CWE-319',
+    owasp: 'API8:2023 Security Misconfiguration',
+    tags: ['saml', 'federation', 'transport', 'tls'],
+    references: { nist80053: ['SC-8', 'IA-8'], iso27001: ['A.8.24'], cisV8: ['3.10'] },
+  },
+  {
+    id: 'SESSION_COOKIE_FLAGS',
+    title: 'Session cookie saved without security flags',
+    description:
+      'A saved example shows a session cookie without Secure, HttpOnly or SameSite. Those flags limit where a session cookie is sent and who can read it.',
+    recommendation: 'Set Secure, HttpOnly and SameSite on session cookies in the service, then save a new example.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-am',
+    cwe: 'CWE-614',
+    owasp: 'API8:2023 Security Misconfiguration',
+    tags: ['sessions', 'cookies'],
+    references: { nist80053: ['SC-23', 'SC-8'], iso27001: ['A.8.5'], rfc: ['6265'] },
+  },
+  {
+    id: 'TOKEN_REVOCATION_NOT_COVERED',
+    title: 'Tokens obtained but never revoked or logged out',
+    description:
+      'The collection requests tokens from an identity provider but has no revocation, logout or session termination request for it, so the clean-up path is not exercised or documented.',
+    recommendation: 'Add a token revocation (RFC 7009), logout or session termination request next to the token request.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-am',
+    cwe: 'CWE-613',
+    tags: ['oauth', 'sessions', 'coverage'],
+    references: { nist80053: ['AC-12', 'IA-5'], iso27001: ['A.8.5'], rfc: ['7009'] },
+  },
 ]

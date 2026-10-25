@@ -231,7 +231,9 @@ test('suppressions with a reason hide findings from the result, the exit code an
   const report = JSON.parse(result.stdout)
   assert.ok(report.findings.every((finding: { severity: string }) => finding.severity !== 'critical'))
   assert.ok(report.suppressed.length > 0)
-  assert.ok(report.score.total > withoutSuppression.score.total)
+  // Warnings alone can already empty the security score of this collection, so compare the secrets category.
+  assert.ok(report.score.total >= withoutSuppression.score.total)
+  assert.ok(report.score.categories.secrets > withoutSuppression.score.categories.secrets)
   assert.match(result.stderr, /Suppressed: \d+ occurrence\(s\)/)
   assert.ok(!result.stdout.includes(FAKE.githubToken))
 })

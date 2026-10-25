@@ -32,6 +32,8 @@ export interface ParsedSavedResponse {
   requestBody?: string
   requestAuthType?: string
   requestAuthFields?: AuthEntry[]
+  /** Cookies Postman stored with the example (`cookie` array). Values are not kept, only the name and the security flags. */
+  cookies?: Array<{ name: string; secure?: boolean; httpOnly?: boolean; sameSite?: string }>
 }
 
 export interface ParsedRequest {
@@ -347,6 +349,21 @@ function savedRequestBody(body: unknown): string | undefined {
   return text ? text.slice(0, MAX_RESPONSE_BODY_SCAN) : undefined
 }
 
+function readSavedCookies(cookies: unknown): ParsedSavedResponse['cookies'] {
+  if (!Array.isArray(cookies)) return undefined
+  const list = cookies
+    .filter(isRecord)
+    .slice(0, 50)
+    .map((cookie) => ({
+      name: asText(cookie.name),
+      secure: typeof cookie.secure === 'boolean' ? cookie.secure : undefined,
+      httpOnly: typeof cookie.httpOnly === 'boolean' ? cookie.httpOnly : undefined,
+      sameSite: asText(cookie.sameSite) || undefined,
+    }))
+    .filter((cookie) => cookie.name)
+  return list.length ? list : undefined
+}
+
 function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
   if (!Array.isArray(responses)) return []
   return responses
@@ -369,6 +386,7 @@ function readSavedResponses(responses: unknown): ParsedSavedResponse[] {
         requestBody: original ? savedRequestBody(original.body) : undefined,
         requestAuthType: originalAuth && !isInheritedAuth(originalAuth) ? normalizeAuthType(originalAuth.type) : undefined,
         requestAuthFields: originalAuth && !isInheritedAuth(originalAuth) ? getAuthEntries(originalAuth) : undefined,
+        cookies: readSavedCookies(response.cookie),
       }
     })
 }

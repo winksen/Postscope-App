@@ -120,7 +120,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.2.0 | `v0.2.0` | B0 | Feature | Rule packs, identity category, compliance metadata | `e8a9d96` |
 | V0.2.1 | `v0.2.1` | B0 | Feature | Identity context extraction and platform fingerprinting | `4f992a7` |
 | V0.2.2 | `v0.2.2` | B1 AM | Feature | OAuth 2.0 and OIDC flow rules | `6508f44` |
-| V0.2.3 | `v0.2.3` | B1 AM | Feature | JWT inspection rules | |
+| V0.2.3 | `v0.2.3` | B1 AM | Feature | JWT inspection rules | `15b8afb` |
 | V0.2.4 | `v0.2.4` | B1 AM | Feature | SAML, sessions and token revocation coverage | |
 | V0.2.5 | `v0.2.5` | B2 IGA | Feature | SCIM 2.0 provisioning analysis | |
 | V0.2.6 | `v0.2.6` | B2 IGA | Feature | Joiner, mover, leaver coverage map | |

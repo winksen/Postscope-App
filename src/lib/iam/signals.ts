@@ -30,8 +30,8 @@ function hostOf(url: string): string {
 }
 
 /** OAuth parameters that appear in the URL or the form body of an authorize, token or callback request. */
-const OAUTH_URL_PARAMETER = /[?&#](?:response_type|grant_type|client_id|access_token|id_token)=/i
-const OAUTH_FORM_FIELD = /^(?:response_type|grant_type|client_id|client_assertion)$/i
+const OAUTH_URL_PARAMETER = /[?&#](?:response_type|grant_type|client_id|access_token|id_token|SAMLResponse)=/i
+const OAUTH_FORM_FIELD = /^(?:response_type|grant_type|client_id|client_assertion|SAMLResponse)$/i
 
 /** A JWT in a header or auth helper: stored tokens are identity material even when nothing else in the collection is. */
 const JWT_SHAPE = /eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\./

@@ -49,6 +49,7 @@ export const ENDPOINT_CLASSES = [
   'oidc.discovery',
   'oidc.jwks',
   'oidc.logout',
+  'session.terminate',
   'saml.acs',
   'saml.sso',
   'scim.users',

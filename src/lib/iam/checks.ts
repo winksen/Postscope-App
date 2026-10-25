@@ -2,6 +2,8 @@ import type { ParsedCollection } from '../parser'
 import type { RulePackId } from '../rulePacks'
 import { checkJwts } from './jwtChecks'
 import { checkOAuth } from './oauth'
+import { checkRevocationCoverage } from './revocation'
+import { checkSamlAndSessions } from './saml'
 import type { FindingSink } from './sink'
 import type { IdentityProfile } from './types'
 
@@ -21,5 +23,7 @@ export function runIdentityChecks(
   if (packs.has('iam-am')) {
     checkOAuth(parsed, profile, out)
     checkJwts(parsed, profile, out, context.now)
+    checkSamlAndSessions(parsed, profile, out)
+    checkRevocationCoverage(profile, out)
   }
 }
