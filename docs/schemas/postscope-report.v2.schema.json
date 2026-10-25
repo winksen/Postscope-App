@@ -158,7 +158,18 @@
     "identity": {
       "type": "object",
       "description": "Identity platforms, endpoint classes, OAuth clients, scopes, grants and token previews. Present only when the collection has identity content. Client ids and token previews are masked.",
-      "required": ["platforms", "endpointCounts", "endpoints", "oauthClients", "scopes", "grants", "scim", "lifecycle", "tokens"],
+      "required": [
+        "platforms",
+        "endpointCounts",
+        "endpoints",
+        "oauthClients",
+        "scopes",
+        "grants",
+        "scim",
+        "lifecycle",
+        "privileged",
+        "tokens"
+      ],
       "properties": {
         "platforms": {
           "type": "array",
@@ -235,6 +246,37 @@
             "type": "object",
             "required": ["grant", "requestCount"],
             "properties": { "grant": { "type": "string" }, "requestCount": { "type": "integer", "minimum": 0 } },
+            "additionalProperties": false
+          }
+        },
+        "privileged": {
+          "type": "array",
+          "description": "Privileged and admin plane operations grouped by platform. Danger zone entries are state-changing admin operations and secret retrievals.",
+          "items": {
+            "type": "object",
+            "required": ["platform", "dangerCount", "operations"],
+            "properties": {
+              "platform": { "type": "string" },
+              "dangerCount": { "type": "integer", "minimum": 0 },
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["requestId", "kind", "method", "path", "danger"],
+                  "properties": {
+                    "requestId": { "type": "string" },
+                    "kind": {
+                      "enum": ["role-assignment", "policy-change", "credential-mint", "safe-admin", "secret-retrieval", "secret-write"]
+                    },
+                    "method": { "type": "string" },
+                    "path": { "type": "string" },
+                    "danger": { "type": "boolean" },
+                    "topTier": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
             "additionalProperties": false
           }
         },

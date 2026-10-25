@@ -45,6 +45,10 @@ export const IAM_RULE_IDS = [
   'PAM_CHECKOUT_WITHOUT_CHECKIN',
   'PAM_PRIVILEGED_ACCOUNT_LITERAL',
   'PAM_SAFE_ADMIN_CHANGE',
+  // iam-pam: admin plane (V0.2.9)
+  'PRIVILEGED_ROLE_ASSIGNMENT',
+  'MFA_POLICY_WEAKENING',
+  'CREDENTIAL_MINTING_ENDPOINT',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

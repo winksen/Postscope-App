@@ -171,6 +171,26 @@ export interface LifecycleRow {
   delete: number
 }
 
+export type PrivilegedKind = 'role-assignment' | 'policy-change' | 'credential-mint' | 'safe-admin' | 'secret-retrieval' | 'secret-write'
+
+/** One privileged or admin plane request. `danger` marks state-changing admin operations and secret retrievals. */
+export interface PrivilegedOperation {
+  requestId: string
+  platform?: PlatformId
+  kind: PrivilegedKind
+  method: string
+  path: string
+  danger: boolean
+  /** Set when the request assigns a top-tier role as a literal, such as `Okta SUPER_ADMIN`. */
+  topTier?: string
+}
+
+export interface PrivilegedGroup {
+  platform: PlatformId | 'unspecified'
+  dangerCount: number
+  operations: PrivilegedOperation[]
+}
+
 /** SCIM operations a collection sends to one target system. */
 export interface ScimTarget {
   /** Literal host, or the name of the variable that stands for it. */
@@ -193,10 +213,12 @@ export interface IdentityProfile {
   scim: ScimTarget[]
   /** Joiner, mover and leaver requests (V0.2.6). */
   lifecycle: LifecycleEntry[]
+  /** Privileged and admin plane operations (V0.2.9). */
+  privileged: PrivilegedOperation[]
 }
 
 export function emptyIdentityProfile(): IdentityProfile {
-  return { platforms: [], endpoints: [], oauthClients: [], scopes: [], grants: [], tokens: [], scim: [], lifecycle: [] }
+  return { platforms: [], endpoints: [], oauthClients: [], scopes: [], grants: [], tokens: [], scim: [], lifecycle: [], privileged: [] }
 }
 
 export function isEmptyProfile(profile: IdentityProfile | undefined): boolean {

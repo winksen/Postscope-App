@@ -156,6 +156,9 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Warning | Privileged account name used as a literal credential | `administrator`, `root`, `sa`, `krbtgt` or a break-glass name as a username |
 | Info | Safe, policy or permission change | CyberArk safe members, Vault ACL policies, BeyondTrust and Delinea permissions; a warning when it grants full permissions |
 | Info | Checkout without a check-in | A PAM platform with checkouts and no check-in or release request |
+| Warning | Top-tier role assigned as a literal | Okta `SUPER_ADMIN`, Entra Global Administrator, Keycloak `realm-admin`, AWS `AdministratorAccess`, Azure Owner |
+| Warning | Policy change that weakens MFA | A factor turned off, enforcement `none`, MFA not required, or every user excluded in a policy or conditional access body |
+| Info | Request that creates credentials | Entra `addPassword`, Okta app secrets and API tokens, Keycloak `client-secret`, AWS `CreateAccessKey`, Google service account keys; a warning when the response is saved |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
@@ -202,6 +205,10 @@ After applying, PostScope re-analyzes the repaired collection, shows the real sc
 The sliders icon in the header opens **Rules**: turn any rule off or change its severity. Changes re-run the audit instantly and are remembered in the browser. Operators can ship **team defaults** (`AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES`, `AUDIT_RULE_PACKS`); "Reset to defaults" returns to them.
 
 Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
+
+### Privileged operations inventory
+
+Role assignments, policy and conditional access changes, credential creation, safe and vault administration, secret retrievals and vault writes are listed per platform. State-changing admin operations and secret retrievals are marked as the **danger zone**, and a role assignment that names a top-tier role carries its name. The list is part of the JSON report and feeds the Identity page.
 
 ### Governance APIs and personal data
 

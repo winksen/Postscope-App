@@ -4,6 +4,7 @@ import { checkJwts } from './jwtChecks'
 import { checkOAuth } from './oauth'
 import { checkPam } from './pam'
 import { checkRevocationCoverage } from './revocation'
+import { checkAdminPlane } from './admin'
 import { checkGovernance } from './governance'
 import { checkLifecycle } from './lifecycle'
 import { checkSamlAndSessions } from './saml'
@@ -35,5 +36,8 @@ export function runIdentityChecks(
     checkLifecycle(parsed, profile, out)
     checkGovernance(parsed, profile, out)
   }
-  if (packs.has('iam-pam')) checkPam(parsed, profile, out)
+  if (packs.has('iam-pam')) {
+    checkPam(parsed, profile, out)
+    checkAdminPlane(parsed, profile, out)
+  }
 }

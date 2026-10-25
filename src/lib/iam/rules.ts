@@ -544,4 +544,50 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['pam', 'vault', 'policies', 'privileges'],
     references: { nist80053: ['AC-6'], iso27001: ['A.8.2'], cisV8: ['5.4', '6.8'] },
   },
+  // iam-pam: admin plane
+  {
+    id: 'PRIVILEGED_ROLE_ASSIGNMENT',
+    title: 'Top-tier role assigned as a literal',
+    description:
+      'A request assigns a top-tier role such as Okta SUPER_ADMIN, Entra Global Administrator, Keycloak realm-admin, AWS AdministratorAccess or Azure Owner using a literal value.',
+    recommendation:
+      'Keep top-tier assignments out of shared collections, use just-in-time elevation, and take role ids from variables that only the approver can set.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-269',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['admin-plane', 'roles', 'privileges'],
+    references: { nist80053: ['AC-6'], iso27001: ['A.8.2'], cisV8: ['6.8'] },
+  },
+  {
+    id: 'MFA_POLICY_WEAKENING',
+    title: 'Policy change that weakens multi-factor authentication',
+    description:
+      'A policy or conditional access request turns a factor off, sets enforcement to none, stops requiring MFA or excludes all users. It lowers the strength of every sign-in it covers.',
+    recommendation:
+      'Do not weaken authentication policies from shared collections. Use report-only modes and scoped exclusions with an owner and an expiry.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-308',
+    owasp: 'API2:2023 Broken Authentication',
+    tags: ['admin-plane', 'mfa', 'policies'],
+    references: { nist80053: ['IA-2'], iso27001: ['A.8.5'], cisV8: ['6.3', '6.4', '6.5'] },
+  },
+  {
+    id: 'CREDENTIAL_MINTING_ENDPOINT',
+    title: 'Request that creates credentials',
+    description:
+      'A request creates a client secret, API token, service account key or access key (Entra addPassword, Okta app secrets, Keycloak client-secret, AWS CreateAccessKey, Google service account keys). It is a warning when the response is saved in an example, because the new secret is then in the collection.',
+    recommendation:
+      'Run credential creation from a controlled pipeline, store the result in a vault, and never save the response as an example.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-522',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['admin-plane', 'credentials', 'minting'],
+    references: { nist80053: ['IA-5'], iso27001: ['A.5.17'], cisV8: ['5.2'] },
+  },
 ]

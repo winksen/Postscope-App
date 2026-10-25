@@ -3,6 +3,11 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.9
+
+- Added an inventory of privileged identity operations such as role assignment, policy changes and credential creation
+- Added checks for super admin role grants and MFA policy weakening
+
 ## V0.2.8
 
 - Added checks for privileged password retrieval captured in saved examples

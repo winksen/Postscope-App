@@ -1,3 +1,4 @@
+import { groupPrivileged } from './admin'
 import { buildLifecycleMatrix } from './lifecycle'
 import { isEmptyProfile, type IdentityProfile } from './types'
 
@@ -49,6 +50,18 @@ export function identityReportSection(profile: IdentityProfile | undefined) {
       requestCount: target.requestIds.length,
     })),
     lifecycle: buildLifecycleMatrix(profile.lifecycle ?? []),
+    privileged: groupPrivileged(profile.privileged ?? []).map((group) => ({
+      platform: group.platform,
+      dangerCount: group.dangerCount,
+      operations: group.operations.map((operation) => ({
+        requestId: operation.requestId,
+        kind: operation.kind,
+        method: operation.method,
+        path: operation.path,
+        danger: operation.danger,
+        topTier: operation.topTier,
+      })),
+    })),
     tokens: profile.tokens.map((token) => ({
       kind: token.kind,
       requestId: token.requestId,

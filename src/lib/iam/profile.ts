@@ -18,6 +18,7 @@ import {
   type ScopeUsage,
   type TokenKind,
 } from './types'
+import { privilegedOperation } from './admin'
 import { classifyLifecycle } from './lifecycle'
 import { addToScimInventory } from './scim'
 import { requestParams, safeDecode, splitUrl, type SplitUrl } from './url'
@@ -268,6 +269,8 @@ export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile 
       if (url.host) endpoint.host = url.host
       profile.endpoints.push(endpoint)
       addToScimInventory(scimTargets, endpoint, url)
+      const operation = privilegedOperation(endpoint, request)
+      if (operation) profile.privileged.push(operation)
     }
     const lifecycle = classifyLifecycle({ method: request.method, path: url.path, endpointClass, platform }, request)
     if (lifecycle && profile.lifecycle.length < MAX_ENDPOINTS) profile.lifecycle.push({ requestId: request.id, platform, ...lifecycle })

@@ -169,6 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
+| identity (`iam-pam`, V0.2.9) | `PRIVILEGED_ROLE_ASSIGNMENT`, `MFA_POLICY_WEAKENING` (warning), `CREDENTIAL_MINTING_ENDPOINT` (info, warning with a saved response) |
 | identity (`iam-pam`, V0.2.8) | `PAM_RETRIEVED_SECRET_CAPTURED`, `PAM_VAULT_TOKEN_LITERAL`, `PAM_ROOT_TOKEN_USAGE` (critical), `PAM_RETRIEVAL_WITHOUT_REASON`, `PAM_PRIVILEGED_ACCOUNT_LITERAL` (warning), `PAM_CHECKOUT_WITHOUT_CHECKIN` (info), `PAM_SAFE_ADMIN_CHANGE` (info, warning for full grants) |
 | identity (`iam-iga`, V0.2.7) | `PII_IN_SAVED_RESPONSE`, `CERTIFICATION_BULK_APPROVE` (warning), `PII_IN_REQUEST_BODY`, `GOVERNANCE_SELF_APPROVAL` (info) |
 | identity (`iam-iga`, V0.2.6) | `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED` (info) |
@@ -352,6 +353,16 @@ Redaction: `redactCollection(json, { scrubPii: true })` runs after the credentia
 | `PAM_SAFE_ADMIN_CHANGE` (info, warning for full grants) | Non-GET `pam.admin` and Vault policy requests. `grantsFullPermissions` is true for 10 or more enabled flags in one object, `manageSafe` with `manageSafeMembers`, `permission: Owner`, `capabilities` with `sudo`, or a `path "*"` policy |
 
 `detectIdentitySignals` also uses `hasStrongPlatformSignal` (hosts, platform-specific paths and headers, token shapes and the Vault port) so a collection with only vault or PAM calls switches the packs on, while generic paths such as `/api/v1/users` do not.
+
+### 2.7.9 Admin plane (`iam/admin.ts`)
+
+`privilegedOperation(endpoint, request)` turns admin and PAM endpoint classes into the inventory entries of `IdentityProfile.privileged` (`role-assignment`, `policy-change`, `credential-mint`, `safe-admin`, `secret-retrieval`, `secret-write`). `danger` is true for every non-GET operation and for secret retrievals and checkouts, and `topTier` carries the role label of a literal top-tier assignment. `groupPrivileged` groups entries per platform with the danger zone first; the JSON report publishes the groups as `identity.privileged`.
+
+| Rule | Decision |
+|---|---|
+| `PRIVILEGED_ROLE_ASSIGNMENT` (warning) | Non-GET `admin.role-assignment` whose URL, raw body or form fields (variables removed first) contain `SUPER_ADMIN`, `ORG_ADMIN`, the Global Administrator (`62e90394-...`) or Privileged Role Administrator (`e8611ab8-...`) template id, `realm-admin`, `AdministratorAccess`, or the Azure Owner (`8e3af657-...`) or User Access Administrator (`18d7d88d-...`) role id; Auth0 requests also match admin role names |
+| `MFA_POLICY_WEAKENING` (warning) | Non-GET `admin.policy` body where `weakensMfa` finds `requireFactor` or `requireMfa` false, a disabled factor, `state` or `status` inactive on an MFA or conditional access policy, enforcement `none`, `excludeUsers` or `excludeGroups` containing `All`, an empty grant control list, or an empty Auth0 `guardian/policies` list |
+| `CREDENTIAL_MINTING_ENDPOINT` (info, warning with a saved response) | `admin.credential-mint` requests (Entra `addPassword` and `addKey`, Okta app `credentials/secrets` and `api-tokens`, Keycloak `client-secret`, AWS `CreateAccessKey`, Google `serviceAccounts/*/keys`); the run becomes a warning when any of them has a saved response body |
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -565,6 +576,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamAdmin.test.ts` | Top-tier role assignments for Okta, Entra, Keycloak, AWS and Azure with safe and variable counterparts, MFA weakening shapes and their negatives, credential minting severity switch, privileged inventory with danger marks and grouping, schema-valid report section, pack gating |
 | `iamPam.test.ts` | Captured secrets for CyberArk, Vault, AWS, Azure and Delinea with metadata and placeholder guards, vault and PAM token literals, root token usage, reason and ticket fields per platform, checkout and check-in coverage, privileged account names, safe and policy changes with full-permission detection, pack independence, no secret in evidence |
 | `iamGovernance.test.ts` | Detection and masking per kind with runtime-built IBAN, card, NIR and DNI values, checksum and placeholder false-positive guards, field-name kinds, JSON paths, saved examples versus request bodies, self-approval and bulk approval, governance endpoint classes, pack gating, PII scrubbing in sanitized copies (idempotent, input untouched) and the CLI flag |
 | `iamLifecycle.test.ts` | Stage and action table for SCIM, Okta, Entra ID, Keycloak, Auth0 and Saviynt with non-identity guards, account-disabling body shapes, coverage matrix counts, the three leaver rules including folder sequences and per-platform revocation, report section and pack gating |
@@ -655,3 +667,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.6 | Joiner, mover, leaver classification and coverage matrix (`iam/lifecycle.ts`, `identity.lifecycle` in the report), `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED`, performance baseline updated (the analysis worker grew from 36 KB to 45 KB gzip with the identity rule packs of V0.2.3 to V0.2.6) |
 | V0.2.7 | Personal data detection (`iam/pii.ts`) and governance checks (`iam/governance.ts`: `PII_IN_SAVED_RESPONSE`, `PII_IN_REQUEST_BODY`, `GOVERNANCE_SELF_APPROVAL`, `CERTIFICATION_BULK_APPROVE`), `redactCollection` `scrubPii` option, CLI `--redact-pii`, export item "Sanitized copy (remove personal data)" |
 | V0.2.8 | `iam-pam` rules (`iam/pam.ts`: retrieved secrets, vault and PAM tokens, root tokens, reason and ticket fields, checkout and check-in, privileged account literals, safe and policy changes), strong platform signals for identity detection (`hasStrongPlatformSignal`) |
+| V0.2.9 | Admin plane checks and privileged operations inventory (`iam/admin.ts`: `PRIVILEGED_ROLE_ASSIGNMENT`, `MFA_POLICY_WEAKENING`, `CREDENTIAL_MINTING_ENDPOINT`, `identity.privileged` in the report) |
