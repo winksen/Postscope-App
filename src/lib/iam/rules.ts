@@ -444,4 +444,104 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['governance', 'certification', 'access-review'],
     references: { nist80053: ['AC-2', 'AC-5'], iso27001: ['A.5.18'], cisV8: ['5.1'] },
   },
+  // iam-pam: PAM and secrets vaults
+  {
+    id: 'PAM_RETRIEVED_SECRET_CAPTURED',
+    title: 'Retrieved secret captured in a saved example',
+    description:
+      'A saved example of a password retrieval or vault read contains the secret that was returned. The vault protected it, and the collection now carries it in clear text.',
+    recommendation: 'Delete the example or replace the secret with a placeholder, and rotate the credential that was retrieved.',
+    severity: 'critical',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-312',
+    owasp: 'API2:2023 Broken Authentication',
+    tags: ['pam', 'vault', 'secrets', 'examples'],
+    references: { nist80053: ['IA-5', 'SC-28'], iso27001: ['A.5.17', 'A.8.2'], cisV8: ['5.4'] },
+  },
+  {
+    id: 'PAM_VAULT_TOKEN_LITERAL',
+    title: 'Vault or PAM session token stored in the collection',
+    description:
+      'An X-Vault-Token, BeyondTrust PS-Auth key, CyberArk logon token or Delinea bearer token is stored as a literal. A session token gives the same access as the account that created it.',
+    recommendation:
+      'Log in at runtime (AppRole, JWT or OIDC auth for Vault; the platform logon API for PAM) and keep the token in a variable that is never exported.',
+    severity: 'critical',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-798',
+    owasp: 'API2:2023 Broken Authentication',
+    tags: ['pam', 'vault', 'tokens'],
+    references: { nist80053: ['IA-5', 'AC-6'], iso27001: ['A.5.17', 'A.8.2'], cisV8: ['5.4'] },
+  },
+  {
+    id: 'PAM_ROOT_TOKEN_USAGE',
+    title: 'Vault root token used or generated',
+    description:
+      'A request generates a Vault root token (sys/generate-root) or sends a token value that looks like a root token. Root tokens have no policy limits and no expiry.',
+    recommendation:
+      'Revoke root tokens after setup, use named policies and short-lived tokens, and keep generate-root for a documented break-glass procedure.',
+    severity: 'critical',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-250',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['pam', 'vault', 'root', 'least-privilege'],
+    references: { nist80053: ['AC-2', 'AC-6'], iso27001: ['A.8.2'], cisV8: ['5.4', '6.8'] },
+  },
+  {
+    id: 'PAM_RETRIEVAL_WITHOUT_REASON',
+    title: 'Credential retrieval without a reason or ticket',
+    description:
+      'A password retrieval or checkout request sends no reason, comment or ticket reference. Dual control and audit trails depend on a stated purpose for privileged access.',
+    recommendation:
+      'Send the reason and ticket fields the platform supports (CyberArk reason and TicketId, BeyondTrust reason, Delinea comment and ticketNumber).',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-pam',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['pam', 'justification', 'audit'],
+    references: { nist80053: ['AC-6', 'AU-2'], iso27001: ['A.8.2', 'A.8.15'], cisV8: ['5.4'] },
+  },
+  {
+    id: 'PAM_CHECKOUT_WITHOUT_CHECKIN',
+    title: 'Checkout without a check-in',
+    description:
+      'The collection checks credentials out of a PAM platform but has no check-in or release request. Credentials that stay checked out stay exposed.',
+    recommendation: 'Add the check-in or release request after each checkout, and run it even when the work in between fails.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-pam',
+    tags: ['pam', 'checkout', 'coverage'],
+    references: { nist80053: ['AC-2', 'AC-6'], iso27001: ['A.8.2'], cisV8: ['5.4'] },
+  },
+  {
+    id: 'PAM_PRIVILEGED_ACCOUNT_LITERAL',
+    title: 'Privileged account name used as a literal credential',
+    description:
+      'A login uses a built-in privileged account name (administrator, root, sa, krbtgt) or a break-glass account as a literal. Shared privileged accounts cannot be tied to a person.',
+    recommendation: 'Use named, personal or service accounts through variables, and keep break-glass accounts out of shared collections.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-1392',
+    owasp: 'API2:2023 Broken Authentication',
+    tags: ['pam', 'accounts', 'least-privilege'],
+    references: { nist80053: ['AC-2', 'AC-6'], iso27001: ['A.5.16', 'A.8.2'], cisV8: ['5.4'] },
+  },
+  {
+    id: 'PAM_SAFE_ADMIN_CHANGE',
+    title: 'Safe, policy or permission change',
+    description:
+      'A request changes a safe, vault policy or permission set. It is a warning when the change grants full permissions (many rights at once, safe management, sudo, a wildcard path).',
+    recommendation:
+      'Grant the smallest set of rights for the task, review permission changes like code, and keep administrative grants out of shared collections.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-pam',
+    cwe: 'CWE-269',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['pam', 'vault', 'policies', 'privileges'],
+    references: { nist80053: ['AC-6'], iso27001: ['A.8.2'], cisV8: ['5.4', '6.8'] },
+  },
 ]

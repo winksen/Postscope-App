@@ -310,6 +310,20 @@ function hasAnySignal(request: ParsedRequest, url: SplitUrl): boolean {
   return tokenSources(request).some((text) => ANY_TOKEN.test(text))
 }
 
+const ANY_STRONG_PATH = union(PLATFORM_FINGERPRINTS.flatMap((fingerprint) => fingerprint.strongPaths))
+
+/**
+ * True when a request has a signal that only an identity platform produces: its host, a path or header that is specific
+ * to it, a token shape, or the Vault port. Typical but generic paths such as `/api/v1/users` do not count.
+ */
+export function hasStrongPlatformSignal(request: ParsedRequest, url: SplitUrl): boolean {
+  if (url.host && ANY_HOST.test(url.host)) return true
+  if (ANY_STRONG_PATH.test(url.path)) return true
+  if (url.port && SIGNAL_PORTS.has(url.port)) return true
+  if (request.headers.some((header) => SIGNAL_HEADER.test(header.key.trim()))) return true
+  return tokenSources(request).some((text) => ANY_TOKEN.test(text))
+}
+
 export interface RequestPlatformMatch {
   id: PlatformId
   score: number

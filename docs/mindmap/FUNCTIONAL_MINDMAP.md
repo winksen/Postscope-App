@@ -127,6 +127,9 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Critical | Secret in saved example response | Captured `access_token` or `Set-Cookie` in an example, or a password in the example's original request body |
 | Critical | Secret pasted into documentation | `password: …` or `Authorization: Bearer …` in a collection, folder or request description |
 | Critical | Provider token detected | AWS, GitHub, Slack, Stripe, Google, OpenAI, Anthropic, JWT, private keys, Entra ID, Okta, Vault, Postman, Atlassian, Shopify, Grafana, Hugging Face, Databricks, PyPI, Square, … |
+| Critical | Retrieved secret captured | A saved example of a CyberArk, BeyondTrust, Delinea, Vault or cloud secret manager retrieval that holds the secret (identity packs) |
+| Critical | Vault or PAM session token stored | `X-Vault-Token`, `PS-Auth`, a CyberArk logon token or a Delinea bearer token as a literal |
+| Critical | Vault root token used or generated | `sys/generate-root`, or `X-Vault-Token: root` |
 | Critical | SAML assertion captured | A `SAMLResponse` form field, query, raw body or saved example that decodes to a SAML assertion (identity packs) |
 | Critical | Unsigned JWT | A stored token with `alg: none` (identity packs) |
 | Critical | OAuth or OpenID Connect endpoint over plain HTTP | A token, introspection or revocation endpoint called with `http://` (identity packs) |
@@ -149,6 +152,10 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Info | Personal data in a request body | The same kinds of data written into a request body |
 | Info | Requester approves their own request | An access request or certification body names the same literal as approver and requester |
 | Warning | Bulk approval of certification items | Five or more approve decisions in one call, or a bulk approval endpoint |
+| Warning | Credential retrieval without a reason or ticket | A password retrieval or checkout with no `reason`, `comment` or `TicketId` field |
+| Warning | Privileged account name used as a literal credential | `administrator`, `root`, `sa`, `krbtgt` or a break-glass name as a username |
+| Info | Safe, policy or permission change | CyberArk safe members, Vault ACL policies, BeyondTrust and Delinea permissions; a warning when it grants full permissions |
+| Info | Checkout without a check-in | A PAM platform with checkouts and no check-in or release request |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |

@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.8
+
+- Added checks for privileged password retrieval captured in saved examples
+- Added detection of vault tokens and privileged accounts in collections
+- Added checks for credential checkout without check-in and retrieval without a reason
+
 ## V0.2.7
 
 - Added detection of governance APIs such as access requests, certifications and separation of duties policies

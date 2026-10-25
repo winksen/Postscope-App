@@ -1,5 +1,6 @@
 import type { ParsedCollection } from '../parser'
-import { resolveUrlText } from './url'
+import { hasStrongPlatformSignal } from './fingerprints'
+import { resolveUrlText, splitUrl } from './url'
 
 /**
  * Cheap check that decides whether the identity packs switch on by themselves. It only needs a hint: the platform and
@@ -47,6 +48,7 @@ export function detectIdentitySignals(parsed: ParsedCollection): boolean {
     if (request.headers.some((header) => JWT_SHAPE.test(header.value)) || request.authFields?.some((field) => JWT_SHAPE.test(field.value)))
       return true
     if (request.bodyFields?.some((field) => OAUTH_FORM_FIELD.test(field.key.trim()))) return true
-    return IDENTITY_PATH.some((pattern) => pattern.test(url))
+    if (IDENTITY_PATH.some((pattern) => pattern.test(url))) return true
+    return hasStrongPlatformSignal(request, splitUrl(request.url, parsed))
   })
 }

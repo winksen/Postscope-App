@@ -169,6 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
+| identity (`iam-pam`, V0.2.8) | `PAM_RETRIEVED_SECRET_CAPTURED`, `PAM_VAULT_TOKEN_LITERAL`, `PAM_ROOT_TOKEN_USAGE` (critical), `PAM_RETRIEVAL_WITHOUT_REASON`, `PAM_PRIVILEGED_ACCOUNT_LITERAL` (warning), `PAM_CHECKOUT_WITHOUT_CHECKIN` (info), `PAM_SAFE_ADMIN_CHANGE` (info, warning for full grants) |
 | identity (`iam-iga`, V0.2.7) | `PII_IN_SAVED_RESPONSE`, `CERTIFICATION_BULK_APPROVE` (warning), `PII_IN_REQUEST_BODY`, `GOVERNANCE_SELF_APPROVAL` (info) |
 | identity (`iam-iga`, V0.2.6) | `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED` (info) |
 | identity (`iam-iga`, V0.2.5) | `SCIM_BULK_DESTRUCTIVE`, `SCIM_PRIVILEGE_PATCH` (warning, info when no admin literal), `SCIM_UNBOUNDED_LIST`, `SCIM_CONTENT_TYPE`, `SCIM_SCHEMA_MISMATCH` (info) |
@@ -335,6 +336,22 @@ New endpoint class `session.terminate`: `DELETE` on `/sessions` or `/users/{id}/
 | `CERTIFICATION_BULK_APPROVE` (warning) | Non-GET `iga.certification` call with 5 or more approving decisions (`approve`, `certify`, `keep`, `accept`) in `decisions`, `items`, `certificationItems`, `reviewItems` or a root array, or a path such as `bulk-approve` or `approve-all` |
 
 Redaction: `redactCollection(json, { scrubPii: true })` runs after the credential pass. Request bodies (raw JSON with unquoted variables restored, urlencoded and form-data fields) get `PII_VARIABLES` (`{{email}}`, `{{phoneNumber}}`, `{{iban}}`, `{{cardNumber}}`, `{{nationalId}}`, `{{dateOfBirth}}`, `{{employeeId}}`); saved example bodies and their original requests get `{{REDACTED}}`. A second pass changes nothing. CLI `--redact-pii` (needs `--sanitize`) and the header export item "Sanitized copy (remove personal data)" use it.
+
+### 2.7.8 PAM and secrets vaults (`iam/pam.ts`)
+
+`checkPam` runs for the `iam-pam` pack. It reads the endpoint classes `pam.retrieve`, `pam.checkout`, `pam.checkin`, `pam.admin` and `vault.read` (plus `admin.policy` on `/sys/polic...`) and the profile's token inventory.
+
+| Rule | Decision |
+|---|---|
+| `PAM_RETRIEVED_SECRET_CAPTURED` (critical) | A saved example of a `pam.retrieve` or `vault.read` request whose body holds a secret: a bare JSON string or plain text (CyberArk, BeyondTrust, Delinea) or a non-placeholder string under `content`, `password`, `secret`, `secretString`, `value`, `key`, `token`, `data` and similar keys at any depth (Vault KV v1 and v2, AWS, Azure, GCP). Metadata-only bodies and variables do not count. Evidence is `evidencePreview(secret)` |
+| `PAM_VAULT_TOKEN_LITERAL` (critical) | Profile tokens of kind `vault-token` and `ps-auth`, plus a literal `Authorization` of 16 or more characters on a request fingerprinted as CyberArk or Delinea (CyberArk logon tokens have no scheme) |
+| `PAM_ROOT_TOKEN_USAGE` (critical) | A path under `/sys/generate-root`, or an `X-Vault-Token` that is `root`, `myroot`, `dev-only-token`, or mentions root and token |
+| `PAM_RETRIEVAL_WITHOUT_REASON` (warning) | `pam.retrieve` and `pam.checkout` without a `reason`, `comment`, `justification` or `ticket*` field in query, form or JSON body (nested keys count). BeyondTrust retrievals are skipped because the reason belongs on the request that opens access |
+| `PAM_CHECKOUT_WITHOUT_CHECKIN` (info) | Platforms with `pam.checkout` and no `pam.checkin`; a check-in without a platform covers all |
+| `PAM_PRIVILEGED_ACCOUNT_LITERAL` (warning) | Literal `administrator`, `admin`, `root`, `sa`, `krbtgt`, `sysadmin`, `superuser`, `domaindmin` or break-glass, fire-call and emergency account names in the Basic auth username, form fields or top-level JSON keys such as `username`, `user`, `login`, `account` and in `X-OpenAM-Username` |
+| `PAM_SAFE_ADMIN_CHANGE` (info, warning for full grants) | Non-GET `pam.admin` and Vault policy requests. `grantsFullPermissions` is true for 10 or more enabled flags in one object, `manageSafe` with `manageSafeMembers`, `permission: Owner`, `capabilities` with `sudo`, or a `path "*"` policy |
+
+`detectIdentitySignals` also uses `hasStrongPlatformSignal` (hosts, platform-specific paths and headers, token shapes and the Vault port) so a collection with only vault or PAM calls switches the packs on, while generic paths such as `/api/v1/users` do not.
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -548,6 +565,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamPam.test.ts` | Captured secrets for CyberArk, Vault, AWS, Azure and Delinea with metadata and placeholder guards, vault and PAM token literals, root token usage, reason and ticket fields per platform, checkout and check-in coverage, privileged account names, safe and policy changes with full-permission detection, pack independence, no secret in evidence |
 | `iamGovernance.test.ts` | Detection and masking per kind with runtime-built IBAN, card, NIR and DNI values, checksum and placeholder false-positive guards, field-name kinds, JSON paths, saved examples versus request bodies, self-approval and bulk approval, governance endpoint classes, pack gating, PII scrubbing in sanitized copies (idempotent, input untouched) and the CLI flag |
 | `iamLifecycle.test.ts` | Stage and action table for SCIM, Okta, Entra ID, Keycloak, Auth0 and Saviynt with non-identity guards, account-disabling body shapes, coverage matrix counts, the three leaver rules including folder sequences and per-platform revocation, report section and pack gating |
 | `iamScim.test.ts` | Bulk deletes and unguarded bulks, unbounded lists, privilege PATCH with admin and variable values, severity switch and override, content type and schema URN checks including templated bodies and SCIM 1.1, SCIM inventory and its report section, pack independence |
@@ -636,3 +654,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.5 | `iam-iga` SCIM rules (`iam/scim.ts`: bulk, unbounded list, privilege PATCH, content type, schema URN), SCIM target inventory in the profile and JSON report, identity signals and profile through leading variables (`resolveUrlText`) |
 | V0.2.6 | Joiner, mover, leaver classification and coverage matrix (`iam/lifecycle.ts`, `identity.lifecycle` in the report), `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED`, performance baseline updated (the analysis worker grew from 36 KB to 45 KB gzip with the identity rule packs of V0.2.3 to V0.2.6) |
 | V0.2.7 | Personal data detection (`iam/pii.ts`) and governance checks (`iam/governance.ts`: `PII_IN_SAVED_RESPONSE`, `PII_IN_REQUEST_BODY`, `GOVERNANCE_SELF_APPROVAL`, `CERTIFICATION_BULK_APPROVE`), `redactCollection` `scrubPii` option, CLI `--redact-pii`, export item "Sanitized copy (remove personal data)" |
+| V0.2.8 | `iam-pam` rules (`iam/pam.ts`: retrieved secrets, vault and PAM tokens, root tokens, reason and ticket fields, checkout and check-in, privileged account literals, safe and policy changes), strong platform signals for identity detection (`hasStrongPlatformSignal`) |

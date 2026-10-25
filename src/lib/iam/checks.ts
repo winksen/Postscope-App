@@ -2,6 +2,7 @@ import type { ParsedCollection } from '../parser'
 import type { RulePackId } from '../rulePacks'
 import { checkJwts } from './jwtChecks'
 import { checkOAuth } from './oauth'
+import { checkPam } from './pam'
 import { checkRevocationCoverage } from './revocation'
 import { checkGovernance } from './governance'
 import { checkLifecycle } from './lifecycle'
@@ -34,4 +35,5 @@ export function runIdentityChecks(
     checkLifecycle(parsed, profile, out)
     checkGovernance(parsed, profile, out)
   }
+  if (packs.has('iam-pam')) checkPam(parsed, profile, out)
 }

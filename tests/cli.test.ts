@@ -152,8 +152,8 @@ test('--weights changes the score and invalid weights are usage errors', () => {
   assert.equal(cli(risky, '--weights', 'critical=abc').code, 2)
   assert.equal(cli(risky, '--weights', 'fatal=5').code, 2)
   assert.match(cli(risky, '--fail-on', 'none').stdout, /security \d+, hygiene \d+/)
-  assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '80', '--weights', 'critical=1,warning=1,info=0').code, 0)
-  assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '80').code, 1)
+  assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '75', '--weights', 'critical=1,warning=1,info=0').code, 0)
+  assert.equal(cli(risky, '--fail-on', 'none', '--min-score', '75').code, 1)
 })
 
 /** A small project folder with its own config; the CLI looks for `.postscope.json` above the scanned file. */
