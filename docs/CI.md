@@ -71,7 +71,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.2.5
+        uses: winksen/Postscope-App@v0.2.6
         with:
           path: collections
           fail-on: critical

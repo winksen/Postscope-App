@@ -3,6 +3,7 @@ import type { RulePackId } from '../rulePacks'
 import { checkJwts } from './jwtChecks'
 import { checkOAuth } from './oauth'
 import { checkRevocationCoverage } from './revocation'
+import { checkLifecycle } from './lifecycle'
 import { checkSamlAndSessions } from './saml'
 import { checkScim } from './scim'
 import type { FindingSink } from './sink'
@@ -27,5 +28,8 @@ export function runIdentityChecks(
     checkSamlAndSessions(parsed, profile, out)
     checkRevocationCoverage(profile, out)
   }
-  if (packs.has('iam-iga')) checkScim(parsed, profile, out)
+  if (packs.has('iam-iga')) {
+    checkScim(parsed, profile, out)
+    checkLifecycle(parsed, profile, out)
+  }
 }

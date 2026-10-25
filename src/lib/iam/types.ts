@@ -146,6 +146,31 @@ export interface IdentityToken {
   preview: string
 }
 
+export type LifecycleStage = 'joiner' | 'mover' | 'leaver'
+export type LifecycleAction =
+  'create' | 'attribute-update' | 'group-change' | 'role-change' | 'disable' | 'remove-access' | 'revoke' | 'delete'
+
+/** One request that creates, changes or removes an identity. */
+export interface LifecycleEntry {
+  requestId: string
+  /** Platform of the request; empty when none was detected. */
+  platform?: PlatformId
+  stage: LifecycleStage
+  action: LifecycleAction
+}
+
+/** One row of the joiner, mover, leaver coverage map. Counts are requests. */
+export interface LifecycleRow {
+  /** `unspecified` collects requests with no detected platform (for example a SCIM target behind a variable). */
+  platform: PlatformId | 'unspecified'
+  joiner: number
+  mover: number
+  disable: number
+  removeAccess: number
+  revoke: number
+  delete: number
+}
+
 /** SCIM operations a collection sends to one target system. */
 export interface ScimTarget {
   /** Literal host, or the name of the variable that stands for it. */
@@ -166,10 +191,12 @@ export interface IdentityProfile {
   tokens: IdentityToken[]
   /** SCIM provisioning inventory per target system (V0.2.5). */
   scim: ScimTarget[]
+  /** Joiner, mover and leaver requests (V0.2.6). */
+  lifecycle: LifecycleEntry[]
 }
 
 export function emptyIdentityProfile(): IdentityProfile {
-  return { platforms: [], endpoints: [], oauthClients: [], scopes: [], grants: [], tokens: [], scim: [] }
+  return { platforms: [], endpoints: [], oauthClients: [], scopes: [], grants: [], tokens: [], scim: [], lifecycle: [] }
 }
 
 export function isEmptyProfile(profile: IdentityProfile | undefined): boolean {

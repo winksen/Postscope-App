@@ -347,4 +347,45 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['scim', 'protocol'],
     references: { nist80053: ['SI-10'], iso27001: ['A.8.26'], rfc: ['7643', '7644'] },
   },
+  // iam-iga: joiner, mover, leaver
+  {
+    id: 'JML_LEAVER_NOT_COVERED',
+    title: 'Joiner requests without a leaver step',
+    description:
+      'The collection creates accounts for a platform but has no request that disables, deactivates or suspends them. Provisioning flows need a tested way to take access away.',
+    recommendation:
+      'Add the disable, deactivate or suspend request to the same collection and test it in the same pipeline as the create request.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-613',
+    tags: ['lifecycle', 'joiner-mover-leaver', 'coverage'],
+    references: { nist80053: ['AC-2'], iso27001: ['A.5.16', 'A.5.18'], cisV8: ['5.3'] },
+  },
+  {
+    id: 'LEAVER_DELETE_WITHOUT_DISABLE',
+    title: 'Account deleted without a disable step first',
+    description:
+      'A request hard-deletes an account and no earlier request in the same folder disables or suspends it. Deleting first removes the chance to review and recover.',
+    recommendation: 'Disable or suspend the account first, remove access, and delete only after the retention period.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    tags: ['lifecycle', 'joiner-mover-leaver', 'deprovisioning'],
+    references: { nist80053: ['AC-2'], iso27001: ['A.5.18'], cisV8: ['5.3'] },
+  },
+  {
+    id: 'LEAVER_SESSION_NOT_REVOKED',
+    title: 'Account disabled without revoking sessions or tokens',
+    description:
+      'A request disables an account, but the collection has no session termination, logout or token revocation for the platform. Existing sessions and refresh tokens often stay valid after a disable.',
+    recommendation:
+      'Revoke sessions and tokens as part of the leaver flow, for example Okta DELETE /api/v1/users/{id}/sessions, Entra revokeSignInSessions or Keycloak logout.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-613',
+    tags: ['lifecycle', 'joiner-mover-leaver', 'sessions'],
+    references: { nist80053: ['AC-2', 'AC-12'], iso27001: ['A.5.18', 'A.8.5'], cisV8: ['5.3'], rfc: ['7009'] },
+  },
 ]

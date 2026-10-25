@@ -18,6 +18,7 @@ import {
   type ScopeUsage,
   type TokenKind,
 } from './types'
+import { classifyLifecycle } from './lifecycle'
 import { addToScimInventory } from './scim'
 import { requestParams, safeDecode, splitUrl, type SplitUrl } from './url'
 
@@ -268,6 +269,8 @@ export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile 
       profile.endpoints.push(endpoint)
       addToScimInventory(scimTargets, endpoint, url)
     }
+    const lifecycle = classifyLifecycle({ method: request.method, path: url.path, endpointClass, platform }, request)
+    if (lifecycle && profile.lifecycle.length < MAX_ENDPOINTS) profile.lifecycle.push({ requestId: request.id, platform, ...lifecycle })
     if (request.auth === 'oauth2') addClient(helperClient(request, platform))
     addClient(requestClient(request, endpointClass, params, platform, url))
     collectTokens(request, profile.tokens)

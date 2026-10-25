@@ -28,6 +28,10 @@ export const IAM_RULE_IDS = [
   'SCIM_PRIVILEGE_PATCH',
   'SCIM_CONTENT_TYPE',
   'SCIM_SCHEMA_MISMATCH',
+  // iam-iga: joiner, mover, leaver (V0.2.6)
+  'JML_LEAVER_NOT_COVERED',
+  'LEAVER_DELETE_WITHOUT_DISABLE',
+  'LEAVER_SESSION_NOT_REVOKED',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

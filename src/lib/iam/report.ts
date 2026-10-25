@@ -1,3 +1,4 @@
+import { buildLifecycleMatrix } from './lifecycle'
 import { isEmptyProfile, type IdentityProfile } from './types'
 
 /** The identity section of the JSON report. Everything in it is already masked: client ids and token previews never hold a full value. */
@@ -47,6 +48,7 @@ export function identityReportSection(profile: IdentityProfile | undefined) {
       operations: target.operations,
       requestCount: target.requestIds.length,
     })),
+    lifecycle: buildLifecycleMatrix(profile.lifecycle ?? []),
     tokens: profile.tokens.map((token) => ({
       kind: token.kind,
       requestId: token.requestId,

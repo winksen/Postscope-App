@@ -169,6 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
+| identity (`iam-iga`, V0.2.6) | `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED` (info) |
 | identity (`iam-iga`, V0.2.5) | `SCIM_BULK_DESTRUCTIVE`, `SCIM_PRIVILEGE_PATCH` (warning, info when no admin literal), `SCIM_UNBOUNDED_LIST`, `SCIM_CONTENT_TYPE`, `SCIM_SCHEMA_MISMATCH` (info) |
 | identity (`iam-am`, V0.2.2 to V0.2.4) | `OAUTH_TOKEN_ENDPOINT_HTTP`, `OAUTH_TOKEN_IN_URL`, `JWT_ALG_NONE`, `SAML_ASSERTION_CAPTURED` (critical), `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER`, `SAML_IDP_METADATA_HTTP` (warning), `JWT_EXPIRED_STORED`, `SESSION_COOKIE_FLAGS`, `TOKEN_REVOCATION_NOT_COVERED` (info), `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT`, `OAUTH_PKCE_MISSING`, `OAUTH_PKCE_PLAIN`, `OAUTH_REDIRECT_URI_UNSAFE`, `OAUTH_BROAD_SCOPE` (warning), `OAUTH_STATE_MISSING`, `OAUTH_CLIENT_SECRET_POST` (info). The other identity packs follow in later releases |
 | hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY`, `UNUSED_COLLECTION_VARIABLE`, `SUPPRESSION_EXPIRED`, `SUPPRESSION_INVALID` |
@@ -310,6 +311,16 @@ New endpoint class `session.terminate`: `DELETE` on `/sessions` or `/users/{id}/
 | `SCIM_SCHEMA_MISMATCH` (info) | JSON body whose `schemas` lacks the User, Group, PatchOp or BulkRequest URN (case-insensitive). Paths under `/scim/v1` are skipped because SCIM 1.1 uses other URNs |
 
 `detectIdentitySignals` and the profile now resolve a leading `{{variable}}` first, so `{{scimBase}}/Users` with `scimBase` set to a `/scim/v2` URL counts as SCIM.
+
+### 2.7.6 Joiner, mover, leaver (`iam/lifecycle.ts`)
+
+`classifyLifecycle(context, request)` returns a stage and an action: `joiner/create`, `mover/attribute-update|group-change|role-change`, `leaver/disable|remove-access|revoke|delete`. It only applies to requests that belong to an identity platform or a SCIM endpoint, so an ordinary `DELETE /users/{id}` is ignored. Revocations come from the endpoint classes (`session.terminate`, `oauth.revoke`, `oidc.logout`) and Okta `clear_sessions`. Disabling is read from the method and body: `bodyDisablesAccount` recognizes `active: false`, `accountEnabled: false`, `enabled: false`, `blocked: true`, a disabled `status` and SCIM PatchOp `path: active, value: false`. Supported shapes: SCIM `/Users` and `/Groups`, Okta users, lifecycle, groups and roles, Graph users, `revokeSignInSessions` and role assignments, Keycloak users, groups, role mappings and logout, Auth0 users, Saviynt `createUser` and `updateUser`. Entries are stored in `IdentityProfile.lifecycle`; `buildLifecycleMatrix` turns them into one `LifecycleRow` per platform (`unspecified` for requests without a detected platform), which the JSON report publishes as `identity.lifecycle`.
+
+| Rule | Decision |
+|---|---|
+| `JML_LEAVER_NOT_COVERED` (info) | A platform has joiner requests and no `disable` entry. A request without a platform counts for every platform |
+| `LEAVER_DELETE_WITHOUT_DISABLE` (info) | A `delete` with no earlier `disable` (request order) in the same folder or in a sibling folder with the same parent |
+| `LEAVER_SESSION_NOT_REVOKED` (info) | A `disable` while no `revoke` exists for the platform (or without a platform) |
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -523,6 +534,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamLifecycle.test.ts` | Stage and action table for SCIM, Okta, Entra ID, Keycloak, Auth0 and Saviynt with non-identity guards, account-disabling body shapes, coverage matrix counts, the three leaver rules including folder sequences and per-platform revocation, report section and pack gating |
 | `iamScim.test.ts` | Bulk deletes and unguarded bulks, unbounded lists, privilege PATCH with admin and variable values, severity switch and override, content type and schema URN checks including templated bodies and SCIM 1.1, SCIM inventory and its report section, pack independence |
 | `iamSaml.test.ts` | Assertions in fields, queries, raw bodies and saved examples, error responses and bad base64, bounded decoding, SAML endpoints over http, cookie flags from headers and stored cookies, revocation coverage per platform, session termination classes, pack switch, no assertion content in findings |
 | `iamJwt.test.ts` | Decoding and masking, oversized and malformed tokens, bounded matches, one fixture per JWT rule with safe counterparts, tokens in helpers, variables, saved examples and disabled headers, collection helper scanned once, identity signal, clock option, pack and severity settings, no token or personal value in findings |
@@ -607,3 +619,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.3 | JWT inspection (`iam/jwt.ts`, `iam/jwtChecks.ts`: `JWT_ALG_NONE`, `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER`, `JWT_EXPIRED_STORED`), masked claims, `TokenInspector` and the Token tab in the request details, stored JWTs as identity signal, clock in the identity check context |
 | V0.2.4 | SAML assertion capture (`iam/saml.ts`), SAML endpoints over http, session cookie flags (saved cookie names and flags in `ParsedSavedResponse.cookies`), token revocation coverage (`iam/revocation.ts`), `session.terminate` endpoint class |
 | V0.2.5 | `iam-iga` SCIM rules (`iam/scim.ts`: bulk, unbounded list, privilege PATCH, content type, schema URN), SCIM target inventory in the profile and JSON report, identity signals and profile through leading variables (`resolveUrlText`) |
+| V0.2.6 | Joiner, mover, leaver classification and coverage matrix (`iam/lifecycle.ts`, `identity.lifecycle` in the report), `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED`, performance baseline updated (the analysis worker grew from 36 KB to 45 KB gzip with the identity rule packs of V0.2.3 to V0.2.6) |

@@ -3,6 +3,11 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.6
+
+- Added a joiner, mover and leaver coverage map per identity platform
+- Added checks for missing leaver steps and hard deletes without a disable step
+
 ## V0.2.5
 
 - Added SCIM provisioning checks for destructive bulk operations, unbounded queries and privilege changes

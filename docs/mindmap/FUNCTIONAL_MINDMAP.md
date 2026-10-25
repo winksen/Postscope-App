@@ -142,6 +142,9 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Warning | Destructive or unguarded SCIM bulk | `DELETE` operations in `/Bulk`, or 20 or more operations without `failOnErrors` |
 | Info | SCIM list without filter or paging | `GET /Users` or `/Groups` with no `filter`, `count` or `startIndex` |
 | Info | SCIM protocol details | A body without `application/scim+json`, or without the core schema URN (`User`, `Group`, `PatchOp`, `BulkRequest`) |
+| Info | Joiner requests without a leaver step | Accounts are created for a platform but nothing disables, deactivates or suspends them |
+| Info | Account deleted without a disable step first | A `DELETE` of a user with no earlier disable in the same folder or sibling folders |
+| Info | Account disabled without revoking sessions or tokens | A disable with no session termination, logout or token revocation for the platform |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
@@ -188,6 +191,10 @@ After applying, PostScope re-analyzes the repaired collection, shows the real sc
 The sliders icon in the header opens **Rules**: turn any rule off or change its severity. Changes re-run the audit instantly and are remembered in the browser. Operators can ship **team defaults** (`AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES`, `AUDIT_RULE_PACKS`); "Reset to defaults" returns to them.
 
 Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
+
+### Joiner, mover, leaver map
+
+Identity requests are classified by what they do to an account: **joiner** (create), **mover** (attribute, group or role change) and **leaver** (disable, remove access, revoke sessions or tokens, delete). The profile counts them per platform, which shows at a glance whether a platform can onboard people but not offboard them. The map is part of the JSON report.
 
 ### SCIM inventory
 
