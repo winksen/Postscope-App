@@ -22,6 +22,12 @@ export const IAM_RULE_IDS = [
   'SAML_IDP_METADATA_HTTP',
   'SESSION_COOKIE_FLAGS',
   'TOKEN_REVOCATION_NOT_COVERED',
+  // iam-iga: SCIM provisioning (V0.2.5)
+  'SCIM_BULK_DESTRUCTIVE',
+  'SCIM_UNBOUNDED_LIST',
+  'SCIM_PRIVILEGE_PATCH',
+  'SCIM_CONTENT_TYPE',
+  'SCIM_SCHEMA_MISMATCH',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

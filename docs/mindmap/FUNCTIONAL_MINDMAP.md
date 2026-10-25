@@ -138,6 +138,10 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Info | Session cookie saved without security flags | A saved `Set-Cookie` or stored cookie such as `JSESSIONID` without `Secure`, `HttpOnly` or `SameSite` |
 | Info | Tokens obtained but never revoked | Token requests for a platform with no revocation, logout or session termination request |
 | Info | Expired token still stored | A JWT whose `exp` is in the past |
+| Warning | SCIM PATCH that changes roles, groups or account state | `add roles`, `replace active`, `add members`; a warning when the value is a literal admin role or group, information otherwise |
+| Warning | Destructive or unguarded SCIM bulk | `DELETE` operations in `/Bulk`, or 20 or more operations without `failOnErrors` |
+| Info | SCIM list without filter or paging | `GET /Users` or `/Groups` with no `filter`, `count` or `startIndex` |
+| Info | SCIM protocol details | A body without `application/scim+json`, or without the core schema URN (`User`, `Group`, `PatchOp`, `BulkRequest`) |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
@@ -184,6 +188,10 @@ After applying, PostScope re-analyzes the repaired collection, shows the real sc
 The sliders icon in the header opens **Rules**: turn any rule off or change its severity. Changes re-run the audit instantly and are remembered in the browser. Operators can ship **team defaults** (`AUDIT_DISABLED_RULES`, `AUDIT_SEVERITY_OVERRIDES`, `AUDIT_RULE_PACKS`); "Reset to defaults" returns to them.
 
 Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
+
+### SCIM inventory
+
+For provisioning collections the identity profile also lists each SCIM target system (host or variable), the resources it touches (Users, Groups, Bulk, Schemas) and how many requests of each method go to it. It is part of the JSON report.
 
 ### Token inspector
 

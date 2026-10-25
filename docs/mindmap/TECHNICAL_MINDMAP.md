@@ -169,6 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
+| identity (`iam-iga`, V0.2.5) | `SCIM_BULK_DESTRUCTIVE`, `SCIM_PRIVILEGE_PATCH` (warning, info when no admin literal), `SCIM_UNBOUNDED_LIST`, `SCIM_CONTENT_TYPE`, `SCIM_SCHEMA_MISMATCH` (info) |
 | identity (`iam-am`, V0.2.2 to V0.2.4) | `OAUTH_TOKEN_ENDPOINT_HTTP`, `OAUTH_TOKEN_IN_URL`, `JWT_ALG_NONE`, `SAML_ASSERTION_CAPTURED` (critical), `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER`, `SAML_IDP_METADATA_HTTP` (warning), `JWT_EXPIRED_STORED`, `SESSION_COOKIE_FLAGS`, `TOKEN_REVOCATION_NOT_COVERED` (info), `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT`, `OAUTH_PKCE_MISSING`, `OAUTH_PKCE_PLAIN`, `OAUTH_REDIRECT_URI_UNSAFE`, `OAUTH_BROAD_SCOPE` (warning), `OAUTH_STATE_MISSING`, `OAUTH_CLIENT_SECRET_POST` (info). The other identity packs follow in later releases |
 | hygiene (info) | `MISSING_DESCRIPTION`, `EMPTY_HEADERS`, `DUPLICATE_REQUEST_NAMES`, `PLACEHOLDER_REQUEST_NAMES`, `ROOT_LEVEL_REQUESTS`, `DEEP_FOLDER_NESTING`, `GET_WITH_BODY`, `UNUSED_COLLECTION_VARIABLE`, `SUPPRESSION_EXPIRED`, `SUPPRESSION_INVALID` |
 
@@ -295,6 +296,20 @@ Request-level clients report their requests as affected. A helper defined on the
 | `TOKEN_REVOCATION_NOT_COVERED` (info) | `checkRevocationCoverage(profile)`: platforms with an `oauth.token` endpoint and no `oauth.revoke`, `oidc.logout` or `session.terminate` endpoint. An endpoint with no detected platform covers every platform. Collection-level evidence per platform (`token requests for Okta Workforce Identity`); nothing is reported when no token endpoint exists |
 
 New endpoint class `session.terminate`: `DELETE` on `/sessions` or `/users/{id}/sessions`, `revokeSignInSessions`, `revokeSessions` and `/users/{id}/logout` (also used by the leaver checks in V0.2.6). A `SAMLResponse` parameter is an identity signal.
+
+### 2.7.5 SCIM provisioning (`iam/scim.ts`)
+
+`checkScim` runs for the `iam-iga` pack over the `scim.*` endpoints of the profile. Bodies are read with `parseTemplatedJson`, so unquoted `{{variables}}` still parse, and nothing from a body is copied into evidence except operation names, attribute names and counts. `addToScimInventory` fills `IdentityProfile.scim` (one `ScimTarget` per host or host variable: resources, request count per method, request ids) while the profile is built; the JSON report has the same list under `identity.scim`.
+
+| Rule | Decision |
+|---|---|
+| `SCIM_BULK_DESTRUCTIVE` (warning) | A `/Bulk` body with any `DELETE` operation, or 20 or more operations and no `failOnErrors` |
+| `SCIM_UNBOUNDED_LIST` (info) | `GET` on a path ending in `/Users` or `/Groups` with no `filter`, `count` or `startIndex` parameter |
+| `SCIM_PRIVILEGE_PATCH` (warning or info) | `PATCH` operations whose `path` (filters and URN prefixes stripped) or value keys are `roles`, `entitlements`, `groups`, `members` or `active`. The rule is a warning for the run when a non-`remove` operation carries a literal value that names an administrative role or group (`admin`, `administrator`, `owner`, `root`, `superuser`, `privileged`, plural forms included), otherwise info (`FindingCollector.setSeverity`; a user override still wins) |
+| `SCIM_CONTENT_TYPE` (info) | `POST`, `PUT` and `PATCH` with a body and a Content-Type that is missing or not `application/scim+json` |
+| `SCIM_SCHEMA_MISMATCH` (info) | JSON body whose `schemas` lacks the User, Group, PatchOp or BulkRequest URN (case-insensitive). Paths under `/scim/v1` are skipped because SCIM 1.1 uses other URNs |
+
+`detectIdentitySignals` and the profile now resolve a leading `{{variable}}` first, so `{{scimBase}}/Users` with `scimBase` set to a `/scim/v2` URL counts as SCIM.
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -508,6 +523,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamScim.test.ts` | Bulk deletes and unguarded bulks, unbounded lists, privilege PATCH with admin and variable values, severity switch and override, content type and schema URN checks including templated bodies and SCIM 1.1, SCIM inventory and its report section, pack independence |
 | `iamSaml.test.ts` | Assertions in fields, queries, raw bodies and saved examples, error responses and bad base64, bounded decoding, SAML endpoints over http, cookie flags from headers and stored cookies, revocation coverage per platform, session termination classes, pack switch, no assertion content in findings |
 | `iamJwt.test.ts` | Decoding and masking, oversized and malformed tokens, bounded matches, one fixture per JWT rule with safe counterparts, tokens in helpers, variables, saved examples and disabled headers, collection helper scanned once, identity signal, clock option, pack and severity settings, no token or personal value in findings |
 | `iamOAuth.test.ts` | One fixture per OAuth rule with safe counterparts (code flow with S256, confidential clients, localhost redirects, variables), helpers at collection, folder and request level, scope catalog, redirect reasons, no duplicate with `SECRET_IN_QUERY`, pack, override and score behavior, no secrets in identity findings |
@@ -590,3 +606,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.2 | `iam-am` OAuth 2.0 and OpenID Connect rules (`iam/oauth.ts`: implicit and password grants, PKCE missing and plain, unsafe redirect URIs, missing state, token endpoints over http, tokens and codes in URLs, broad scopes, client secret in the body), identity rule registry (`iam/rules.ts`, `iam/ruleIds.ts`, `iam/checks.ts`, `FindingSink`), `localHost.ts`, identity signals from OAuth parameters, performance baseline updated (the identity profile adds about 50% to parse and audit time on the OAuth-heavy 6000-request benchmark and 12 KB gzip to the worker; collections without identity signals skip it) |
 | V0.2.3 | JWT inspection (`iam/jwt.ts`, `iam/jwtChecks.ts`: `JWT_ALG_NONE`, `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER`, `JWT_EXPIRED_STORED`), masked claims, `TokenInspector` and the Token tab in the request details, stored JWTs as identity signal, clock in the identity check context |
 | V0.2.4 | SAML assertion capture (`iam/saml.ts`), SAML endpoints over http, session cookie flags (saved cookie names and flags in `ParsedSavedResponse.cookies`), token revocation coverage (`iam/revocation.ts`), `session.terminate` endpoint class |
+| V0.2.5 | `iam-iga` SCIM rules (`iam/scim.ts`: bulk, unbounded list, privilege PATCH, content type, schema URN), SCIM target inventory in the profile and JSON report, identity signals and profile through leading variables (`resolveUrlText`) |

@@ -1,4 +1,5 @@
 import type { ParsedCollection } from '../parser'
+import { resolveUrlText } from './url'
 
 /**
  * Cheap check that decides whether the identity packs switch on by themselves. It only needs a hint: the platform and
@@ -40,11 +41,12 @@ const JWT_SHAPE = /eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\./
 export function detectIdentitySignals(parsed: ParsedCollection): boolean {
   if ((parsed.authTypes.oauth2 ?? 0) > 0) return true
   return parsed.requests.some((request) => {
-    if (IDENTITY_HOST.test(hostOf(request.url))) return true
-    if (OAUTH_URL_PARAMETER.test(request.url)) return true
+    const url = resolveUrlText(request.url, parsed)
+    if (IDENTITY_HOST.test(hostOf(url))) return true
+    if (OAUTH_URL_PARAMETER.test(url)) return true
     if (request.headers.some((header) => JWT_SHAPE.test(header.value)) || request.authFields?.some((field) => JWT_SHAPE.test(field.value)))
       return true
     if (request.bodyFields?.some((field) => OAUTH_FORM_FIELD.test(field.key.trim()))) return true
-    return IDENTITY_PATH.some((pattern) => pattern.test(request.url))
+    return IDENTITY_PATH.some((pattern) => pattern.test(url))
   })
 }

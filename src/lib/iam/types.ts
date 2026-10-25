@@ -146,6 +146,17 @@ export interface IdentityToken {
   preview: string
 }
 
+/** SCIM operations a collection sends to one target system. */
+export interface ScimTarget {
+  /** Literal host, or the name of the variable that stands for it. */
+  target: string
+  platform?: PlatformId
+  resources: string[]
+  /** Request count per HTTP method. */
+  operations: Record<string, number>
+  requestIds: string[]
+}
+
 export interface IdentityProfile {
   platforms: DetectedPlatform[]
   endpoints: IdentityEndpoint[]
@@ -153,10 +164,12 @@ export interface IdentityProfile {
   scopes: ScopeUsage[]
   grants: GrantUsage[]
   tokens: IdentityToken[]
+  /** SCIM provisioning inventory per target system (V0.2.5). */
+  scim: ScimTarget[]
 }
 
 export function emptyIdentityProfile(): IdentityProfile {
-  return { platforms: [], endpoints: [], oauthClients: [], scopes: [], grants: [], tokens: [] }
+  return { platforms: [], endpoints: [], oauthClients: [], scopes: [], grants: [], tokens: [], scim: [] }
 }
 
 export function isEmptyProfile(profile: IdentityProfile | undefined): boolean {

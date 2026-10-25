@@ -279,4 +279,72 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['oauth', 'sessions', 'coverage'],
     references: { nist80053: ['AC-12', 'IA-5'], iso27001: ['A.8.5'], rfc: ['7009'] },
   },
+  // iam-iga: SCIM provisioning
+  {
+    id: 'SCIM_BULK_DESTRUCTIVE',
+    title: 'Destructive or unguarded SCIM bulk operation',
+    description:
+      'A SCIM /Bulk request deletes resources, or sends many operations without failOnErrors, so one bad entry can run on unchecked across the whole batch.',
+    recommendation: 'Split destructive bulk work into reviewed batches, set failOnErrors, and disable accounts before deleting them.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-1220',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['scim', 'provisioning', 'bulk'],
+    references: { nist80053: ['AC-2', 'AC-6'], iso27001: ['A.5.16', 'A.5.18'], cisV8: ['5.3'], rfc: ['7644'] },
+  },
+  {
+    id: 'SCIM_UNBOUNDED_LIST',
+    title: 'SCIM list without filter or paging',
+    description:
+      'A SCIM request lists all Users or Groups without filter, count or startIndex. It can return the whole directory, including personal data.',
+    recommendation: 'Add a filter, or page with count and startIndex.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-770',
+    owasp: 'API4:2023 Unrestricted Resource Consumption',
+    tags: ['scim', 'provisioning', 'paging'],
+    references: { nist80053: ['AC-6', 'SI-12'], iso27001: ['A.5.15', 'A.5.34'], rfc: ['7644'] },
+  },
+  {
+    id: 'SCIM_PRIVILEGE_PATCH',
+    title: 'SCIM PATCH that changes roles, groups or account state',
+    description:
+      'A SCIM PATCH touches roles, entitlements, groups, members or active. These changes grant or remove access. It is a warning when the value is a literal administrative role or group.',
+    recommendation:
+      'Review privilege changes like code: use variables for role and group ids, and keep administrative grants out of shared collections.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-269',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['scim', 'provisioning', 'privileges'],
+    references: { nist80053: ['AC-2', 'AC-6'], iso27001: ['A.5.18', 'A.8.2'], cisV8: ['5.4', '6.8'], rfc: ['7644'] },
+  },
+  {
+    id: 'SCIM_CONTENT_TYPE',
+    title: 'SCIM request without application/scim+json',
+    description:
+      'A SCIM request with a body does not declare Content-Type application/scim+json. Strict SCIM servers reject it, and others treat the payload differently.',
+    recommendation: 'Send Content-Type: application/scim+json.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    tags: ['scim', 'protocol'],
+    references: { nist80053: ['SI-10'], iso27001: ['A.8.26'], rfc: ['7644'] },
+  },
+  {
+    id: 'SCIM_SCHEMA_MISMATCH',
+    title: 'SCIM body without the expected schema URN',
+    description:
+      'The schemas attribute of a SCIM body is missing or lacks the URN for the resource or message, such as urn:ietf:params:scim:schemas:core:2.0:User.',
+    recommendation: 'List the core schema URN of the resource (User, Group, PatchOp or BulkRequest) in schemas.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    tags: ['scim', 'protocol'],
+    references: { nist80053: ['SI-10'], iso27001: ['A.8.26'], rfc: ['7643', '7644'] },
+  },
 ]

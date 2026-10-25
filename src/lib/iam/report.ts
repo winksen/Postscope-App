@@ -40,6 +40,13 @@ export function identityReportSection(profile: IdentityProfile | undefined) {
     })),
     scopes: profile.scopes.map((scope) => ({ scope: scope.scope, clients: scope.clients, requestCount: scope.requestIds.length })),
     grants: profile.grants.map((grant) => ({ grant: grant.grant, requestCount: grant.requestIds.length })),
+    scim: (profile.scim ?? []).map((target) => ({
+      target: target.target,
+      platform: target.platform,
+      resources: target.resources,
+      operations: target.operations,
+      requestCount: target.requestIds.length,
+    })),
     tokens: profile.tokens.map((token) => ({
       kind: token.kind,
       requestId: token.requestId,

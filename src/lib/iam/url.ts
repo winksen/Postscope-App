@@ -32,6 +32,11 @@ function resolveLeading(url: string, parsed: ParsedCollection): { url: string; v
   return { url: current, variable }
 }
 
+/** The URL with a leading `{{variable}}` replaced by its value, when the selected environment, collection or globals define one. */
+export function resolveUrlText(url: string, parsed: ParsedCollection): string {
+  return url.startsWith('{{') ? resolveLeading(url, parsed).url : url
+}
+
 export function normalizePath(path: string): string {
   const bare = path.split(/[?#]/)[0]
   if (!bare.includes('{{') && !bare.includes('/:') && !bare.includes('//')) {

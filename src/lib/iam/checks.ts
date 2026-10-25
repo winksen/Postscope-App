@@ -4,6 +4,7 @@ import { checkJwts } from './jwtChecks'
 import { checkOAuth } from './oauth'
 import { checkRevocationCoverage } from './revocation'
 import { checkSamlAndSessions } from './saml'
+import { checkScim } from './scim'
 import type { FindingSink } from './sink'
 import type { IdentityProfile } from './types'
 
@@ -26,4 +27,5 @@ export function runIdentityChecks(
     checkSamlAndSessions(parsed, profile, out)
     checkRevocationCoverage(profile, out)
   }
+  if (packs.has('iam-iga')) checkScim(parsed, profile, out)
 }

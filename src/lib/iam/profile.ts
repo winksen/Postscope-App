@@ -14,9 +14,11 @@ import {
   type OAuthClient,
   type PkceState,
   type PlatformId,
+  type ScimTarget,
   type ScopeUsage,
   type TokenKind,
 } from './types'
+import { addToScimInventory } from './scim'
 import { requestParams, safeDecode, splitUrl, type SplitUrl } from './url'
 
 const MAX_ENDPOINTS = 2000
@@ -245,6 +247,7 @@ export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile 
   const clients = new Map<string, OAuthClient>()
   const scopeUse = new Map<string, { requestIds: string[]; clients: Set<string> }>()
   const grantUse = new Map<GrantType, string[]>()
+  const scimTargets = new Map<string, ScimTarget>()
 
   const addClient = (client: OAuthClient | null) => {
     if (!client) return
@@ -263,6 +266,7 @@ export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile 
       if (platform) endpoint.platform = platform
       if (url.host) endpoint.host = url.host
       profile.endpoints.push(endpoint)
+      addToScimInventory(scimTargets, endpoint, url)
     }
     if (request.auth === 'oauth2') addClient(helperClient(request, platform))
     addClient(requestClient(request, endpointClass, params, platform, url))
@@ -276,6 +280,7 @@ export function buildIdentityProfile(parsed: ParsedCollection): IdentityProfile 
       profile.tokens.push({ kind, location: `collection variable ${variable.key}`, preview: evidencePreview(variable.value) })
   }
 
+  profile.scim = [...scimTargets.values()]
   profile.oauthClients = [...clients.values()]
   for (const client of profile.oauthClients) {
     const grantRequests = grantUse.get(client.grant) ?? []
