@@ -1,0 +1,287 @@
+{
+  "info": {
+    "name": "IAM sample: access management",
+    "description": "OAuth 2.0, OpenID Connect, JWT and SAML requests on fictional tenants, with the mistakes PostScope looks for. Every value is made up.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "clientSecret",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authorization code",
+      "item": [
+        {
+          "name": "Authorize without PKCE or state",
+          "request": {
+            "method": "GET",
+            "url": "https://example-tenant.okta.com/oauth2/default/v1/authorize?response_type=code&client_id=0oasamplespa0001&redirect_uri=https%3A%2F%2Fapp.sample-widgets.net%2Fcallback&scope=openid%20profile",
+            "description": "Authorize without PKCE or state. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Authorize with PKCE",
+          "request": {
+            "method": "GET",
+            "url": "https://example-tenant.okta.com/oauth2/default/v1/authorize?response_type=code&client_id=0oasamplespa0002&redirect_uri=https%3A%2F%2Fapp.sample-widgets.net%2Fcallback&scope=openid%20profile&state={{state}}&code_challenge={{codeChallenge}}&code_challenge_method=S256",
+            "description": "Authorize with PKCE. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Authorize with an unsafe redirect",
+          "request": {
+            "method": "GET",
+            "url": "https://example-tenant.okta.com/oauth2/default/v1/authorize?response_type=code&client_id=0oasamplespa0003&redirect_uri=http%3A%2F%2Fapp.sample-widgets.net%2Fcallback%3Fnext%3Dhttps%3A%2F%2Fother.sample-widgets.net&state={{state}}&code_challenge={{codeChallenge}}&code_challenge_method=S256",
+            "description": "Authorize with an unsafe redirect. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Authorize with the implicit grant",
+          "request": {
+            "method": "GET",
+            "url": "https://example-tenant.okta.com/oauth2/default/v1/authorize?response_type=token&client_id=0oasamplespa0004&redirect_uri=https%3A%2F%2Fapp.sample-widgets.net%2Fcallback&state={{state}}",
+            "description": "Authorize with the implicit grant. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Callback with a code in the URL",
+          "request": {
+            "method": "GET",
+            "url": "https://app.sample-widgets.net/callback?code=SampleAuthorizationCode0000&state={{state}}",
+            "description": "Callback with a code in the URL. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tokens",
+      "item": [
+        {
+          "name": "Token with a client secret in the body",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.okta.com/oauth2/default/v1/token",
+            "description": "Token with a client secret in the body. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "okta.users.manage"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Token for a user with the password grant",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.okta.com/oauth2/default/v1/token",
+            "description": "Token for a user with the password grant. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "username",
+                  "value": "{{username}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{password}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Token over plain HTTP",
+          "request": {
+            "method": "POST",
+            "url": "http://idp.sample-widgets.net/oauth2/token",
+            "description": "Token over plain HTTP. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Call an API with a stored unsigned token",
+          "request": {
+            "method": "GET",
+            "url": "https://api.sample-widgets.net/orders",
+            "description": "Call an API with a stored unsigned token. Sample request for PostScope identity checks.",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2V4YW1wbGUtdGVuYW50Lm9rdGEuY29tL29hdXRoMi9kZWZhdWx0Iiwic3ViIjoic2FtcGxlLXVzZXIiLCJlbWFpbCI6InNhbXBsZS51c2VyQHNhbXBsZS13aWRnZXRzLm5ldCIsInJvbGVzIjpbInNhbXBsZS1hZG1pbiJdLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MTcwMDAwMzYwMH0."
+              }
+            ]
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Federation",
+      "item": [
+        {
+          "name": "SAML assertion consumer",
+          "request": {
+            "method": "POST",
+            "url": "https://sp.sample-widgets.net/saml2/acs",
+            "description": "SAML assertion consumer. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "SAMLResponse",
+                  "value": "PHNhbWxwOlJlc3BvbnNlIHhtbG5zOnNhbWxwPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6cHJvdG9jb2wiPjxzYW1sOklzc3VlciB4bWxuczpzYW1sPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YXNzZXJ0aW9uIj5odHRwczovL2lkcC5zYW1wbGUtd2lkZ2V0cy5uZXQvc2FtbDwvc2FtbDpJc3N1ZXI+PHNhbWw6QXNzZXJ0aW9uIHhtbG5zOnNhbWw9InVybjpvYXNpczpuYW1lczp0YzpTQU1MOjIuMDphc3NlcnRpb24iIElEPSJfc2FtcGxlIj48c2FtbDpTdWJqZWN0PjxzYW1sOk5hbWVJRD5zYW1wbGUudXNlckBzYW1wbGUtd2lkZ2V0cy5uZXQ8L3NhbWw6TmFtZUlEPjwvc2FtbDpTdWJqZWN0Pjwvc2FtbDpBc3NlcnRpb24+PC9zYW1scDpSZXNwb25zZT4="
+                },
+                {
+                  "key": "RelayState",
+                  "value": "sample"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Login",
+              "originalRequest": {
+                "method": "POST",
+                "url": "https://sp.sample-widgets.net/saml2/acs",
+                "header": []
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Set-Cookie",
+                  "value": "JSESSIONID=sample-session-value; Path=/"
+                }
+              ],
+              "body": "{}"
+            }
+          ]
+        },
+        {
+          "name": "Identity provider metadata over HTTP",
+          "request": {
+            "method": "GET",
+            "url": "http://idp.sample-widgets.net/saml2/idp/metadata",
+            "description": "Identity provider metadata over HTTP. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Retired endpoints and tenants",
+      "item": [
+        {
+          "name": "Azure AD Graph users",
+          "request": {
+            "method": "GET",
+            "url": "https://graph.windows.net/sample-tenant.onmicrosoft.com/users?api-version=1.6",
+            "description": "Azure AD Graph users. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Entra token (v1.0 endpoint)",
+          "request": {
+            "method": "POST",
+            "url": "https://login.microsoftonline.com/sample-tenant.onmicrosoft.com/oauth2/token",
+            "description": "Entra token (v1.0 endpoint). Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Okta preview tenant",
+          "request": {
+            "method": "GET",
+            "url": "https://example-tenant.oktapreview.com/api/v1/users?limit=1",
+            "description": "Okta preview tenant. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

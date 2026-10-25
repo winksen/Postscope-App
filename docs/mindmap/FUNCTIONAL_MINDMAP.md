@@ -225,6 +225,10 @@ Identity requests are classified by what they do to an account: **joiner** (crea
 
 For provisioning collections the identity profile also lists each SCIM target system (host or variable), the resources it touches (Users, Groups, Bulk, Schemas) and how many requests of each method go to it. It is part of the JSON report.
 
+### Identity samples and guide
+
+Three samples on fictional tenants show the identity findings: **IAM: access management** (OAuth, JWT, SAML, retired endpoints), **IAM: provisioning and governance** (SCIM, joiner mover leaver, access requests, reviews, personal data) and **IAM: privileged access** (vault, PAM retrieval, admin plane). They are in the sample list of the landing page and in `public/samples`. [../IAM.md](../IAM.md) explains the checks per domain, how the packs switch on, how to read the Identity page and the conventions for IAM collections.
+
 ### Identity repairs
 
 The Repair center covers the identity findings that can be changed safely:

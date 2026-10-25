@@ -108,8 +108,8 @@ flowchart LR
 | `dist-node/` | Build output of `npm run build:node` (gitignored): `cli.js` and `server.js` |
 | `tests/` | `node:test` suites run through `tsx` (`npm test`) |
 | `scripts/` | Demo collection generator, test runner, `release-check.mjs`, `bench.mjs` and `bench-baseline.json` (performance budgets) |
-| `public/samples/` | Bundled sample collections |
-| `docs/` | Architecture, deployment, security, design system, mindmaps |
+| `public/samples/` | Bundled sample collections, including `iam-access-management`, `iam-provisioning-governance` and `iam-privileged-access` (registered in `sampleCollections.ts`; `tests/iamSamples.test.ts` checks the findings each one demonstrates, that hosts are fictional and that sanitizing leaves no critical secret) |
+| `docs/` | Architecture, deployment, security, IAM guide (`IAM.md`), design system, mindmaps |
 | `mindmap/ROADMAP.md` | Release plan and conventions (one commit per version) |
 | `CHANGELOG.md` | Shipped changes per version, newest first |
 
@@ -601,6 +601,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamSamples.test.ts` | The three IAM samples are registered, use fictional hosts, produce the findings they demonstrate on the platforms they target, and hold no real credential |
 | `iamRepair.test.ts` | PKCE upgrade and plain to S256, request-style flows as guidance, migration guidance for implicit, password and broad scope, state added to string and object URLs and idempotent, tenant variables for Okta and Entra with host and path rewriting, captured credential removal that keeps the rest of the example, manual fallback outside saved examples, selection of repairs |
 | `iamReports.test.ts` | Identity appendix and compliance tables in Markdown and HTML, absent for plain collections, grouping by control for each framework, schema-valid JSON, SARIF identity summary, CSV content, masking, formula protection and CLI flags |
 | `iamPlatforms.test.ts` | Profile completeness for all 17 platforms, legacy SailPoint, CyberArk and Vault KV checks, repeated tenant identifiers per platform with masking and variable guards, mixed environments including variable-resolved hosts, retired API table with current counterparts, platform endpoint rules, pack gating |
@@ -701,3 +702,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.12 | Identity page (`IdentityPage.tsx`: platform cards, OAuth clients, scopes, tokens, joiner mover leaver matrix, privileged operations, SCIM targets, identity findings), `identity` address and sidebar item with identity finding badge, e2e coverage |
 | V0.2.13 | Identity appendix in Markdown and HTML, `identity` and `compliance` in JSON, SARIF identity summary, compliance mapping tables and `--compliance` grouping (`compliance.ts`), `identity-inventory.csv` export (`--format identity-csv`, export menu) |
 | V0.2.14 | Identity repairs (`iam/repairs.ts`: PKCE with S256, authorize state, tenant identifier variables, removal of captured tokens, assertions and retrieved secrets from saved examples) and manual migration guidance for implicit and password grants and broad scopes |
+| V0.2.15 | IAM samples (`iam-access-management`, `iam-provisioning-governance`, `iam-privileged-access`), IAM guide `docs/IAM.md`, README, SECURITY and mindmap updates; Track B (V0.2.0 to V0.2.15) is complete: 77 rules in five packs, identity profile, Identity page, reports, compliance mapping, repairs |

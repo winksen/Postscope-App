@@ -51,6 +51,7 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 
 - [docs/VISUAL_STYLE.md](docs/VISUAL_STYLE.md): voice, punctuation, colors, typography, and layout personality
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): component patterns and Tailwind conventions
+- [docs/IAM.md](docs/IAM.md): identity and access management checks, packs, the Identity page and conventions for IAM collections
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/CI.md](docs/CI.md): architecture, threat model, operations and CI integration (GitHub Action, GitLab, Azure DevOps, pre-commit)
 - [docs/schemas/postscope-report.v2.schema.json](docs/schemas/postscope-report.v2.schema.json): JSON Schema of the JSON report
 - [docs/mindmap/](docs/mindmap): functional and technical mindmaps (the source of truth for how the code is organized)
@@ -63,7 +64,8 @@ Path alias: `@/` → `src/` (see `vite.config.ts`).
 - **Import by drag-and-drop, file picker or pasted JSON**: accepts `.json` and typical `*.postman_collection.json` exports, plus optional `*.postman_environment.json` and `*.postman_globals.json` files
 - **Environments and globals**: checked for secrets, used to resolve `{{baseUrl}}` for transport checks, with an environment selector and a sanitized export
 - **Collection parsing**: folders, HTTP methods, URLs, headers, bodies, auth inheritance, scripts, saved responses, GraphQL and other request protocols, `{{variable}}` usage vs. defined collection variables
-- **Automated audit** with 33 rules, severities (critical / warning / info), categories (secrets, variables, auth, hygiene) and 32 provider secret patterns
+- **Automated audit** with 77 rules in five packs, severities (critical / warning / info), categories (secrets, variables, auth, identity, hygiene), compliance references (NIST SP 800-53, ISO/IEC 27001, CIS v8) and 32 provider secret patterns
+- **Identity and access management**: OAuth 2.0, OpenID Connect, JWT, SAML, SCIM, joiner mover leaver, governance APIs, personal data, PAM and vault, admin plane and 17 platform profiles (Okta, Entra ID, Auth0, Ping, Keycloak, SailPoint, CyberArk, HashiCorp Vault, AWS, Azure, Google Cloud and more). The identity packs switch on by themselves, there is an Identity page, an identity inventory CSV, identity repairs and three IAM samples. See [docs/IAM.md](docs/IAM.md)
 - **Overview**: stat cards, method and auth distribution charts, request tree with search
 - **Requests, Security and Hygiene**: filterable findings with masked evidence and per-request context
 - **Repair**: guided fixes (secrets to variables, base URL variables, auth cleanup and more) and a sanitized download

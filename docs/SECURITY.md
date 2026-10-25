@@ -52,6 +52,8 @@ Postman collections routinely contain live credentials: bearer tokens, API keys,
 
 ## 3. Detection coverage
 
+Identity and access management checks (OAuth, JWT, SAML, SCIM, governance, PAM, admin plane and platform profiles) are listed per area below and explained in [IAM.md](IAM.md).
+
 The audit engine (`src/lib/auditor.ts`, rules in `src/lib/rules.ts`) inspects:
 
 | Location | Examples |

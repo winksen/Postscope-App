@@ -2,7 +2,7 @@
 
 > **Audience:** the agent or engineer implementing the next releases, plus reviewers who want to know what is coming and why.
 > **Baseline:** `Update V0.1.24` (commit `e97a99c`, 2026-10-08). Every item below was derived from a read of the code and docs at that commit.
-> **Status:** in progress. Shipped releases get their commit hash in the `Commit` column of section 2; the plan text below is kept as written for history.
+> **Status:** Track A (V0.1.25 to V0.1.45) and Track B (V0.2.0 to V0.2.15) are implemented. The hash of the newest release is filled in by the commit that follows it. Shipped releases get their commit hash in the `Commit` column of section 2; the plan text below is kept as written for history.
 
 ---
 
@@ -131,7 +131,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.2.11 | `v0.2.11` | B4 | Feature | Platform profiles: IGA, PAM and cloud IAM | `2f250f2` |
 | V0.2.12 | `v0.2.12` | B5 | Feature | Identity page | `bd1de02` |
 | V0.2.13 | `v0.2.13` | B5 | Feature | IAM reporting and compliance mapping | `2af9309` |
-| V0.2.14 | `v0.2.14` | B5 | Enhancement | IAM repair fixes | |
+| V0.2.14 | `v0.2.14` | B5 | Enhancement | IAM repair fixes | `cc878ec` |
 | V0.2.15 | `v0.2.15` | B5 | Feature, Docs | IAM sample collections and guide | |
 
 ---

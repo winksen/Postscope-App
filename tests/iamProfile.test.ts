@@ -315,7 +315,7 @@ test('literal tokens are inventoried with masked previews only', () => {
 test('the profile is empty for collections that have nothing to do with identity', () => {
   assert.ok(isEmptyProfile(buildIdentityProfile(parseCollection(cleanCollection()))))
   const samples = path.resolve('public/samples')
-  for (const file of fs.readdirSync(samples).filter((name) => name.endsWith('.postman_collection.json'))) {
+  for (const file of fs.readdirSync(samples).filter((name) => name.endsWith('.postman_collection.json') && !name.startsWith('iam-'))) {
     const profile = buildIdentityProfile(parseCollection(JSON.parse(fs.readFileSync(path.join(samples, file), 'utf8'))))
     // The samples call an application's own OAuth endpoints, which are classified, but no identity platform.
     assert.equal(profile.platforms.length, 0, `${file} has no identity platform`)

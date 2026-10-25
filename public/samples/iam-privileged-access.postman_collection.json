@@ -1,0 +1,245 @@
+{
+  "info": {
+    "name": "IAM sample: privileged access",
+    "description": "Vault, PAM and admin plane requests on fictional systems, with the mistakes PostScope looks for. Every value is made up.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Password retrieval",
+      "item": [
+        {
+          "name": "Log on as a built-in account",
+          "request": {
+            "method": "POST",
+            "url": "https://pvwa.sample-widgets.net/PasswordVault/API/Auth/CyberArk/Logon",
+            "description": "Log on as a built-in account. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"Administrator\",\n  \"password\": \"{{pvwaPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Retrieve a password",
+          "request": {
+            "method": "POST",
+            "url": "https://pvwa.sample-widgets.net/PasswordVault/API/Accounts/{{accountId}}/Password/Retrieve",
+            "description": "Retrieve a password. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "originalRequest": {
+                "method": "POST",
+                "url": "https://pvwa.sample-widgets.net/PasswordVault/API/Accounts/{{accountId}}/Password/Retrieve",
+                "header": []
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "\"Vlt9-Kp2x-Lm4n-Qz8r\""
+            }
+          ]
+        },
+        {
+          "name": "Check out a credential",
+          "request": {
+            "method": "POST",
+            "url": "https://beyondtrust.sample-widgets.net/BeyondTrust/api/public/v3/Requests",
+            "description": "Check out a credential. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"SystemId\": 1,\n  \"AccountId\": 2,\n  \"DurationMinutes\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add a safe member with every right",
+          "request": {
+            "method": "POST",
+            "url": "https://pvwa.sample-widgets.net/PasswordVault/API/Safes/{{safe}}/Members",
+            "description": "Add a safe member with every right. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberName\": \"sample-team\",\n  \"permissions\": {\n    \"useAccounts\": true,\n    \"retrieveAccounts\": true,\n    \"listAccounts\": true,\n    \"addAccounts\": true,\n    \"updateAccountContent\": true,\n    \"updateAccountProperties\": true,\n    \"initiateCPMAccountManagementOperations\": true,\n    \"specifyNextAccountContent\": true,\n    \"renameAccounts\": true,\n    \"deleteAccounts\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Vault",
+      "item": [
+        {
+          "name": "Read a secret with a root token",
+          "request": {
+            "method": "GET",
+            "url": "https://vault.sample-widgets.net:8200/v1/secret/data/app",
+            "description": "Read a secret with a root token. Sample request for PostScope identity checks.",
+            "header": [
+              {
+                "key": "X-Vault-Token",
+                "value": "root"
+              }
+            ]
+          },
+          "response": [
+            {
+              "name": "Example",
+              "originalRequest": {
+                "method": "GET",
+                "url": "https://vault.sample-widgets.net:8200/v1/secret/data/app",
+                "header": []
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"data\": {\n    \"data\": {\n      \"password\": \"Wrt5-Hd3c-Bn7m-Yx1s\"\n    },\n    \"metadata\": {\n      \"version\": 3\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Generate a root token",
+          "request": {
+            "method": "POST",
+            "url": "https://vault.sample-widgets.net:8200/v1/sys/generate-root/attempt",
+            "description": "Generate a root token. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Write a secret with the wrong body shape",
+          "request": {
+            "method": "POST",
+            "url": "https://vault.sample-widgets.net:8200/v1/secret/app",
+            "description": "Write a secret with the wrong body shape. Sample request for PostScope identity checks.",
+            "header": [
+              {
+                "key": "X-Vault-Token",
+                "value": "{{vaultToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"password\": \"{{password}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin plane",
+      "item": [
+        {
+          "name": "Assign a top-tier role",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.okta.com/api/v1/users/{{userId}}/roles",
+            "description": "Assign a top-tier role. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SUPER_ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Turn off a conditional access policy",
+          "request": {
+            "method": "PATCH",
+            "url": "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies/{{policyId}}",
+            "description": "Turn off a conditional access policy. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"disabled\",\n  \"grantControls\": {\n    \"operator\": \"OR\",\n    \"builtInControls\": [\n      \"mfa\"\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create a client secret",
+          "request": {
+            "method": "POST",
+            "url": "https://graph.microsoft.com/v1.0/applications/{{appId}}/addPassword",
+            "description": "Create a client secret. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passwordCredential\": {\n    \"displayName\": \"sample\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "Example",
+              "originalRequest": {
+                "method": "POST",
+                "url": "https://graph.microsoft.com/v1.0/applications/{{appId}}/addPassword",
+                "header": []
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\"keyId\":\"sample\",\"secretText\":\"sample-only-secret-value\"}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "info": {
+    "name": "IAM sample: provisioning and governance",
+    "description": "SCIM provisioning, joiner mover leaver requests, access requests and certifications on fictional systems. Every value is made up.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "SCIM",
+      "item": [
+        {
+          "name": "List all users",
+          "request": {
+            "method": "GET",
+            "url": "https://scim.sample-widgets.net/scim/v2/Users",
+            "description": "List all users. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "url": "https://scim.sample-widgets.net/scim/v2/Users",
+            "description": "Create user. Sample request for PostScope identity checks.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"sample.user\",\n  \"name\": {\n    \"givenName\": \"Sample\",\n    \"familyName\": \"User\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Grant an administrator role",
+          "request": {
+            "method": "PATCH",
+            "url": "https://scim.sample-widgets.net/scim/v2/Users/{{userId}}",
+            "description": "Grant an administrator role. Sample request for PostScope identity checks.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:PatchOp\"\n  ],\n  \"Operations\": [\n    {\n      \"op\": \"add\",\n      \"path\": \"roles\",\n      \"value\": [\n        {\n          \"value\": \"Domain Admins\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk delete",
+          "request": {
+            "method": "POST",
+            "url": "https://scim.sample-widgets.net/scim/v2/Bulk",
+            "description": "Bulk delete. Sample request for PostScope identity checks.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/scim+json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schemas\": [\n    \"urn:ietf:params:scim:api:messages:2.0:BulkRequest\"\n  ],\n  \"Operations\": [\n    {\n      \"method\": \"DELETE\",\n      \"path\": \"/Users/{{userId}}\"\n    },\n    {\n      \"method\": \"DELETE\",\n      \"path\": \"/Users/{{otherUserId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Joiner mover leaver",
+      "item": [
+        {
+          "name": "Create account",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.okta.com/api/v1/users?activate=false",
+            "description": "Create account. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profile\": {\n    \"login\": \"{{login}}\",\n    \"email\": \"{{email}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update department",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.okta.com/api/v1/users/{{userId}}",
+            "description": "Update department. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profile\": {\n    \"department\": \"{{department}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete account",
+          "request": {
+            "method": "DELETE",
+            "url": "https://example-tenant.okta.com/api/v1/users/{{userId}}",
+            "description": "Delete account. Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Access requests and reviews",
+      "item": [
+        {
+          "name": "Request access for yourself",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.api.identitynow.com/v3/access-requests",
+            "description": "Request access for yourself. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestedFor\": [\n    \"sample.user\"\n  ],\n  \"requestedBy\": \"sample.user\",\n  \"approver\": \"sample.user\",\n  \"requestedItems\": [\n    {\n      \"type\": \"ENTITLEMENT\",\n      \"id\": \"{{entitlementId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve a whole review",
+          "request": {
+            "method": "POST",
+            "url": "https://example-tenant.api.identitynow.com/v3/certifications/{{certificationId}}/decide",
+            "description": "Approve a whole review. Sample request for PostScope identity checks.",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"id\": \"item-1\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-2\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-3\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-4\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-5\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-6\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-7\",\n    \"decision\": \"APPROVE\"\n  },\n  {\n    \"id\": \"item-8\",\n    \"decision\": \"APPROVE\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Read an identity (saved example holds personal data)",
+          "request": {
+            "method": "GET",
+            "url": "https://example-tenant.api.identitynow.com/v3/identities/{{identityId}}",
+            "description": "Read an identity (saved example holds personal data). Sample request for PostScope identity checks.",
+            "header": []
+          },
+          "response": [
+            {
+              "name": "Example",
+              "originalRequest": {
+                "method": "GET",
+                "url": "https://example-tenant.api.identitynow.com/v3/identities/{{identityId}}",
+                "header": []
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [],
+              "body": "{\n  \"id\": \"2c9180867624cbd7017642d8c8c81f67\",\n  \"displayName\": \"Sample User\",\n  \"email\": \"sample.user@sample-widgets.net\",\n  \"phone\": \"+33 6 12 34 56 78\",\n  \"dateOfBirth\": \"1985-05-12\",\n  \"employeeId\": \"E000123\",\n  \"iban\": \"GB82WEST12345698765432\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

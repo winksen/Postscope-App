@@ -27,6 +27,27 @@ export const SAMPLE_COLLECTIONS = [
     path: '/samples/security-issues.postman_collection.json',
     filename: 'sample-security-issues.postman_collection.json',
   },
+  {
+    id: 'iam-access-management',
+    label: 'IAM: access management',
+    description: 'OAuth 2.0, OpenID Connect, JWT and SAML mistakes on fictional tenants',
+    path: '/samples/iam-access-management.postman_collection.json',
+    filename: 'sample-iam-access-management.postman_collection.json',
+  },
+  {
+    id: 'iam-provisioning-governance',
+    label: 'IAM: provisioning and governance',
+    description: 'SCIM, joiner mover leaver, access requests, reviews and personal data',
+    path: '/samples/iam-provisioning-governance.postman_collection.json',
+    filename: 'sample-iam-provisioning-governance.postman_collection.json',
+  },
+  {
+    id: 'iam-privileged-access',
+    label: 'IAM: privileged access',
+    description: 'Vault, PAM retrieval and admin plane operations with their risks',
+    path: '/samples/iam-privileged-access.postman_collection.json',
+    filename: 'sample-iam-privileged-access.postman_collection.json',
+  },
 ] as const
 
 export type SampleCollectionId = (typeof SAMPLE_COLLECTIONS)[number]['id']
