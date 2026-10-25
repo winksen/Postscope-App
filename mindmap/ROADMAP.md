@@ -127,7 +127,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.2.7 | `v0.2.7` | B2 IGA | Feature | Governance APIs and personal data exposure | `2b596c7` |
 | V0.2.8 | `v0.2.8` | B3 PAM | Feature | PAM and secrets vault API rules | `1d88a89` |
 | V0.2.9 | `v0.2.9` | B3 PAM | Feature | Privileged and admin-plane operations inventory | `5b006c2` |
-| V0.2.10 | `v0.2.10` | B4 | Feature | Platform profiles: access management and CIAM | |
+| V0.2.10 | `v0.2.10` | B4 | Feature | Platform profiles: access management and CIAM | `55be46b` |
 | V0.2.11 | `v0.2.11` | B4 | Feature | Platform profiles: IGA, PAM and cloud IAM | |
 | V0.2.12 | `v0.2.12` | B5 | Feature | Identity page | |
 | V0.2.13 | `v0.2.13` | B5 | Feature | IAM reporting and compliance mapping | |

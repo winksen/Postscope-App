@@ -35,21 +35,92 @@ function audit(requests: Req[], variable: Array<{ key: string; value: string }> 
 const GUID_A = '11111111-2222-4333-8444-555555555555'
 const GUID_B = '66666666-7777-4888-8999-aaaaaaaaaaaa'
 
-test('every access management and CIAM platform has a profile with variables, tokens and advice', () => {
+test('every platform has a profile with variables, tokens and advice', () => {
   assert.deepEqual(
     PLATFORM_PROFILES.map((profile) => profile.id),
-    ['okta', 'entra', 'auth0', 'ping', 'forgerock', 'keycloak']
+    [
+      'okta',
+      'entra',
+      'auth0',
+      'ping',
+      'forgerock',
+      'keycloak',
+      'sailpoint',
+      'saviynt',
+      'oneidentity',
+      'omada',
+      'cyberark',
+      'beyondtrust',
+      'delinea',
+      'vault',
+      'aws-iam',
+      'azure-iam',
+      'gcp-iam',
+    ]
   )
   for (const profile of PLATFORM_PROFILES) {
     assert.equal(profile.fingerprint.id, profile.id)
     assert.ok(profile.expectedVariables.length > 0 && profile.tokenFormats.length > 0 && profile.recommendation.length > 20, profile.id)
-    assert.ok(profile.recommendation.includes('{{'), `${profile.id} names the variable to use`)
+    assert.ok(profile.recommendation.includes('{{') || profile.id.endsWith('-iam'), `${profile.id} names the variable to use`)
   }
   assert.ok(profileOf('okta')?.expectedVariables.includes('oktaDomain'))
   assert.ok(profileOf('entra')?.expectedVariables.includes('tenantId'))
   assert.ok(profileOf('auth0')?.expectedVariables.includes('auth0Domain'))
   assert.ok(profileOf('keycloak')?.expectedVariables.includes('realm'))
   assert.ok(profileOf('ping')?.expectedVariables.includes('envId'))
+  assert.ok(profileOf('cyberark')?.expectedVariables.includes('pvwaUrl'))
+  assert.ok(profileOf('vault')?.expectedVariables.includes('vaultAddr'))
+  assert.ok(profileOf('aws-iam')?.expectedVariables.includes('awsAccessKeyId'))
+})
+
+test('legacy governance and vault API versions are reported', () => {
+  const { names, byRule } = audit([
+    { name: 'SailPoint cc', url: 'https://acme.api.identitynow.com/cc/api/org/get' },
+    { name: 'SailPoint v2', url: 'https://acme.api.identitynow.com/v2/accounts' },
+    { name: 'SailPoint v3', url: 'https://acme.api.identitynow.com/v3/accounts' },
+    {
+      name: 'CyberArk classic',
+      method: 'POST',
+      url: 'https://pvwa.acme-corp.com/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logon',
+    },
+    { name: 'CyberArk current', method: 'POST', url: 'https://pvwa.acme-corp.com/PasswordVault/API/Auth/CyberArk/Logon' },
+  ])
+  assert.deepEqual(names('DEPRECATED_IDENTITY_API').sort(), ['CyberArk classic', 'SailPoint cc', 'SailPoint v2'])
+  assert.match(JSON.stringify(byRule.get('DEPRECATED_IDENTITY_API')?.evidence), /PasswordVault\/API/)
+})
+
+test('Vault KV v1 and v2 paths and bodies must agree', () => {
+  const kv = (name: string, url: string, body: unknown) => ({ name, method: 'POST', url, body })
+  const build2 = (requests: Array<ReturnType<typeof kv>>) => ({
+    info: { name: 'Vault', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+    item: requests.map((request) => ({
+      name: request.name,
+      request: { method: 'POST', url: request.url, description: 'd', header: [], body: { mode: 'raw', raw: JSON.stringify(request.body) } },
+    })),
+  })
+  const parsed = parseCollection(
+    build2([
+      kv('v2 body on v1 path', 'https://vault.acme-corp.com:8200/v1/secret/app', { data: { password: '{{p}}' } }),
+      kv('v1 body on v2 path', 'https://vault.acme-corp.com:8200/v1/secret/data/app', { password: '{{p}}' }),
+      kv('v2 ok', 'https://vault.acme-corp.com:8200/v1/secret/data/app', { data: { password: '{{p}}' } }),
+      kv('v1 ok', 'https://vault.acme-corp.com:8200/v1/secret/app', { password: '{{p}}' }),
+      kv('Other mount', 'https://vault.acme-corp.com:8200/v1/transit/encrypt/key', { plaintext: 'x' }),
+    ])
+  )
+  const finding = runAudit(parsed).find((entry) => entry.ruleId === 'DEPRECATED_IDENTITY_API')
+  assert.deepEqual((finding?.affected ?? []).sort(), ['v1 body on v2 path', 'v2 body on v1 path'])
+})
+
+test('governance and PAM tenants are recognized as repeated literals', () => {
+  const { names } = audit([1, 2, 3].map((index) => ({ name: `S${index}`, url: `https://acme.api.identitynow.com/v3/accounts?i=${index}` })))
+  assert.equal(names('TENANT_IDENTIFIER_HARDCODED').length, 3)
+  const cloud = audit(
+    [1, 2, 3].map((index) => ({
+      name: `C${index}`,
+      url: `https://acme.privilegecloud.cyberark.cloud/PasswordVault/API/Accounts?i=${index}`,
+    }))
+  )
+  assert.equal(cloud.names('TENANT_IDENTIFIER_HARDCODED').length, 3)
 })
 
 test('a tenant identifier repeated in three or more requests should be a variable', () => {

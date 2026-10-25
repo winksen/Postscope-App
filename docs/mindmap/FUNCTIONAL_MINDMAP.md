@@ -161,7 +161,7 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Info | Request that creates credentials | Entra `addPassword`, Okta app secrets and API tokens, Keycloak `client-secret`, AWS `CreateAccessKey`, Google service account keys; a warning when the response is saved |
 | Info | Tenant identifier repeated as a literal | `acme.okta.com`, a tenant GUID, a realm or a PingOne environment id written in three or more requests instead of `{{oktaDomain}}`, `{{tenantId}}`, `{{realm}}`, `{{envId}}` |
 | Warning | Preview and production tenants in one collection | `oktapreview.com` with `okta.com`, dev and production Auth0 tenants, several Entra tenant ids |
-| Warning | Retired or legacy identity API | Azure AD Graph, Entra v1.0 `/oauth2/token`, Keycloak `/auth/` prefix, Okta `/api/v1/authn`, Auth0 `/oauth/ro` |
+| Warning | Retired or legacy identity API | Azure AD Graph, Entra v1.0 `/oauth2/token`, Keycloak `/auth/` prefix, Okta `/api/v1/authn`, Auth0 `/oauth/ro`, SailPoint `/cc/api` and `/v2`, CyberArk `PasswordVault/WebServices`, a Vault KV v2 body sent to a KV v1 path or the reverse |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
