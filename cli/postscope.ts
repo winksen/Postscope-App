@@ -45,6 +45,8 @@ interface CliOptions {
   baseline?: string
   writeBaseline?: string
   sanitize?: string
+  /** Also remove personal data from the sanitized copy (`--redact-pii`). */
+  redactPii: boolean
   /** Postman environment and globals export files (applied to every collection). */
   environments: Array<{ file: string; globals: boolean }>
   /** Also analyze the environment and globals files stored next to each collection. */
@@ -82,6 +84,8 @@ Options:
                                            Points deducted per finding severity (default critical=20,warning=8,info=2)
       --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input).
                                            Environment files are written next to it as <name>.sanitized.postman_environment.json
+      --redact-pii                         With --sanitize, also replace personal data (emails, phone and card numbers, IBANs, national ids,
+                                           dates of birth, employee ids) in request bodies and saved examples
       --auto-env                           Also use the *.postman_environment.json and *.postman_globals.json next to each collection
   -e, --environment <file>                 Postman environment export to analyze with the collections (repeatable)
       --globals <file>                     Postman globals export to analyze with the collections (repeatable)
@@ -109,6 +113,7 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
     autoEnv: false,
     noConfig: false,
     quiet: false,
+    redactPii: false,
   }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
@@ -195,6 +200,9 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
       case '--sanitize':
         options.sanitize = value()
         break
+      case '--redact-pii':
+        options.redactPii = true
+        break
       case '-e':
       case '--environment':
         options.environments.push({ file: value(), globals: false })
@@ -221,6 +229,7 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
   options.audit = sanitizeAuditOptions({ disabledRules: disabled, severityOverrides: overrides, rulePacks })
 
   if (!options.inputs.length) throw new UsageError('Provide at least one collection file.')
+  if (options.redactPii && !options.sanitize) throw new UsageError('--redact-pii needs --sanitize <file>.')
   if (options.baseline && options.writeBaseline) throw new UsageError('Use either --baseline or --write-baseline, not both.')
   if (options.config && options.noConfig) throw new UsageError('Use either --config or --no-config, not both.')
   return options
@@ -562,6 +571,7 @@ function runDiff(argv: string[], appVersion: string): number {
       noConfig: options.noConfig,
       config: options.config,
       quiet: true,
+      redactPii: false,
     }
     const [older, newer] = [options.before, options.after].map((input) => analyzeFile(input, scanOptions, appVersion, []).result.ctx)
     const comparison = compareCollections(older, newer)
@@ -635,7 +645,7 @@ export function main(argv: string[]): number {
       const { result, json } = analyzeFile(input, options, appVersion, environments, baseline)
       files.push(result)
       if (options.sanitize) {
-        const { json: sanitized, redactedCount } = redactCollection(json)
+        const { json: sanitized, redactedCount } = redactCollection(json, { scrubPii: options.redactPii })
         fs.writeFileSync(options.sanitize, JSON.stringify(sanitized, null, 2))
         if (!options.quiet) process.stderr.write(`Sanitized copy written to ${options.sanitize} (${redactedCount} value(s) replaced)\n`)
         for (const environment of environments) {

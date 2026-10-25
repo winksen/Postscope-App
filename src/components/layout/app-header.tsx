@@ -24,7 +24,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
-export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'html' | 'sanitized' | 'sanitized-environments'
+export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'html' | 'sanitized' | 'sanitized-pii' | 'sanitized-environments'
 
 export interface EnvironmentOption {
   /** Index into the loaded environment files. */
@@ -169,6 +169,9 @@ export function AppHeader({
               <DropdownMenuLabel className="text-xs text-muted-foreground">Collection</DropdownMenuLabel>
               <DropdownMenuItem onSelect={() => onExport('sanitized')}>
                 <ShieldCheck weight="fill" /> Sanitized copy (secrets removed)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport('sanitized-pii')}>
+                <ShieldCheck weight="fill" /> Sanitized copy (remove personal data)
               </DropdownMenuItem>
               {hasEnvironmentFiles && (
                 <DropdownMenuItem onSelect={() => onExport('sanitized-environments')}>

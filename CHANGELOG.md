@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.7
+
+- Added detection of governance APIs such as access requests, certifications and separation of duties policies
+- Added detection of personal data in saved examples and request bodies
+- Added optional personal data scrubbing to sanitized exports
+
 ## V0.2.6
 
 - Added a joiner, mover and leaver coverage map per identity platform

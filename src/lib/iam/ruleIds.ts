@@ -32,6 +32,11 @@ export const IAM_RULE_IDS = [
   'JML_LEAVER_NOT_COVERED',
   'LEAVER_DELETE_WITHOUT_DISABLE',
   'LEAVER_SESSION_NOT_REVOKED',
+  // iam-iga: governance APIs and personal data (V0.2.7)
+  'PII_IN_SAVED_RESPONSE',
+  'PII_IN_REQUEST_BODY',
+  'GOVERNANCE_SELF_APPROVAL',
+  'CERTIFICATION_BULK_APPROVE',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

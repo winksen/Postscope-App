@@ -388,4 +388,60 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['lifecycle', 'joiner-mover-leaver', 'sessions'],
     references: { nist80053: ['AC-2', 'AC-12'], iso27001: ['A.5.18', 'A.8.5'], cisV8: ['5.3'], rfc: ['7009'] },
   },
+  // iam-iga: governance APIs and personal data
+  {
+    id: 'PII_IN_SAVED_RESPONSE',
+    title: 'Personal data in a saved example',
+    description:
+      'A saved example holds personal data: email addresses, phone numbers, bank or card numbers, national identifiers, dates of birth or employee ids. Examples are copied with the collection to everyone who gets it.',
+    recommendation:
+      'Replace real values with fictional ones before saving an example, or create the example from a synthetic test identity.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-359',
+    owasp: 'API3:2023 Broken Object Property Level Authorization',
+    tags: ['pii', 'privacy', 'examples'],
+    references: { nist80053: ['SI-12', 'AC-4'], iso27001: ['A.5.34'], cisV8: ['3.1'] },
+  },
+  {
+    id: 'PII_IN_REQUEST_BODY',
+    title: 'Personal data in a request body',
+    description:
+      'A request body contains literal personal data such as an email address, phone number, bank or card number, national identifier or date of birth.',
+    recommendation: 'Use variables such as {{email}} and keep real values in a private environment, or use fictional test identities.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-359',
+    tags: ['pii', 'privacy'],
+    references: { nist80053: ['SI-12'], iso27001: ['A.5.34'], cisV8: ['3.1'] },
+  },
+  {
+    id: 'GOVERNANCE_SELF_APPROVAL',
+    title: 'Requester approves their own request',
+    description:
+      'An access request or certification body names the same literal as approver and as requester or recipient. Separation of duties does not allow approving your own access.',
+    recommendation: 'Use different identities for the requester and the approver, and take both from variables.',
+    severity: 'info',
+    category: 'identity',
+    pack: 'iam-iga',
+    cwe: 'CWE-863',
+    owasp: 'API5:2023 Broken Function Level Authorization',
+    tags: ['governance', 'separation-of-duties'],
+    references: { nist80053: ['AC-5'], iso27001: ['A.5.3'], cisV8: ['6.8'] },
+  },
+  {
+    id: 'CERTIFICATION_BULK_APPROVE',
+    title: 'Bulk approval of certification items',
+    description:
+      'A certification or access review call approves five or more items at once, or uses a bulk approval endpoint. Rubber-stamping reviews defeats the purpose of the campaign.',
+    recommendation:
+      'Review items individually or in small, reviewed groups, and keep bulk approvals for exceptions with a documented reason.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-iga',
+    tags: ['governance', 'certification', 'access-review'],
+    references: { nist80053: ['AC-2', 'AC-5'], iso27001: ['A.5.18'], cisV8: ['5.1'] },
+  },
 ]

@@ -145,6 +145,10 @@ Analysis runs in a **background worker**, so the page stays responsive even for 
 | Info | Joiner requests without a leaver step | Accounts are created for a platform but nothing disables, deactivates or suspends them |
 | Info | Account deleted without a disable step first | A `DELETE` of a user with no earlier disable in the same folder or sibling folders |
 | Info | Account disabled without revoking sessions or tokens | A disable with no session termination, logout or token revocation for the platform |
+| Warning | Personal data in a saved example | Emails, phone numbers, IBANs, card numbers, national ids, dates of birth or employee ids in an example response or its original request, with masked values (identity packs) |
+| Info | Personal data in a request body | The same kinds of data written into a request body |
+| Info | Requester approves their own request | An access request or certification body names the same literal as approver and requester |
+| Warning | Bulk approval of certification items | Five or more approve decisions in one call, or a bulk approval endpoint |
 | Warning | Deprecated OAuth grants | Implicit grant (`response_type=token`) and password grant, in requests and in Postman OAuth 2.0 helpers |
 | Warning | Authorization code flow without PKCE, or with `plain` | A public client that sends no `code_challenge`, or `code_challenge_method=plain` |
 | Warning | Unsafe redirect URI | `http://` to a remote host, wildcards, user info, `?next=https://…` |
@@ -192,6 +196,10 @@ The sliders icon in the header opens **Rules**: turn any rule off or change its 
 
 Rules belong to **packs**. The core pack always runs. The four identity packs (access management, governance and provisioning, privileged access, platform profiles) are `Auto` by default: they switch on when a collection shows identity signals such as OAuth helpers, `/oauth2/` or `/scim/` paths, or identity platform hosts. Each pack can be forced `Always on` or `Off` in the Rules dialog. Identity findings use the **Identity** category, which has its own score that appears on the Score page only when the collection has identity findings, and a filter on the Security page.
 
+### Governance APIs and personal data
+
+Requests to identity governance products are recognized by what they do: SailPoint Identity Security Cloud and IdentityIQ (access requests, certifications, campaigns, separation of duties policies and violations), Saviynt (`createrequest`), One Identity Manager (`PersonWantsOrg`) and Omada. Access requests and certifications are checked for self-approval and bulk approval, and every request body and saved example is scanned for personal data. Previews are always masked (`j•••@•••`, `FR76••••`, `••••1111`).
+
 ### Joiner, mover, leaver map
 
 Identity requests are classified by what they do to an account: **joiner** (create), **mover** (attribute, group or role change) and **leaver** (disable, remove access, revoke sessions or tokens, delete). The profile counts them per platform, which shows at a glance whether a platform can onboard people but not offboard them. The map is part of the JSON report.
@@ -219,6 +227,7 @@ The download icon in the header offers:
 | JSON report | Dashboards and custom tooling. Versioned (`reportVersion: 2`) and described by `docs/schemas/postscope-report.v2.schema.json` |
 | SARIF report | GitHub code scanning, Azure DevOps, other CI security dashboards. Results carry the line and column of the offending value in the collection file |
 | Sanitized copy | A runnable collection with every detected credential replaced by `{{variables}}` / `{{REDACTED}}`, safe to share |
+| Sanitized copy (remove personal data) | The same, and personal data in request bodies and saved examples is replaced too: `{{email}}`, `{{phoneNumber}}`, `{{iban}}` and similar in requests, `{{REDACTED}}` in examples. CLI: `--sanitize out.json --redact-pii` |
 
 Reports never include full secret values, only masked previews.
 

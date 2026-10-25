@@ -40,6 +40,7 @@ Useful options (all in `postscope --help`):
 | `--min-score N` | Exit code 1 when a collection scores below N |
 | `--baseline file` / `--write-baseline file` | Fail only on findings that are new compared with a committed baseline |
 | `--config file` | Project config (`.postscope.json`), otherwise the nearest one above each collection is used |
+| `--sanitize file` with `--redact-pii` | Write a sanitized copy that also replaces personal data (emails, phone and card numbers, IBANs, national ids, dates of birth, employee ids) in request bodies and saved examples |
 | `--packs auto\|none\|PACK,-PACK` | Rule packs. `auto` (default) turns the identity packs on when the collection shows identity signals; list packs (`iam-am`, `iam-iga`, `iam-pam`, `iam-platform`) to force them on, prefix with `-` to force them off |
 | `--auto-env` | Also analyze `*.postman_environment.json` and `*.postman_globals.json` stored next to each collection |
 | `--format text\|json\|sarif\|markdown\|html\|junit` | Report format; `--output file` writes it to a file |
@@ -71,7 +72,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.2.6
+        uses: winksen/Postscope-App@v0.2.7
         with:
           path: collections
           fail-on: critical

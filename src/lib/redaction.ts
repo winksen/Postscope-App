@@ -7,6 +7,7 @@ import { detectIndent, parseTemplatedJson } from './jsonBody'
 import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
 import { scrubDescription } from './descriptions'
 import { scrubScript } from './scriptSecrets'
+import { PII_VARIABLES, scrubPiiJson, scrubPiiText } from './iam/pii'
 
 /** Marker for places that cannot hold a usable variable (saved responses, scripts, free text). */
 export const REDACTED = '{{REDACTED}}'
@@ -325,13 +326,93 @@ class Redactor {
   }
 }
 
+export interface RedactOptions {
+  /**
+   * Also replace personal data (emails, phone numbers, bank and card numbers, national identifiers, dates of birth,
+   * employee ids) in request bodies and saved examples. Request bodies get variables such as `{{email}}`, saved
+   * examples get `{{REDACTED}}`.
+   */
+  scrubPii?: boolean
+}
+
+function scrubPiiBody(body: UnknownRecord, replacer: (kind: keyof typeof PII_VARIABLES) => string): number {
+  let count = 0
+  for (const mode of ['urlencoded', 'formdata'] as const) {
+    const fields = body[mode]
+    if (!Array.isArray(fields)) continue
+    for (const field of fields) {
+      if (!isRecord(field) || typeof field.key !== 'string' || typeof field.value !== 'string') continue
+      const result = scrubPiiText(field.value, replacer, field.key)
+      if (result.count) {
+        field.value = result.text
+        count += result.count
+      }
+    }
+  }
+  const raw = body.raw
+  if (typeof raw === 'string' && raw.trim()) {
+    const templated = parseTemplatedJson(raw)
+    if (templated) {
+      const changed = scrubPiiJson(templated.value, replacer)
+      if (changed) {
+        body.raw = templated.restore(JSON.stringify(templated.value, null, detectIndent(raw)))
+        count += changed
+      }
+    } else {
+      const result = scrubPiiText(raw, replacer)
+      if (result.count) {
+        body.raw = result.text
+        count += result.count
+      }
+    }
+  }
+  return count
+}
+
+/** Walks the item tree and removes personal data from request bodies and saved examples. Returns how many values changed. */
+function scrubPiiItems(items: unknown, depth = 0): number {
+  if (!Array.isArray(items) || depth > 100) return 0
+  let count = 0
+  const forRequest = (kind: keyof typeof PII_VARIABLES) => PII_VARIABLES[kind]
+  const forExample = () => REDACTED
+  for (const item of items) {
+    if (!isRecord(item)) continue
+    if (isRecord(item.request) && isRecord(item.request.body)) count += scrubPiiBody(item.request.body, forRequest)
+    if (Array.isArray(item.response)) {
+      for (const response of item.response) {
+        if (!isRecord(response)) continue
+        if (typeof response.body === 'string' && response.body) {
+          const templated = parseTemplatedJson(response.body)
+          if (templated) {
+            const changed = scrubPiiJson(templated.value, forExample)
+            if (changed) {
+              response.body = templated.restore(JSON.stringify(templated.value, null, detectIndent(response.body)))
+              count += changed
+            }
+          } else {
+            const result = scrubPiiText(response.body, forExample)
+            if (result.count) {
+              response.body = result.text
+              count += result.count
+            }
+          }
+        }
+        if (isRecord(response.originalRequest) && isRecord(response.originalRequest.body))
+          count += scrubPiiBody(response.originalRequest.body, forExample)
+      }
+    }
+    count += scrubPiiItems(item.item, depth + 1)
+  }
+  return count
+}
+
 /**
  * Returns a deep copy of a Postman collection with credentials removed: auth helper secrets,
  * sensitive headers, query strings, body fields, URL credentials, collection variable values,
  * script literals, saved example responses, and any provider-format token elsewhere.
  * Request-side values become `{{variables}}` so the sanitized copy stays runnable.
  */
-export function redactCollection(input: unknown): RedactionResult {
+export function redactCollection(input: unknown, options: RedactOptions = {}): RedactionResult {
   const json = cloneJson(input)
   if (!isRecord(json)) return { json, redactedCount: 0 }
   const redactor = new Redactor()
@@ -340,6 +421,7 @@ export function redactCollection(input: unknown): RedactionResult {
   redactor.script(json.event)
   redactor.variables(json.variable)
   redactor.items(json.item)
+  if (options.scrubPii) redactor.count += scrubPiiItems(json.item)
   return { json, redactedCount: redactor.count }
 }
 

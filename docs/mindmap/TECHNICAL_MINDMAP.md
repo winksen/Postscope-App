@@ -169,6 +169,7 @@ All modules are pure TypeScript with relative imports only, so the same code run
 | secrets (warning) | `SECRET_LOGGED_IN_SCRIPT`, `HIGH_ENTROPY_LITERAL` |
 | variables | `HARDCODED_BASEURL`, `HARDCODED_ENV_URL`, `UNDEFINED_VARIABLE` (warning, informational when uncertain), `NO_COLLECTION_VARIABLES` (info) |
 | auth | `MISSING_AUTH` (API key, cookie, query credential and auth script aware), `BASIC_AUTH_PLAINTEXT`, `INSECURE_HTTP`, `TLS_VERIFICATION_DISABLED` (warning), `INCONSISTENT_AUTH` (info) |
+| identity (`iam-iga`, V0.2.7) | `PII_IN_SAVED_RESPONSE`, `CERTIFICATION_BULK_APPROVE` (warning), `PII_IN_REQUEST_BODY`, `GOVERNANCE_SELF_APPROVAL` (info) |
 | identity (`iam-iga`, V0.2.6) | `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED` (info) |
 | identity (`iam-iga`, V0.2.5) | `SCIM_BULK_DESTRUCTIVE`, `SCIM_PRIVILEGE_PATCH` (warning, info when no admin literal), `SCIM_UNBOUNDED_LIST`, `SCIM_CONTENT_TYPE`, `SCIM_SCHEMA_MISMATCH` (info) |
 | identity (`iam-am`, V0.2.2 to V0.2.4) | `OAUTH_TOKEN_ENDPOINT_HTTP`, `OAUTH_TOKEN_IN_URL`, `JWT_ALG_NONE`, `SAML_ASSERTION_CAPTURED` (critical), `JWT_LONG_LIVED`, `JWT_SENSITIVE_CLAIMS`, `ID_TOKEN_AS_BEARER`, `SAML_IDP_METADATA_HTTP` (warning), `JWT_EXPIRED_STORED`, `SESSION_COOKIE_FLAGS`, `TOKEN_REVOCATION_NOT_COVERED` (info), `OAUTH_IMPLICIT_GRANT`, `OAUTH_PASSWORD_GRANT`, `OAUTH_PKCE_MISSING`, `OAUTH_PKCE_PLAIN`, `OAUTH_REDIRECT_URI_UNSAFE`, `OAUTH_BROAD_SCOPE` (warning), `OAUTH_STATE_MISSING`, `OAUTH_CLIENT_SECRET_POST` (info). The other identity packs follow in later releases |
@@ -321,6 +322,19 @@ New endpoint class `session.terminate`: `DELETE` on `/sessions` or `/users/{id}/
 | `JML_LEAVER_NOT_COVERED` (info) | A platform has joiner requests and no `disable` entry. A request without a platform counts for every platform |
 | `LEAVER_DELETE_WITHOUT_DISABLE` (info) | A `delete` with no earlier `disable` (request order) in the same folder or in a sibling folder with the same parent |
 | `LEAVER_SESSION_NOT_REVOKED` (info) | A `disable` while no `revoke` exists for the platform (or without a platform) |
+
+### 2.7.7 Governance and personal data (`iam/governance.ts`, `iam/pii.ts`)
+
+`scanPiiText` and `scanPiiValue(key, value)` return `PiiMatch` (kind, offsets, masked preview). Free text is matched for emails (documentation domains `example.com|org|net` and `*.example|test|invalid|localhost` are skipped), IBANs (`validIban`, ISO 13616 mod 97), card numbers (Visa, Mastercard, Amex, Discover, JCB, Diners prefixes and Luhn; `findCard` tries every group boundary of a digit run), US SSN (dashed form, invalid ranges excluded), French NIR (key `97 - (first 13 digits mod 97)`, computed with BigInt), Spanish DNI and NIE (letter mod 23) and phone numbers that start with `+` and have 8 to 15 digits. Field names add dates of birth (`dob`, `dateOfBirth`, ...), employee ids and phone numbers (`phone`, `mobile`, `msisdn`, ...). Variables and empty values never match. `scanPiiJson` reports the path of each value (`users[0].profile.dateOfBirth`); `scrubPiiText` and `scrubPiiJson` replace values with a replacer function.
+
+| Rule | Decision |
+|---|---|
+| `PII_IN_SAVED_RESPONSE` (warning) | PII in a saved example's body or original request body (JSON by path, other text by span) |
+| `PII_IN_REQUEST_BODY` (info) | PII in the raw body (JSON, templated JSON or text) or form fields of a request |
+| `GOVERNANCE_SELF_APPROVAL` (info) | `iga.access-request` or `iga.certification` body where a literal under an approver key (`approver`, `approvedBy`, `reviewer`, `decisionBy`, `certifier`, ...) equals a literal under a requester key (`requester`, `requestedBy`, `requestedFor`, `recipient`, `beneficiary`, ...); objects such as `{ "id": "u1" }` are read through `id`, `value`, `name`, `email`, `username` |
+| `CERTIFICATION_BULK_APPROVE` (warning) | Non-GET `iga.certification` call with 5 or more approving decisions (`approve`, `certify`, `keep`, `accept`) in `decisions`, `items`, `certificationItems`, `reviewItems` or a root array, or a path such as `bulk-approve` or `approve-all` |
+
+Redaction: `redactCollection(json, { scrubPii: true })` runs after the credential pass. Request bodies (raw JSON with unquoted variables restored, urlencoded and form-data fields) get `PII_VARIABLES` (`{{email}}`, `{{phoneNumber}}`, `{{iban}}`, `{{cardNumber}}`, `{{nationalId}}`, `{{dateOfBirth}}`, `{{employeeId}}`); saved example bodies and their original requests get `{{REDACTED}}`. A second pass changes nothing. CLI `--redact-pii` (needs `--sanitize`) and the header export item "Sanitized copy (remove personal data)" use it.
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -534,6 +548,7 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | `analysisPipeline.test.ts` | `auditAgain` with new rules, separate `main` and `reference` slots, environment selection from the cache, no secrets in results |
 | `bench.test.ts` | Baseline completeness, CI runs the budget check, pages and the analyzer are lazy and the shell does not import charts or animation |
 | `tooling.test.ts` | Style check finds an em dash (file and line) and ignores `node_modules`, the repository passes it, scripts and workflows cover lint, formatting, style, browser tests, Docker and CodeQL, Dependabot ecosystems, no `continue-on-error`, Playwright config and specs exist |
+| `iamGovernance.test.ts` | Detection and masking per kind with runtime-built IBAN, card, NIR and DNI values, checksum and placeholder false-positive guards, field-name kinds, JSON paths, saved examples versus request bodies, self-approval and bulk approval, governance endpoint classes, pack gating, PII scrubbing in sanitized copies (idempotent, input untouched) and the CLI flag |
 | `iamLifecycle.test.ts` | Stage and action table for SCIM, Okta, Entra ID, Keycloak, Auth0 and Saviynt with non-identity guards, account-disabling body shapes, coverage matrix counts, the three leaver rules including folder sequences and per-platform revocation, report section and pack gating |
 | `iamScim.test.ts` | Bulk deletes and unguarded bulks, unbounded lists, privilege PATCH with admin and variable values, severity switch and override, content type and schema URN checks including templated bodies and SCIM 1.1, SCIM inventory and its report section, pack independence |
 | `iamSaml.test.ts` | Assertions in fields, queries, raw bodies and saved examples, error responses and bad base64, bounded decoding, SAML endpoints over http, cookie flags from headers and stored cookies, revocation coverage per platform, session termination classes, pack switch, no assertion content in findings |
@@ -620,3 +635,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.4 | SAML assertion capture (`iam/saml.ts`), SAML endpoints over http, session cookie flags (saved cookie names and flags in `ParsedSavedResponse.cookies`), token revocation coverage (`iam/revocation.ts`), `session.terminate` endpoint class |
 | V0.2.5 | `iam-iga` SCIM rules (`iam/scim.ts`: bulk, unbounded list, privilege PATCH, content type, schema URN), SCIM target inventory in the profile and JSON report, identity signals and profile through leading variables (`resolveUrlText`) |
 | V0.2.6 | Joiner, mover, leaver classification and coverage matrix (`iam/lifecycle.ts`, `identity.lifecycle` in the report), `JML_LEAVER_NOT_COVERED`, `LEAVER_DELETE_WITHOUT_DISABLE`, `LEAVER_SESSION_NOT_REVOKED`, performance baseline updated (the analysis worker grew from 36 KB to 45 KB gzip with the identity rule packs of V0.2.3 to V0.2.6) |
+| V0.2.7 | Personal data detection (`iam/pii.ts`) and governance checks (`iam/governance.ts`: `PII_IN_SAVED_RESPONSE`, `PII_IN_REQUEST_BODY`, `GOVERNANCE_SELF_APPROVAL`, `CERTIFICATION_BULK_APPROVE`), `redactCollection` `scrubPii` option, CLI `--redact-pii`, export item "Sanitized copy (remove personal data)" |

@@ -123,7 +123,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.2.3 | `v0.2.3` | B1 AM | Feature | JWT inspection rules | `15b8afb` |
 | V0.2.4 | `v0.2.4` | B1 AM | Feature | SAML, sessions and token revocation coverage | `8db8ccf` |
 | V0.2.5 | `v0.2.5` | B2 IGA | Feature | SCIM 2.0 provisioning analysis | `cc74f4d` |
-| V0.2.6 | `v0.2.6` | B2 IGA | Feature | Joiner, mover, leaver coverage map | |
+| V0.2.6 | `v0.2.6` | B2 IGA | Feature | Joiner, mover, leaver coverage map | `7807507` |
 | V0.2.7 | `v0.2.7` | B2 IGA | Feature | Governance APIs and personal data exposure | |
 | V0.2.8 | `v0.2.8` | B3 PAM | Feature | PAM and secrets vault API rules | |
 | V0.2.9 | `v0.2.9` | B3 PAM | Feature | Privileged and admin-plane operations inventory | |

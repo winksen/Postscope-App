@@ -627,15 +627,16 @@ export function AnalyzeApp({
     (format: ExportFormat) => {
       if (!parsed || !score || !rawJson) return
       try {
-        if (format === 'sanitized') {
-          const { json, redactedCount } = redactCollection(JSON.parse(rawJson) as unknown)
+        if (format === 'sanitized' || format === 'sanitized-pii') {
+          const scrubPii = format === 'sanitized-pii'
+          const { json, redactedCount } = redactCollection(JSON.parse(rawJson) as unknown, { scrubPii })
           downloadTextFile(`${safeFileStem(parsed.name)}-sanitized.postman_collection.json`, JSON.stringify(json, null, 2))
           notify({
             variant: 'success',
             title: 'Sanitized copy downloaded',
             description: redactedCount
-              ? `${redactedCount} credential value(s) were replaced with {{variables}}. Review before sharing.`
-              : 'No credentials were detected; the copy matches the original.',
+              ? `${redactedCount} value(s) were replaced${scrubPii ? ' (credentials and personal data)' : ' with {{variables}}'}. Review before sharing.`
+              : `No ${scrubPii ? 'credentials or personal data were' : 'credentials were'} detected; the copy matches the original.`,
           })
           return
         }
