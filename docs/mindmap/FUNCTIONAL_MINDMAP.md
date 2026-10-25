@@ -225,6 +225,19 @@ Identity requests are classified by what they do to an account: **joiner** (crea
 
 For provisioning collections the identity profile also lists each SCIM target system (host or variable), the resources it touches (Users, Groups, Bulk, Schemas) and how many requests of each method go to it. It is part of the JSON report.
 
+### Identity repairs
+
+The Repair center covers the identity findings that can be changed safely:
+
+| Finding | Repair | Risk | Selected by default |
+|---|---|---|---|
+| Authorization code flow without PKCE, or with `plain` | OAuth 2.0 helpers on `authorization_code` become "Authorization Code (With PKCE)" with `challengeAlgorithm: S256` | Medium | No |
+| Authorize request without state | `state={{$randomUUID}}` is added to the authorize URL | Low | No |
+| Tenant identifier repeated as a literal | The identifier becomes `{{oktaDomain}}`, `{{tenantId}}`, `{{realm}}` and so on, and the variable is added to the collection with the current value | Medium | No |
+| Token, SAML assertion or retrieved secret in a saved example | The value is replaced with `{{REDACTED}}` in the example (body, headers, original request) | High | Yes, because these are live credentials |
+
+Implicit and password grants, broad scopes, and flows written as requests (no OAuth helper to upgrade) get manual guidance with the migration steps. Tokens that are not in a saved example are left to manual review.
+
 ### Identity in reports and compliance mapping
 
 The Markdown and HTML reports get an **Identity** appendix (platforms, OAuth clients and flows, scopes, stored tokens, joiner mover leaver coverage, privileged operations, credential retrievals and SCIM targets) when the collection has an identity profile, and a **Compliance mapping** table with the NIST SP 800-53, ISO/IEC 27001 and CIS v8 controls of every finding. JSON carries the same data (`identity`, and `compliance` when a framework is chosen), and SARIF carries an identity summary on the run. With `--compliance` the findings are also listed per control. The export menu has **Identity inventory (.csv)** for access reviews: one row per identity endpoint with its class, platform, method, URL without query string, request and related findings. Cells that start with `=`, `+`, `-` or `@` are quoted so spreadsheets cannot run them.

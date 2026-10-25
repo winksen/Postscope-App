@@ -17,6 +17,16 @@ import { analyzeVariableUsage } from './variableUsage'
 import { detectIndent, parseTemplatedJson } from './jsonBody'
 import { replaceRawBodyFields, scanRawBodyFields } from './rawBody'
 import { scrubDescription } from './descriptions'
+import {
+  CAPTURED_RULES,
+  IDENTITY_GUIDANCE,
+  hasUpgradableOauthHelper,
+  patchCapturedSecrets,
+  patchOauthPkce,
+  patchOauthState,
+  patchTenantIdentifiers,
+  tenantReplacementsFor,
+} from './iam/repairs'
 
 export type RepairFixKind =
   | 'hardcodedBaseUrl'
@@ -34,6 +44,10 @@ export type RepairFixKind =
   | 'secretVariables'
   | 'insecureHttp'
   | 'tlsVerification'
+  | 'oauthPkce'
+  | 'oauthState'
+  | 'tenantVariables'
+  | 'scrubCaptured'
   | 'manualReview'
 
 export type RepairRiskLevel = 'low' | 'medium' | 'high' | 'manual'
@@ -76,6 +90,10 @@ export interface RepairFix {
   variableKeys?: string[]
   /** For `bodySecrets`: which body classifier the fix targets. */
   bodyRule?: 'HARDCODED_PASSWORD' | 'HARDCODED_SECRET'
+  /** For `tenantVariables`: literal identifiers and the variable that replaces each. */
+  tenantReplacements?: Array<{ value: string; variable: string }>
+  /** For `scrubCaptured`: which kinds of captured credential are removed from saved examples. */
+  capturedKinds?: Array<'jwt' | 'saml' | 'secret'>
 }
 
 /** One literal origin (`https://auth.example.com`) and the collection variable that replaces it. */
@@ -344,6 +362,17 @@ const KIND_BY_RULE: Partial<Record<string, RepairFixKind>> = {
   SECRET_IN_COLLECTION_VARIABLE: 'secretVariables',
   INSECURE_HTTP: 'insecureHttp',
   TLS_VERIFICATION_DISABLED: 'tlsVerification',
+  OAUTH_PKCE_MISSING: 'oauthPkce',
+  OAUTH_PKCE_PLAIN: 'oauthPkce',
+  OAUTH_STATE_MISSING: 'oauthState',
+  TENANT_IDENTIFIER_HARDCODED: 'tenantVariables',
+  SAML_ASSERTION_CAPTURED: 'scrubCaptured',
+  PAM_RETRIEVED_SECRET_CAPTURED: 'scrubCaptured',
+  JWT_ALG_NONE: 'scrubCaptured',
+  JWT_LONG_LIVED: 'scrubCaptured',
+  JWT_SENSITIVE_CLAIMS: 'scrubCaptured',
+  JWT_EXPIRED_STORED: 'scrubCaptured',
+  ID_TOKEN_AS_BEARER: 'scrubCaptured',
 }
 
 function findingKind(finding: Finding): RepairFixKind | null {
@@ -668,6 +697,77 @@ function buildFixForFinding(rawJson: unknown, parsed: ParsedCollection, finding:
     }
   }
 
+  const guidance = IDENTITY_GUIDANCE[finding.ruleId]
+  if (kind === 'oauthPkce' && hasUpgradableOauthHelper(rawJson)) {
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Use PKCE with S256 in the OAuth 2.0 helper',
+      description:
+        'Switches OAuth 2.0 helpers on the authorization code grant to "Authorization Code (With PKCE)" with the S256 challenge method, and changes the plain method to S256. The identity platform must allow PKCE for the client.',
+      risk: 'medium',
+      selectedByDefault: false,
+      beforeSnippet: 'grant_type: authorization_code',
+      afterSnippet: 'grant_type: authorization_code_with_pkce, challengeAlgorithm: S256',
+    }
+  }
+  if (kind === 'oauthState') {
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Add a state value to authorize requests',
+      description:
+        'Appends state={{$randomUUID}} to the authorize URLs. Check the value on the callback so the response can be tied to the request.',
+      risk: 'low',
+      selectedByDefault: false,
+      beforeSnippet: 'https://idp.example.com/authorize?response_type=code',
+      afterSnippet: 'https://idp.example.com/authorize?response_type=code&state={{$randomUUID}}',
+    }
+  }
+  if (kind === 'tenantVariables') {
+    const tenantReplacements = tenantReplacementsFor(finding, parsed)
+    if (tenantReplacements.length) {
+      return {
+        ...base,
+        status: 'auto',
+        title: 'Move tenant identifiers into variables',
+        description: `Replaces ${tenantReplacements.map((entry) => `the literal tenant identifier with {{${entry.variable}}}`).join(' and ')} in the URLs of the affected requests and adds the variable to the collection with the current value.`,
+        risk: 'medium',
+        selectedByDefault: false,
+        beforeSnippet: 'https://acme.okta.com/api/v1/users',
+        afterSnippet: 'https://{{oktaDomain}}/api/v1/users',
+        tenantReplacements,
+        variablesToEnsure: tenantReplacements.map((entry) => ({ key: entry.variable, value: entry.value })),
+      }
+    }
+  }
+  if (kind === 'scrubCaptured' && finding.evidence?.some((entry) => entry.location.includes('saved response'))) {
+    const capturedKinds = [CAPTURED_RULES[finding.ruleId]].filter((entry): entry is 'jwt' | 'saml' | 'secret' => !!entry)
+    return {
+      ...base,
+      status: 'auto',
+      title: 'Remove captured credentials from saved examples',
+      description:
+        'Replaces tokens, SAML assertions and retrieved secrets in the saved examples of the affected requests with {{REDACTED}}. These are live credentials: rotate them as well.',
+      risk: 'high',
+      selectedByDefault: true,
+      beforeSnippet: 'Saved example holds a working token, assertion or secret',
+      afterSnippet: '{{REDACTED}}',
+      capturedKinds,
+    }
+  }
+  if (guidance) {
+    return {
+      ...base,
+      status: 'manual',
+      title: guidance.title,
+      description: finding.recommendation,
+      risk: 'manual',
+      selectedByDefault: false,
+      manualReason: guidance.reason,
+    }
+  }
+
   return {
     ...base,
     status: 'manual',
@@ -694,7 +794,7 @@ export function createRepairPlan(rawJson: unknown, parsed: ParsedCollection, fin
   }
 }
 
-interface PatchResult {
+export interface PatchResult {
   changed: number
   skipped: SkippedRepair[]
   variables: RepairVariable[]
@@ -1341,6 +1441,10 @@ export function applyRepairPlan(
         secretVariables: patchSecretVariables,
         insecureHttp: patchInsecureHttp,
         tlsVerification: patchTlsVerification,
+        oauthPkce: (collection) => patchOauthPkce(collection),
+        oauthState: patchOauthState,
+        tenantVariables: patchTenantIdentifiers,
+        scrubCaptured: patchCapturedSecrets,
       }
       const result = patchers[fix.kind]?.(fixedJson, fix)
       if (result) {
@@ -1354,6 +1458,10 @@ export function applyRepairPlan(
           secretVariables: `Cleared ${changed} secret collection variable value(s).`,
           insecureHttp: `Upgraded ${changed} endpoint(s) to HTTPS.`,
           tlsVerification: `Re-enabled certificate verification in ${changed} place(s).`,
+          oauthPkce: `Switched ${changed} OAuth 2.0 helper(s) to PKCE with S256.`,
+          oauthState: `Added a state value to ${changed} authorize request(s).`,
+          tenantVariables: `Replaced tenant identifiers with variables in ${changed} request(s).`,
+          scrubCaptured: `Removed ${changed} captured credential value(s) from saved examples.`,
         }
         action = actions[fix.kind] ?? action
       }

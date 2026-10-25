@@ -11,7 +11,7 @@ const RETRIEVAL_CLASSES = new Set(['pam.retrieve', 'vault.read'])
 const ACCESS_CLASSES = new Set(['pam.retrieve', 'pam.checkout'])
 
 /** Keys that hold the secret in the responses of PAM and vault retrieval endpoints. */
-const SECRET_KEYS =
+export const SECRET_LEAF_KEYS =
   /^(?:content|password|passphrase|secret|secretstring|secretbinary|value|privatekey|apikey|api_key|credential|credentials|key|token|data)$/i
 const REASON_KEYS =
   /^(?:reason|comment|comments|justification|business_?justification|ticket(?:_?id|_?number|_?no)?|ticketing_?system_?(?:name|id)|ticket_?system_?(?:name|id))$/i
@@ -35,7 +35,7 @@ function bodyJson(request: ParsedRequest): unknown {
 function secretLeaves(value: unknown, key = '', depth = 0, found: string[] = []): string[] {
   if (depth > 8 || found.length >= 5) return found
   if (typeof value === 'string') {
-    if (isLikelySecretValue(value) && value.trim().length >= 4 && (depth === 0 || SECRET_KEYS.test(key))) found.push(value)
+    if (isLikelySecretValue(value) && value.trim().length >= 4 && (depth === 0 || SECRET_LEAF_KEYS.test(key))) found.push(value)
     return found
   }
   if (Array.isArray(value)) {
