@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { parseCollection } from '../src/lib/parser'
 import { cleanCollection } from '../tests/fixtures'
-import { PAGES, SAMPLES, SAMPLES_DIR, collectProblems, goToPage, importFile } from './helpers'
+import { PAGES, SAMPLES, SAMPLES_DIR, collectProblems, goToPage, importFile, pagesNav } from './helpers'
 
 for (const sample of SAMPLES) {
   test(`${sample}: imports and every page renders without errors`, async ({ page }) => {
@@ -28,6 +28,11 @@ const EXPORTS = [
   { label: 'SARIF for CI (.sarif)', extension: '.sarif', check: (text: string) => expect(JSON.parse(text).version).toBe('2.1.0') },
   {
     label: 'Sanitized copy (secrets removed)',
+    extension: '.json',
+    check: (text: string) => expect(JSON.parse(text).item).toBeInstanceOf(Array),
+  },
+  {
+    label: 'Sanitized copy (remove personal data)',
     extension: '.json',
     check: (text: string) => expect(JSON.parse(text).item).toBeInstanceOf(Array),
   },
@@ -95,5 +100,20 @@ test('a high score celebrates on the Score page without breaking the content sec
   await expect(page.locator('canvas').first()).toBeAttached({ timeout: 10_000 })
   await page.waitForTimeout(2500)
   expect(problems.filter((problem) => /content security policy|Refused to/i.test(problem))).toEqual([])
+  expect(problems).toEqual([])
+})
+
+test('the Identity page is offered for collections with identity content only', async ({ page }) => {
+  const problems = collectProblems(page)
+  await importFile(page, 'secrets-auth.postman_collection.json')
+  const identity = pagesNav(page).getByRole('button', { name: /^Identity/ })
+  await expect(identity).toBeVisible()
+  await identity.click()
+  await expect(page.locator('main h1').first()).toHaveText('Identity')
+  await expect(page.getByText('OAuth clients').first()).toBeVisible()
+  expect(page.url()).toContain('/identity')
+
+  await importFile(page, 'default.postman_collection.json')
+  await expect(pagesNav(page).getByRole('button', { name: /^Identity/ })).toHaveCount(0)
   expect(problems).toEqual([])
 })

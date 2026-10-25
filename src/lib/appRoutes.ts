@@ -4,7 +4,7 @@ import type { FindingCategory, Severity } from './severity'
  * Addresses inside the analyzer. A link names a page, a request and filters, never collection content: request ids
  * are the `folder/name` ids the parser creates, and values, evidence and bodies are never part of a URL.
  */
-export const PAGE_IDS = ['overview', 'requests', 'security', 'hygiene', 'repair', 'score', 'compare'] as const
+export const PAGE_IDS = ['overview', 'requests', 'security', 'hygiene', 'repair', 'score', 'compare', 'identity'] as const
 export type PageId = (typeof PAGE_IDS)[number]
 
 export const FILTER_SEVERITIES = ['critical', 'warning', 'info'] as const

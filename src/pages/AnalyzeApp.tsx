@@ -17,6 +17,7 @@ const HygienePage = lazyPage(() => import('./HygienePage'), 'HygienePage')
 const ScorePage = lazyPage(() => import('./ScorePage'), 'ScorePage')
 const RepairPage = lazyPage(() => import('./RepairPage'), 'RepairPage')
 const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
+const IdentityPage = lazyPage(() => import('./IdentityPage'), 'IdentityPage')
 import { analyzeCollectionText, auditAgain, describeAnalysisError } from '../lib/analyzeCollection'
 import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
 import { clearCollectionSession, loadCollectionSession, saveCollectionSession } from '../lib/collectionSession'
@@ -43,6 +44,7 @@ import type { AuditOptions, Finding } from '../lib/auditor'
 import type { SuppressedFinding } from '../lib/suppressions'
 import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
 import { redactCollection, redactEnvironment } from '../lib/redaction'
+import { isEmptyProfile } from '../lib/iam/types'
 import { attachEvidencePointers } from '../lib/evidencePointers'
 import { downloadTextFile } from '../lib/download'
 import type { CompareInput } from '../lib/compare'
@@ -764,6 +766,8 @@ export function AnalyzeApp({
   const securityFindings = findings.filter((finding) => finding.category !== 'hygiene')
   const hygieneFindings = findings.filter((finding) => finding.category === 'hygiene')
   const isSavedToLibrary = currentLibraryId != null
+  const identityCount = findings.filter((finding) => finding.category === 'identity').length
+  const showIdentity = !isEmptyProfile(parsed.identity) || (auditOptions.rulePacks?.enabled?.length ?? 0) > 0
 
   return (
     <>
@@ -771,6 +775,8 @@ export function AnalyzeApp({
         issueCount={securityFindings.length}
         hygieneCount={hygieneFindings.length}
         repairCount={repairAutoFixCount}
+        showIdentity={showIdentity}
+        identityCount={identityCount}
         active={active}
         onNav={setActive}
         search={search}
@@ -828,6 +834,7 @@ export function AnalyzeApp({
             />
           )}
           {active === 'score' && <ScorePage score={score} findings={findings} />}
+          {active === 'identity' && <IdentityPage parsed={parsed} findings={findings} onLocationChange={goTo} />}
           {active === 'compare' && (
             <ComparePage
               current={{ parsed, findings, score }}

@@ -110,3 +110,10 @@ test('search shortcuts: Ctrl+K anywhere, slash only outside text fields and dial
   assert.equal(isSearchShortcut(press('a')), false)
   assert.equal(isTypingTarget(null), false)
 })
+
+test('the identity page has an address', () => {
+  assert.deepEqual(parseAppLocation('/identity', ''), { page: 'identity' })
+  assert.deepEqual(parseAppLocation('/analyze/identity', '', '/analyze'), { page: 'identity' })
+  assert.equal(buildAppPath('/analyze', { page: 'identity' }), '/analyze/identity')
+  assert.equal(parseAppLocation('/identity/extra', ''), null)
+})

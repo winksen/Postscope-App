@@ -225,6 +225,20 @@ Identity requests are classified by what they do to an account: **joiner** (crea
 
 For provisioning collections the identity profile also lists each SCIM target system (host or variable), the resources it touches (Users, Groups, Bulk, Schemas) and how many requests of each method go to it. It is part of the JSON report.
 
+### Identity page
+
+When a collection has an identity profile, or the identity packs are forced on in the Rules dialog, the sidebar shows **Identity** (address `/identity`). The badge counts identity findings only; the same findings are on the Security page under the Identity category. The page shows:
+
+- four counters: platforms, OAuth clients, danger zone operations, identity findings;
+- one card per detected platform with its confidence, hosts and the variables a collection of that platform should use;
+- the OAuth client table with flow, client authentication, PKCE state, redirect URIs and scopes (broad scopes are highlighted);
+- tokens stored in the collection (masked previews, linked to the request);
+- the joiner, mover, leaver coverage matrix per platform;
+- privileged operations per platform, with the danger zone first, top-tier roles named and links to the requests;
+- SCIM provisioning targets and the identity findings, each with a link to the Security page filtered by rule.
+
+A collection without identity content does not get the item, and opening `/identity` anyway shows a short explanation.
+
 ### Token inspector
 
 When a request holds a JWT (in a header, an auth helper, a query parameter, a body or a saved example), its details dialog gets a **Token** tab. It shows the header (`alg`, `typ`, key id), the issuer host, the expiry and lifetime, and every claim with a masked value: emails as `j•••@•••`, lists as `[3 values]`, identifiers cut to four characters. The signature is never shown and never checked, and the token is decoded in your browser.

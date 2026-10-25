@@ -100,6 +100,7 @@ flowchart LR
 | `src/workers/analysis.worker.ts` | Web Worker entry: `analyze` (`JSON.parse` → `parseCollection` → `runAuditDetailed`) and `audit` messages; keeps the full parsed collection per slot and returns a compact copy |
 | `src/lib/iam/` | Identity analysis (V0.2.1): `types.ts` (profile model), `url.ts` (host and normalized path, request parameters), `fingerprints.ts` (platform table), `endpoints.ts` (endpoint classes), `profile.ts` (`buildIdentityProfile`), `signals.ts` (auto-enable check), `report.ts` (JSON section) |
 | `src/lib/compare.ts`, `compareReport.ts` | Comparison of two analyzed collections and its text, Markdown and JSON renderers (see 2.8) |
+| `src/pages/IdentityPage.tsx` | The Identity page (V0.2.12), a lazy page like the others |
 | `src/pages/`, `src/components/` | React UI (pages, layout, shadcn-style primitives in `components/ui`) |
 | `server/` | Node HTTP server and Vite dev/preview middleware |
 | `cli/postscope.ts`, `cli/inputs.ts` | CI scanner; `inputs.ts` expands folders and globs and finds sibling environment files |
@@ -378,6 +379,10 @@ Each platform module exports a `PlatformProfile`: its `fingerprint` (moved out o
 #### Governance, PAM and cloud IAM profiles (V0.2.11)
 
 `PLATFORM_PROFILES` now holds all 17 platforms and `PLATFORM_FINGERPRINTS` is built from it. SailPoint (`*.api.identitynow.com`), Saviynt, Omada, CyberArk Privilege Cloud and Delinea Cloud expose their tenant host as an `org-domain` identifier (`sailpointTenant`, `saviyntHost`, `omadaHost`, `pvwaUrl`, `delineaUrl`), so `TENANT_IDENTIFIER_HARDCODED` covers them. One Identity, BeyondTrust, Vault and the three cloud profiles have no tenant identifier. Legacy API detection feeds `DEPRECATED_IDENTITY_API`: SailPoint `/cc/api/` and `/v2/` on a tenant host, CyberArk `/PasswordVault/WebServices/`, and Vault KV mismatches (`deprecated(request, url)` reads the JSON body of a `POST` or `PUT` to a `secret` or `kv*` mount: a `data` envelope without `/data/` in the path means KV v2 data sent to a KV v1 style path, and a flat body on a `/data/` path means the reverse). The cloud profiles describe the rest of V0.2.11 through the shared classification: AWS IAM and STS actions (`Action=AssumeRole`, `CreateAccessKey`, `AttachUserPolicy`, from the query, body or `X-Amz-Target`), the `awsv4` auth helper as a fingerprint signal, Azure `roleAssignments` with the Owner and User Access Administrator ids, and Google `serviceAccounts/*/keys` as credential minting.
+
+#### Identity page (V0.2.12)
+
+`PAGE_IDS` and `NavId` gain `identity`. `AnalyzeApp` passes `showIdentity` (`!isEmptyProfile(parsed.identity)` or any pack forced on in `auditOptions.rulePacks.enabled`) and `identityCount` (findings with category `identity`) to `DashboardShell` and `AppSidebar`, which hides the item otherwise unless the page is open. `IdentityPage` is lazy (`lazyPage`) and reads only `parsed.identity` and the findings: `groupPrivileged`, `buildLifecycleMatrix`, `broadScopeReason` and `profileOf` give it its data, request and finding links go through `onLocationChange` (`requests/{id}` and `security?rule=...`). The Compare page and the sample app do not use it. `e2e/smoke.spec.ts` checks that the item exists for `secrets-auth` and not for `default`.
 
 ### 2.8 Comparison (`compare.ts`, `compareReport.ts`)
 
@@ -686,3 +691,4 @@ Shared by `index.ts` (production, serves `dist/`) and `vite-plugin.ts` (dev/prev
 | V0.2.9 | Admin plane checks and privileged operations inventory (`iam/admin.ts`: `PRIVILEGED_ROLE_ASSIGNMENT`, `MFA_POLICY_WEAKENING`, `CREDENTIAL_MINTING_ENDPOINT`, `identity.privileged` in the report) |
 | V0.2.10 | Platform profiles for Okta, Entra ID, Auth0, Ping, ForgeRock and Keycloak (`iam/platforms/`: fingerprints, token formats, expected variables, endpoint rules, tenant identifiers, environments, retired APIs), `iam-platform` rules `TENANT_IDENTIFIER_HARDCODED`, `MIXED_TENANT_ENVIRONMENTS`, `DEPRECATED_IDENTITY_API`, performance baseline updated (analysis worker 45 KB to 56 KB gzip with the PAM, admin plane and platform profile rules) |
 | V0.2.11 | Profiles for SailPoint, Saviynt, One Identity, Omada, CyberArk, BeyondTrust, Delinea, Vault, AWS IAM, Azure IAM and Google Cloud IAM (all 17 platforms in `PLATFORM_PROFILES`), legacy governance and vault API detection (SailPoint `/cc/api` and `/v2`, CyberArk WebServices, Vault KV v1 and v2 mismatches) |
+| V0.2.12 | Identity page (`IdentityPage.tsx`: platform cards, OAuth clients, scopes, tokens, joiner mover leaver matrix, privileged operations, SCIM targets, identity findings), `identity` address and sidebar item with identity finding badge, e2e coverage |

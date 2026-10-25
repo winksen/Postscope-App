@@ -7,6 +7,8 @@ interface DashboardShellProps {
   issueCount: number
   hygieneCount?: number
   repairCount?: number
+  showIdentity?: boolean
+  identityCount?: number
   active: NavId
   onNav: (id: NavId) => void
   search: string
@@ -33,6 +35,8 @@ export function DashboardShell({
   issueCount,
   hygieneCount = 0,
   repairCount = 0,
+  showIdentity = false,
+  identityCount = 0,
   active,
   onNav,
   search,
@@ -73,6 +77,8 @@ export function DashboardShell({
         issueCount={issueCount}
         hygieneCount={hygieneCount}
         repairCount={repairCount}
+        showIdentity={showIdentity}
+        identityCount={identityCount}
         showGitHubLink={showGitHubLink}
         showFeedbackLink={showFeedbackLink}
         feedbackUrl={feedbackUrl}

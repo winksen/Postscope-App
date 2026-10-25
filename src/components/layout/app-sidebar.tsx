@@ -7,6 +7,7 @@ import {
   Gauge,
   GearSix,
   GithubLogo,
+  IdentificationBadge,
   LockKey,
   PresentationChart,
   Sparkle,
@@ -22,7 +23,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { GITHUB_REPO_URL } from '@/components/marketing/marketing-shell'
 
-export type NavId = 'overview' | 'requests' | 'security' | 'hygiene' | 'repair' | 'score' | 'compare'
+export type NavId = 'overview' | 'requests' | 'security' | 'hygiene' | 'repair' | 'score' | 'compare' | 'identity'
 
 type SidebarIcon = ElementType
 
@@ -34,6 +35,7 @@ const nav: { id: NavId; label: string; icon: SidebarIcon; activeIcon: SidebarIco
   { id: 'repair', label: 'Repair', icon: GearSix, activeIcon: GearSix },
   { id: 'score', label: 'Score', icon: Gauge, activeIcon: Gauge },
   { id: 'compare', label: 'Compare', icon: ArrowsLeftRight, activeIcon: ArrowsLeftRight },
+  { id: 'identity', label: 'Identity', icon: IdentificationBadge, activeIcon: IdentificationBadge },
 ]
 
 interface AppSidebarProps {
@@ -44,6 +46,10 @@ interface AppSidebarProps {
   issueCount: number
   hygieneCount?: number
   repairCount?: number
+  /** Show the Identity page: the collection has an identity profile, or the identity packs are forced on. */
+  showIdentity?: boolean
+  /** Identity findings only. */
+  identityCount?: number
   showGitHubLink?: boolean
   showFeedbackLink?: boolean
   feedbackUrl?: string
@@ -59,6 +65,8 @@ export function AppSidebar({
   issueCount,
   hygieneCount = 0,
   repairCount = 0,
+  showIdentity = false,
+  identityCount = 0,
   showGitHubLink = true,
   showFeedbackLink = true,
   feedbackUrl = 'https://github.com/winksen/Postscope-App/issues/new',
@@ -88,58 +96,68 @@ export function AppSidebar({
 
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="flex flex-col gap-1" aria-label="Pages">
-          {nav.map((item) => {
-            const isActive = active === item.id
-            const Icon = isActive ? item.activeIcon : item.icon
-            const count =
-              item.id === 'security' ? issueCount : item.id === 'hygiene' ? hygieneCount : item.id === 'repair' ? repairCount : 0
-            const badge =
-              count > 0 ? (
-                <Badge
+          {nav
+            .filter((item) => item.id !== 'identity' || showIdentity || active === 'identity')
+            .map((item) => {
+              const isActive = active === item.id
+              const Icon = isActive ? item.activeIcon : item.icon
+              const count =
+                item.id === 'security'
+                  ? issueCount
+                  : item.id === 'hygiene'
+                    ? hygieneCount
+                    : item.id === 'repair'
+                      ? repairCount
+                      : item.id === 'identity'
+                        ? identityCount
+                        : 0
+              const badge =
+                count > 0 ? (
+                  <Badge
+                    className={cn(
+                      'h-4 min-w-4 justify-center px-1 text-[9px] font-semibold',
+                      isActive ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {count > 99 ? '99+' : count}
+                  </Badge>
+                ) : null
+              const btn = (
+                <Button
+                  key={item.id}
+                  variant={isActive ? 'secondary' : 'ghost'}
+                  size="sm"
                   className={cn(
-                    'h-4 min-w-4 justify-center px-1 text-[9px] font-semibold',
-                    isActive ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground'
+                    'h-9 w-full justify-start gap-3 rounded-full text-sm font-medium transition-all duration-200 [&_svg]:size-5',
+                    isActive && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
+                    collapsed && 'justify-center px-0'
                   )}
+                  onClick={() => onNav(item.id)}
+                  aria-label={collapsed ? item.label : undefined}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  {count > 99 ? '99+' : count}
-                </Badge>
-              ) : null
-            const btn = (
-              <Button
-                key={item.id}
-                variant={isActive ? 'secondary' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-9 w-full justify-start gap-3 rounded-full text-sm font-medium transition-all duration-200 [&_svg]:size-5',
-                  isActive && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
-                  collapsed && 'justify-center px-0'
-                )}
-                onClick={() => onNav(item.id)}
-                aria-label={collapsed ? item.label : undefined}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon className={cn('shrink-0 transition-colors duration-200', isActive && 'text-background')} weight="fill" />
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 truncate text-left">{item.label}</span>
-                    {badge}
-                  </>
-                )}
-              </Button>
-            )
-            if (collapsed) {
-              return (
-                <Tooltip key={item.id} delayDuration={0}>
-                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
-                  <TooltipContent side="right" className="flex items-center gap-2">
-                    {item.label}
-                    {count > 0 ? <Badge className="bg-foreground text-[10px] text-background">{count > 99 ? '99+' : count}</Badge> : null}
-                  </TooltipContent>
-                </Tooltip>
+                  <Icon className={cn('shrink-0 transition-colors duration-200', isActive && 'text-background')} weight="fill" />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 truncate text-left">{item.label}</span>
+                      {badge}
+                    </>
+                  )}
+                </Button>
               )
-            }
-            return btn
-          })}
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.id} delayDuration={0}>
+                    <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                    <TooltipContent side="right" className="flex items-center gap-2">
+                      {item.label}
+                      {count > 0 ? <Badge className="bg-foreground text-[10px] text-background">{count > 99 ? '99+' : count}</Badge> : null}
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              }
+              return btn
+            })}
         </nav>
       </ScrollArea>
 
