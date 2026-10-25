@@ -3,13 +3,15 @@ import type { ParsedCollection, ParsedRequest } from './parser'
 import type { ScoreBreakdown } from './scorer'
 import { RULES, RULE_LIST, type RuleReferences } from './rules'
 import { identityReportSection } from './iam/report'
+import { identityAppendix, buildIdentityInventoryCsv } from './iam/appendix'
+import { FRAMEWORK_LABELS, complianceRows, groupByControl, type ComplianceFramework } from './compliance'
 import { SEVERITY_ORDER } from './severity'
 import { findingOccurrences, occurrenceFingerprint } from './occurrences'
 import type { SuppressedFinding } from './suppressions'
 import { locatePointers } from './jsonPositions'
 import { buildHtmlReport } from './htmlReport'
 
-export type ReportFormat = 'json' | 'sarif' | 'markdown' | 'html'
+export type ReportFormat = 'json' | 'sarif' | 'markdown' | 'html' | 'identity-csv'
 
 /** Version of the JSON report layout; the schema lives in docs/schemas/postscope-report.v2.schema.json. */
 export const REPORT_VERSION = 2
@@ -31,6 +33,8 @@ export interface ReportContext {
    * a line and column for each result.
    */
   sourceText?: string
+  /** Group the report by the controls of this framework (`--compliance`). */
+  compliance?: ComplianceFramework
 }
 
 const TOOL_NAME = 'PostScope'
@@ -61,12 +65,14 @@ export function reportFileName(collectionName: string, format: ReportFormat): st
   const stem = `${safeFileStem(collectionName)}.postscope`
   if (format === 'sarif') return `${stem}.sarif`
   if (format === 'markdown') return `${stem}.md`
+  if (format === 'identity-csv') return 'identity-inventory.csv'
   if (format === 'html') return `${stem}.html`
   return `${stem}.json`
 }
 
 export function reportMimeType(format: ReportFormat): string {
   if (format === 'markdown') return 'text/markdown'
+  if (format === 'identity-csv') return 'text/csv'
   if (format === 'sarif') return 'application/sarif+json'
   if (format === 'html') return 'text/html'
   return 'application/json'
@@ -82,6 +88,20 @@ export function frameworkTags(rule: { references?: RuleReferences }): string[] {
     ...(references.cisV8 ?? []).map((id) => `CIS-v8:${id}`),
     ...(references.rfc ?? []).map((id) => `RFC:${id}`),
   ]
+}
+
+/** Identity summary on the SARIF run: platforms and counts only, so code scanning dashboards can filter by platform. */
+function sarifIdentityProperties(ctx: ReportContext): Record<string, unknown> | undefined {
+  const identity = ctx.parsed.identity
+  if (!identity || (!identity.platforms.length && !identity.endpoints.length && !identity.oauthClients.length)) return undefined
+  return {
+    identity: {
+      platforms: identity.platforms.map((platform) => ({ id: platform.id, name: platform.name, confidence: platform.confidence })),
+      endpoints: identity.endpoints.length,
+      oauthClients: identity.oauthClients.length,
+      privilegedOperations: identity.privileged?.length ?? 0,
+    },
+  }
 }
 
 function severityCounts(findings: Finding[]): Record<Finding['severity'], number> {
@@ -118,6 +138,15 @@ export function buildJsonReport(ctx: ReportContext): string {
       score: ctx.score,
       summary: severityCounts(ctx.findings),
       identity: identityReportSection(ctx.parsed.identity),
+      compliance: ctx.compliance
+        ? {
+            framework: ctx.compliance,
+            controls: groupByControl(ctx.findings, ctx.compliance).map((group) => ({
+              control: group.control,
+              findings: group.findings.map((finding) => ({ ruleId: finding.ruleId, severity: finding.severity, count: finding.count })),
+            })),
+          }
+        : undefined,
       findings: ctx.findings.map((finding) => ({
         ruleId: finding.ruleId,
         severity: finding.severity,
@@ -271,6 +300,7 @@ export function buildSarifReport(ctx: ReportContext): string {
                 : {}),
             },
           ],
+          properties: sarifIdentityProperties(ctx),
           tool: {
             driver: {
               name: TOOL_NAME,
@@ -332,7 +362,7 @@ export function buildMarkdownReport(ctx: ReportContext): string {
     lines.push(`| Environments | ${names} |`)
   }
   lines.push(
-    `| Category scores | Secrets ${ctx.score.categories.secrets}, Variables ${ctx.score.categories.variables}, Auth ${ctx.score.categories.auth}, Hygiene ${ctx.score.categories.hygiene} |`
+    `| Category scores | Secrets ${ctx.score.categories.secrets}, Variables ${ctx.score.categories.variables}, Auth ${ctx.score.categories.auth}${ctx.score.categories.identity === undefined ? '' : `, Identity ${ctx.score.categories.identity}`}, Hygiene ${ctx.score.categories.hygiene} |`
   )
   lines.push('', `> ${ctx.score.summary}`, '')
 
@@ -369,6 +399,35 @@ export function buildMarkdownReport(ctx: ReportContext): string {
     }
   }
 
+  const appendix = identityAppendix(ctx.parsed.identity)
+  if (appendix.length) lines.push('## Identity', '')
+  for (const table of appendix) {
+    lines.push(`### ${table.title}`, '', `| ${table.columns.join(' | ')} |`, `|${table.columns.map(() => '---').join('|')}|`)
+    for (const row of table.rows) lines.push(`| ${row.map((cell) => escapeMarkdown(cell).replace(/\n/g, ' ')).join(' | ')} |`)
+    lines.push('')
+  }
+
+  const mapped = complianceRows(ctx.findings)
+  if (mapped.length) {
+    lines.push('## Compliance mapping', '', '| Finding | Severity | NIST SP 800-53 | ISO/IEC 27001 | CIS v8 |', '|---|---|---|---|---|')
+    for (const row of mapped)
+      lines.push(
+        `| \`${row.ruleId}\` | ${row.severity} | ${row.nist80053.join(', ')} | ${row.iso27001.join(', ')} | ${row.cisV8.join(', ')} |`
+      )
+    lines.push('')
+  }
+  if (ctx.compliance) {
+    lines.push(`## Findings by control: ${FRAMEWORK_LABELS[ctx.compliance]}`, '')
+    const groups = groupByControl(ctx.findings, ctx.compliance)
+    if (!groups.length) lines.push('No finding maps to a control of this framework.', '')
+    for (const group of groups) {
+      lines.push(`### ${escapeMarkdown(group.control)}`, '')
+      for (const finding of group.findings)
+        lines.push(`- ${finding.severity}: ${escapeMarkdown(finding.title)} (\`${finding.ruleId}\`, ${finding.count})`)
+      lines.push('')
+    }
+  }
+
   if (ctx.suppressed?.length) {
     lines.push(`## Suppressed (${ctx.suppressed.length}, not scored)`, '')
     for (const finding of ctx.suppressed) {
@@ -395,5 +454,6 @@ export function buildReport(format: ReportFormat, ctx: ReportContext): string {
   if (format === 'sarif') return buildSarifReport(ctx)
   if (format === 'markdown') return buildMarkdownReport(ctx)
   if (format === 'html') return buildHtmlReport(ctx)
+  if (format === 'identity-csv') return buildIdentityInventoryCsv(ctx.parsed, ctx.findings)
   return buildJsonReport(ctx)
 }

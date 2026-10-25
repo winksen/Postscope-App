@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.13
+
+- Added an identity section to Markdown, HTML, JSON and SARIF reports
+- Added compliance mapping for NIST, ISO 27001 and CIS controls
+- Added an access review evidence export of identity inventories
+
 ## V0.2.12
 
 - Added an Identity page with detected platforms, OAuth clients, scopes and tokens

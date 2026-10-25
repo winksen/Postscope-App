@@ -796,6 +796,7 @@ export function AnalyzeApp({
         activeEnvironment={parsed.activeEnvironment}
         onEnvironmentChange={handleSelectEnvironment}
         hasEnvironmentFiles={environmentTexts.length > 0}
+        hasIdentity={showIdentity}
       >
         <Suspense fallback={<PageFallback />}>
           {active === 'overview' && <OverviewPage parsed={parsed} findings={findings} />}

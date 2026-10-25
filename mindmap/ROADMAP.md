@@ -129,7 +129,7 @@ These are the concrete defects and gaps that drive milestone A1 and A2. Line num
 | V0.2.9 | `v0.2.9` | B3 PAM | Feature | Privileged and admin-plane operations inventory | `5b006c2` |
 | V0.2.10 | `v0.2.10` | B4 | Feature | Platform profiles: access management and CIAM | `55be46b` |
 | V0.2.11 | `v0.2.11` | B4 | Feature | Platform profiles: IGA, PAM and cloud IAM | `2f250f2` |
-| V0.2.12 | `v0.2.12` | B5 | Feature | Identity page | |
+| V0.2.12 | `v0.2.12` | B5 | Feature | Identity page | `bd1de02` |
 | V0.2.13 | `v0.2.13` | B5 | Feature | IAM reporting and compliance mapping | |
 | V0.2.14 | `v0.2.14` | B5 | Enhancement | IAM repair fixes | |
 | V0.2.15 | `v0.2.15` | B5 | Feature, Docs | IAM sample collections and guide | |

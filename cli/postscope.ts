@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { parseCollection } from '../src/lib/parser'
 import { runAuditDetailed, sanitizeAuditOptions, type AuditOptions, type Finding } from '../src/lib/auditor'
 import { calculateScore } from '../src/lib/scorer'
-import { buildJsonReport, buildMarkdownReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
+import { buildJsonReport, buildMarkdownReport, buildReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
 import { renderHtmlReports } from '../src/lib/htmlReport'
 import { buildJunitReport } from '../src/lib/junitReport'
 import { expandInputs, findSiblingEnvironments } from './inputs'
@@ -22,13 +22,20 @@ import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
+import {
+  COMPLIANCE_FRAMEWORKS,
+  FRAMEWORK_LABELS,
+  groupByControl,
+  isComplianceFramework,
+  type ComplianceFramework,
+} from '../src/lib/compliance'
 import { parseRulePacks, type RulePackSettings } from '../src/lib/rulePacks'
 import { compareCollections, newFindingsAtOrAbove } from '../src/lib/compare'
 import { buildComparisonJson, buildComparisonMarkdown, buildComparisonText } from '../src/lib/compareReport'
 import { readPackageVersion } from '../server/appVersion'
 import { isSeverity, parseScoreWeights, severityRank, type ScoreWeights, type Severity } from '../src/lib/severity'
 
-type Format = 'text' | 'json' | 'sarif' | 'markdown' | 'html' | 'junit'
+type Format = 'text' | 'json' | 'sarif' | 'markdown' | 'html' | 'junit' | 'identity-csv'
 type FailOn = Severity | 'none'
 
 interface CliOptions {
@@ -45,6 +52,8 @@ interface CliOptions {
   baseline?: string
   writeBaseline?: string
   sanitize?: string
+  /** Group reports by the controls of this framework (`--compliance`). */
+  compliance?: ComplianceFramework
   /** Also remove personal data from the sanitized copy (`--redact-pii`). */
   redactPii: boolean
   /** Postman environment and globals export files (applied to every collection). */
@@ -64,7 +73,7 @@ Folders are searched for *.postman_collection.json. Quote globs so the tool expa
   postscope scan "collections/**/*.postman_collection.json" --fail-on warning
 
 Options:
-  -f, --format <text|json|sarif|markdown|html|junit>
+  -f, --format <text|json|sarif|markdown|html|junit|identity-csv>
                                            Report format (default: text). html is one self-contained file without scripts;
                                            junit is for the tests tab of GitLab, Azure DevOps and Jenkins
   -o, --output <file>                      Write the report to a file instead of stdout
@@ -84,6 +93,8 @@ Options:
                                            Points deducted per finding severity (default critical=20,warning=8,info=2)
       --sanitize <file>                    Write a copy with credentials replaced by {{variables}} (single input).
                                            Environment files are written next to it as <name>.sanitized.postman_environment.json
+      --compliance <nist-800-53|iso-27001|cis-v8>
+                                           Group the markdown, html and json reports by the controls of a framework
       --redact-pii                         With --sanitize, also replace personal data (emails, phone and card numbers, IBANs, national ids,
                                            dates of birth, employee ids) in request bodies and saved examples
       --auto-env                           Also use the *.postman_environment.json and *.postman_globals.json next to each collection
@@ -138,7 +149,8 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
       case '-f':
       case '--format': {
         const format = value()
-        if (!['text', 'json', 'sarif', 'markdown', 'html', 'junit'].includes(format)) throw new UsageError(`Unknown format "${format}"`)
+        if (!['text', 'json', 'sarif', 'markdown', 'html', 'junit', 'identity-csv'].includes(format))
+          throw new UsageError(`Unknown format "${format}"`)
         options.format = format as Format
         break
       }
@@ -200,6 +212,13 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
       case '--sanitize':
         options.sanitize = value()
         break
+      case '--compliance': {
+        const framework = value()
+        if (!isComplianceFramework(framework))
+          throw new UsageError(`Unknown --compliance framework "${framework}" (use ${COMPLIANCE_FRAMEWORKS.join(', ')})`)
+        options.compliance = framework
+        break
+      }
       case '--redact-pii':
         options.redactPii = true
         break
@@ -376,6 +395,7 @@ function analyzeFile(
         suppressed: attachEvidencePointers(json, parsed, suppressed),
         baselined: applied?.hidden,
         sourceText,
+        compliance: options.compliance,
       },
     },
     json,
@@ -403,6 +423,11 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
         lines.push(`           ↳ ${where}: ${evidence.location}${evidence.preview ? ` = ${evidence.preview}` : ''}`)
       }
     }
+    if (ctx.compliance) {
+      lines.push(`  By control (${FRAMEWORK_LABELS[ctx.compliance]}):`)
+      for (const group of groupByControl(ctx.findings, ctx.compliance))
+        lines.push(`    ${group.control.padEnd(10)} ${group.findings.map((finding) => finding.ruleId).join(', ')}`)
+    }
     lines.push('')
   }
   return lines.join('\n')
@@ -412,6 +437,7 @@ function render(files: AnalyzedFile[], format: Format, appVersion: string, failO
   if (format === 'text') return textReport(files, appVersion)
   if (format === 'markdown') return files.map(({ ctx }) => buildMarkdownReport(ctx)).join('\n\n---\n\n')
   if (format === 'html') return renderHtmlReports(files.map(({ ctx }) => ctx))
+  if (format === 'identity-csv') return files.map(({ ctx }) => buildReport('identity-csv', ctx)).join('\r\n')
   if (format === 'junit')
     return buildJunitReport(
       files.map(({ ctx }) => ctx),

@@ -32,6 +32,11 @@ const EXPORTS = [
     check: (text: string) => expect(JSON.parse(text).item).toBeInstanceOf(Array),
   },
   {
+    label: 'Identity inventory (.csv)',
+    extension: '.csv',
+    check: (text: string) => expect(text).toMatch(/^endpoint class,platform,method,url,request,findings/),
+  },
+  {
     label: 'Sanitized copy (remove personal data)',
     extension: '.json',
     check: (text: string) => expect(JSON.parse(text).item).toBeInstanceOf(Array),

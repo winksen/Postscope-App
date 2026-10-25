@@ -225,6 +225,10 @@ Identity requests are classified by what they do to an account: **joiner** (crea
 
 For provisioning collections the identity profile also lists each SCIM target system (host or variable), the resources it touches (Users, Groups, Bulk, Schemas) and how many requests of each method go to it. It is part of the JSON report.
 
+### Identity in reports and compliance mapping
+
+The Markdown and HTML reports get an **Identity** appendix (platforms, OAuth clients and flows, scopes, stored tokens, joiner mover leaver coverage, privileged operations, credential retrievals and SCIM targets) when the collection has an identity profile, and a **Compliance mapping** table with the NIST SP 800-53, ISO/IEC 27001 and CIS v8 controls of every finding. JSON carries the same data (`identity`, and `compliance` when a framework is chosen), and SARIF carries an identity summary on the run. With `--compliance` the findings are also listed per control. The export menu has **Identity inventory (.csv)** for access reviews: one row per identity endpoint with its class, platform, method, URL without query string, request and related findings. Cells that start with `=`, `+`, `-` or `@` are quoted so spreadsheets cannot run them.
+
 ### Identity page
 
 When a collection has an identity profile, or the identity packs are forced on in the Rules dialog, the sidebar shows **Identity** (address `/identity`). The badge counts identity findings only; the same findings are on the Security page under the Identity category. The page shows:
@@ -284,6 +288,8 @@ Available in `hybrid` and `on` modes.
 | `--min-score N` | Exit code 1 when a collection scores below N (headline score; thresholds chosen before V0.1.36 may need adjusting) |
 | `--weights critical=N,warning=N,info=N` | Override the points deducted per finding severity |
 | `--disable`, `--severity` | Same rule policy controls as the UI |
+| `--compliance nist-800-53|iso-27001|cis-v8` | Group the report by the controls of one framework (text, Markdown, HTML, JSON) |
+| `--format identity-csv` | The identity inventory as CSV, for access reviews and audits |
 | `--packs auto|none|PACK,-PACK` | Rule packs: `auto` (default), a list of packs to force on, `-pack` to force one off, `none` for no identity packs |
 | `--sanitize out.json` | Write a sanitized copy; sanitized environment copies are written next to it as `<name>.sanitized.postman_environment.json` |
 | `-e, --environment file.json` | Analyze a Postman environment export with the collections (repeatable) |

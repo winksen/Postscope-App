@@ -28,6 +28,7 @@ interface DashboardShellProps {
   activeEnvironment?: number
   onEnvironmentChange?: (index: number) => void
   hasEnvironmentFiles?: boolean
+  hasIdentity?: boolean
   children: React.ReactNode
 }
 
@@ -56,6 +57,7 @@ export function DashboardShell({
   activeEnvironment,
   onEnvironmentChange,
   hasEnvironmentFiles,
+  hasIdentity,
   children,
 }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false)
@@ -99,6 +101,7 @@ export function DashboardShell({
         activeEnvironment={activeEnvironment}
         onEnvironmentChange={onEnvironmentChange}
         hasEnvironmentFiles={hasEnvironmentFiles}
+        hasIdentity={hasIdentity}
       />
       <main
         id="main-content"

@@ -24,7 +24,8 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 
-export type ExportFormat = 'json' | 'sarif' | 'markdown' | 'html' | 'sanitized' | 'sanitized-pii' | 'sanitized-environments'
+export type ExportFormat =
+  'json' | 'sarif' | 'markdown' | 'html' | 'sanitized' | 'sanitized-pii' | 'sanitized-environments' | 'identity-csv'
 
 export interface EnvironmentOption {
   /** Index into the loaded environment files. */
@@ -50,6 +51,8 @@ interface AppHeaderProps {
   onEnvironmentChange?: (index: number) => void
   /** True when any environment or globals file is loaded, which enables the sanitized environment export. */
   hasEnvironmentFiles?: boolean
+  /** The collection has an identity profile, so the identity inventory can be exported. */
+  hasIdentity?: boolean
 }
 
 export function AppHeader({
@@ -68,6 +71,7 @@ export function AppHeader({
   activeEnvironment,
   onEnvironmentChange,
   hasEnvironmentFiles = false,
+  hasIdentity = false,
 }: AppHeaderProps) {
   return (
     <header
@@ -165,6 +169,11 @@ export function AppHeader({
               <DropdownMenuItem onSelect={() => onExport('sarif')}>
                 <TreeStructure weight="fill" /> SARIF for CI (.sarif)
               </DropdownMenuItem>
+              {hasIdentity && (
+                <DropdownMenuItem onSelect={() => onExport('identity-csv')}>
+                  <FileText weight="fill" /> Identity inventory (.csv)
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="text-xs text-muted-foreground">Collection</DropdownMenuLabel>
               <DropdownMenuItem onSelect={() => onExport('sanitized')}>

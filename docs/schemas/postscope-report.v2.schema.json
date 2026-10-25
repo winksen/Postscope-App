@@ -98,6 +98,39 @@
       "additionalProperties": false
     },
     "identity": { "$ref": "#/definitions/identity" },
+    "compliance": {
+      "type": "object",
+      "description": "Findings grouped by the controls of one framework. Present when the report was built with a compliance framework.",
+      "required": ["framework", "controls"],
+      "properties": {
+        "framework": { "enum": ["nist-800-53", "iso-27001", "cis-v8"] },
+        "controls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["control", "findings"],
+            "properties": {
+              "control": { "type": "string" },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["ruleId", "severity", "count"],
+                  "properties": {
+                    "ruleId": { "type": "string" },
+                    "severity": { "$ref": "#/definitions/severity" },
+                    "count": { "type": "integer", "minimum": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "findings": { "type": "array", "items": { "$ref": "#/definitions/finding" } },
     "suppressed": {
       "type": "array",

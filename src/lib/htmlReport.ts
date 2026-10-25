@@ -3,6 +3,8 @@ import type { ParsedRequest } from './parser'
 import { RULES } from './rules'
 import { SEVERITY_ORDER } from './severity'
 import type { ReportContext } from './reportExport'
+import { identityAppendix } from './iam/appendix'
+import { FRAMEWORK_LABELS, complianceRows, groupByControl } from './compliance'
 
 /**
  * Self-contained HTML report: one file, inline CSS, no scripts, no external requests. It works under a strict
@@ -119,6 +121,38 @@ ${counts.map(({ severity, count }) => `<div class="card"><span class="muted smal
       const penalty = ctx.score.penalties.find((item) => item.ruleId === finding.ruleId)
       sections.push(renderFinding(finding, requests, penalty ? `<p class="muted small">Score impact: -${penalty.penalty} points</p>` : ''))
     }
+  }
+
+  const appendix = identityAppendix(ctx.parsed.identity)
+  if (appendix.length) {
+    sections.push('<h2>Identity</h2>')
+    for (const table of appendix) {
+      sections.push(
+        `<h3>${escapeHtml(table.title)}</h3><table><thead><tr>${table.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${table.rows
+          .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
+          .join('')}</tbody></table>`
+      )
+    }
+  }
+  const mapped = complianceRows(ctx.findings)
+  if (mapped.length) {
+    sections.push(
+      `<h2>Compliance mapping</h2><table><thead><tr><th>Finding</th><th>Severity</th><th>NIST SP 800-53</th><th>ISO/IEC 27001</th><th>CIS v8</th></tr></thead><tbody>${mapped
+        .map(
+          (row) =>
+            `<tr><td><code>${escapeHtml(row.ruleId)}</code></td><td>${escapeHtml(row.severity)}</td><td>${escapeHtml(row.nist80053.join(', '))}</td><td>${escapeHtml(row.iso27001.join(', '))}</td><td>${escapeHtml(row.cisV8.join(', '))}</td></tr>`
+        )
+        .join('')}</tbody></table>`
+    )
+  }
+  if (ctx.compliance) {
+    sections.push(`<h2>Findings by control: ${escapeHtml(FRAMEWORK_LABELS[ctx.compliance])}</h2>`)
+    const groups = groupByControl(ctx.findings, ctx.compliance)
+    if (!groups.length) sections.push('<p>No finding maps to a control of this framework.</p>')
+    for (const group of groups)
+      sections.push(
+        `<h3>${escapeHtml(group.control)}</h3><ul>${group.findings.map((finding) => `<li>${escapeHtml(finding.severity)}: ${escapeHtml(finding.title)} (<code>${escapeHtml(finding.ruleId)}</code>, ${finding.count})</li>`).join('')}</ul>`
+      )
   }
 
   if (ctx.suppressed?.length) {
