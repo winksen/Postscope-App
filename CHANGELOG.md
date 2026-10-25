@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.2.10
+
+- Added platform profiles for Okta, Microsoft Entra ID, Auth0, Ping Identity, ForgeRock and Keycloak
+- Added checks for hardcoded tenant identifiers and mixed tenant environments
+- Added detection of retired identity APIs
+
 ## V0.2.9
 
 - Added an inventory of privileged identity operations such as role assignment, policy changes and credential creation

@@ -49,6 +49,10 @@ export const IAM_RULE_IDS = [
   'PRIVILEGED_ROLE_ASSIGNMENT',
   'MFA_POLICY_WEAKENING',
   'CREDENTIAL_MINTING_ENDPOINT',
+  // iam-platform: platform profiles (V0.2.10)
+  'TENANT_IDENTIFIER_HARDCODED',
+  'MIXED_TENANT_ENVIRONMENTS',
+  'DEPRECATED_IDENTITY_API',
 ] as const
 
 export type IamRuleId = (typeof IAM_RULE_IDS)[number]

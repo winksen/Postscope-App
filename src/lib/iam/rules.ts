@@ -590,4 +590,47 @@ export const IAM_RULE_DEFINITIONS: RuleDefinition[] = [
     tags: ['admin-plane', 'credentials', 'minting'],
     references: { nist80053: ['IA-5'], iso27001: ['A.5.17'], cisV8: ['5.2'] },
   },
+  // iam-platform: platform profiles
+  {
+    id: 'TENANT_IDENTIFIER_HARDCODED',
+    title: 'Tenant identifier repeated as a literal',
+    description:
+      'A tenant id, organization domain, realm or environment id of an identity platform is written out in several requests. Moving to another tenant, or sharing the collection, means editing every one of them.',
+    recommendation:
+      'Put the identifier in one variable ({{oktaDomain}}, {{tenantId}}, {{auth0Domain}}, {{realm}}, {{envId}}) and use it everywhere.',
+    severity: 'info',
+    category: 'variables',
+    pack: 'iam-platform',
+    cwe: 'CWE-547',
+    tags: ['tenant', 'variables', 'platform'],
+    references: { nist80053: ['CM-6'], iso27001: ['A.8.9'], cisV8: ['4.1'] },
+  },
+  {
+    id: 'MIXED_TENANT_ENVIRONMENTS',
+    title: 'Preview and production tenants in one collection',
+    description:
+      'One collection calls production and preview or development tenants of the same identity platform, or several tenants (for example two Entra tenant ids). A wrong click or variable can run a test action against production.',
+    recommendation:
+      'Keep one collection per tenant or select the tenant through an environment, and keep production behind its own credentials.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-platform',
+    cwe: 'CWE-1188',
+    tags: ['tenant', 'environments', 'platform'],
+    references: { nist80053: ['CM-2', 'CM-6'], iso27001: ['A.8.31'], cisV8: ['4.1'] },
+  },
+  {
+    id: 'DEPRECATED_IDENTITY_API',
+    title: 'Retired or legacy identity API',
+    description:
+      'A request uses an identity API that the vendor has retired or replaced: Azure AD Graph, Entra v1.0 endpoints, the Keycloak /auth prefix, the Okta classic Authentication API or the deprecated Auth0 endpoints.',
+    recommendation: 'Move to the current API of the platform before the old one stops working, and re-test the flow.',
+    severity: 'warning',
+    category: 'identity',
+    pack: 'iam-platform',
+    cwe: 'CWE-1104',
+    owasp: 'API9:2023 Improper Inventory Management',
+    tags: ['deprecated', 'platform', 'maintenance'],
+    references: { nist80053: ['SI-2', 'SA-22'], iso27001: ['A.8.8'], cisV8: ['2.2'] },
+  },
 ]

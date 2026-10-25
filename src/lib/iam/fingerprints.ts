@@ -1,34 +1,11 @@
 import type { ParsedCollection, ParsedRequest } from '../parser'
 import { extractVariableNames } from '../variables'
-import type { DetectedPlatform, PlatformFamily, PlatformId } from './types'
+import { PLATFORM_PROFILES } from './platforms'
+import type { HeaderSignal, PlatformFingerprint } from './platforms/types'
+import type { DetectedPlatform, PlatformId } from './types'
 import { splitUrl, type SplitUrl } from './url'
 
-interface HeaderSignal {
-  name: RegExp
-  /** When set, the header value must match too. */
-  value?: RegExp
-  label: string
-}
-
-interface PlatformFingerprint {
-  id: PlatformId
-  name: string
-  family: PlatformFamily
-  /** Host suffix or exact host patterns. A match is the strongest signal. */
-  hosts: RegExp[]
-  /** Specific paths that only this platform uses. */
-  strongPaths: RegExp[]
-  /** Paths that are typical but could belong to other APIs. */
-  paths: RegExp[]
-  headers: HeaderSignal[]
-  /** Token shapes in the header values and auth helper fields. */
-  tokens: Array<{ pattern: RegExp; label: string }>
-  ports: string[]
-  /** Variable names that hint at the platform, such as `{{oktaDomain}}`. */
-  variables: RegExp[]
-  /** Postman auth helper types that point to the platform (for example `awsv4`). */
-  authTypes: string[]
-}
+export type { HeaderSignal, PlatformFingerprint }
 
 const WEIGHT = { host: 0.6, strongPath: 0.5, path: 0.3, header: 0.5, token: 0.5, port: 0.2, variable: 0.15, authType: 0.3 }
 
@@ -41,90 +18,7 @@ const MAX_LISTED = 50
  * pattern is anchored or bounded so none of them backtracks badly on long values.
  */
 export const PLATFORM_FINGERPRINTS: PlatformFingerprint[] = [
-  {
-    id: 'okta',
-    name: 'Okta Workforce Identity',
-    family: 'access-management',
-    hosts: [/(?:^|\.)(?:okta|oktapreview|okta-emea|okta-gov|trexcloud)\.com$/],
-    strongPaths: [/^\/oauth2\/(?:default|aus[a-z0-9]+)\/v1\//i, /^\/api\/v1\/(?:authorizationservers|sessions|factors|idps|iam)\b/i],
-    paths: [/^\/api\/v1\/(?:users|groups|apps|policies|roles|logs|org|zones|trustedorigins)\b/i],
-    headers: [{ name: /^authorization$/i, value: /^SSWS\s/, label: 'Authorization: SSWS' }],
-    tokens: [],
-    ports: [],
-    variables: [/okta/i],
-    authTypes: [],
-  },
-  {
-    id: 'entra',
-    name: 'Microsoft Entra ID',
-    family: 'access-management',
-    hosts: [/^login\.microsoftonline\.(?:com|us|de)$/, /^graph\.microsoft\.(?:com|us)$/, /^graph\.windows\.net$/, /^sts\.windows\.net$/],
-    strongPaths: [
-      /\/oauth2\/(?:v2\.0\/)?(?:token|authorize|devicecode)$/i,
-      /^\/(?:v1\.0|beta)\/(?:users|groups|applications|serviceprincipals|directoryroles|rolemanagement|identity)\b/i,
-    ],
-    paths: [],
-    headers: [],
-    tokens: [{ pattern: /[A-Za-z0-9_.~-]{3}\dQ~[A-Za-z0-9_.~-]{20,}/, label: 'client secret (Q~)' }],
-    ports: [],
-    variables: [/tenant(?:id)?\b/i, /entra|azuread|msgraph/i],
-    authTypes: [],
-  },
-  {
-    id: 'auth0',
-    name: 'Auth0',
-    family: 'ciam',
-    hosts: [/(?:^|\.)auth0\.com$/],
-    strongPaths: [/^\/api\/v2\/(?:users|clients|connections|roles|resource-servers|guardian|tenants|client-grants|rules|actions)\b/i],
-    paths: [/^\/oauth\/token$/i, /^\/api\/v2\//i],
-    headers: [],
-    tokens: [],
-    ports: [],
-    variables: [/auth0/i],
-    authTypes: [],
-  },
-  {
-    id: 'ping',
-    name: 'Ping Identity',
-    family: 'access-management',
-    hosts: [/(?:^|\.)pingone\.(?:com|eu|asia|ca|com\.au)$/, /(?:^|\.)pingidentity\.(?:com|cloud)$/],
-    strongPaths: [/^\/as\/(?:token|authorization|introspect|revoke|userinfo)\.oauth2$/i, /^\/pf-admin-api\//i, /^\/v1\/environments\//i],
-    paths: [],
-    headers: [],
-    tokens: [],
-    ports: [],
-    variables: [/pingone|pingfederate|pingid/i],
-    authTypes: [],
-  },
-  {
-    id: 'forgerock',
-    name: 'ForgeRock and Ping Advanced Identity Cloud',
-    family: 'access-management',
-    hosts: [/(?:^|\.)forgeblocks\.com$/, /(?:^|\.)forgerock\.io$/],
-    strongPaths: [/^\/am\/oauth2\//i, /^\/openidm\//i, /^\/am\/json\//i],
-    paths: [],
-    headers: [
-      { name: /^x-openam-username$/i, label: 'X-OpenAM-Username' },
-      { name: /^x-openam-password$/i, label: 'X-OpenAM-Password' },
-    ],
-    tokens: [],
-    ports: [],
-    variables: [/forgerock|openam|openidm|forgeblocks/i],
-    authTypes: [],
-  },
-  {
-    id: 'keycloak',
-    name: 'Keycloak',
-    family: 'access-management',
-    hosts: [],
-    strongPaths: [/^(?:\/auth)?\/realms\/[^/]+\/protocol\/openid-connect\//i, /^(?:\/auth)?\/admin\/realms\b/i],
-    paths: [/^(?:\/auth)?\/realms\/[^/]+\/(?:\.well-known|account|clients-registrations)\b/i],
-    headers: [],
-    tokens: [],
-    ports: [],
-    variables: [/keycloak/i],
-    authTypes: [],
-  },
+  ...PLATFORM_PROFILES.map((profile) => profile.fingerprint),
   {
     id: 'sailpoint',
     name: 'SailPoint Identity Security Cloud and IdentityIQ',

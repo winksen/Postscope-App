@@ -67,7 +67,7 @@ function ids(finding: Finding | undefined, parsed: ReturnType<typeof parseCollec
 test('identity rules are registered with the identity category, a pack and references', () => {
   assert.deepEqual([...IAM_RULE_IDS].sort(), IAM_RULE_DEFINITIONS.map((definition) => definition.id).sort())
   for (const definition of IAM_RULE_DEFINITIONS) {
-    assert.equal(definition.category, 'identity')
+    assert.equal(definition.category, definition.id === 'TENANT_IDENTIFIER_HARDCODED' ? 'variables' : 'identity')
     assert.match(definition.pack, /^iam-/)
     assert.ok(RULES[definition.id], `${definition.id} is in the registry`)
     assert.ok(definition.tags.length > 0 && (definition.references?.nist80053?.length ?? 0) > 0)

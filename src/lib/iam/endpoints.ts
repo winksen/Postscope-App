@@ -1,5 +1,6 @@
 import type { ParsedRequest } from '../parser'
 import type { EndpointClass, PlatformId } from './types'
+import { PLATFORM_PROFILES } from './platforms'
 import type { SplitUrl } from './url'
 
 export interface EndpointContext {
@@ -197,12 +198,16 @@ const rules: Array<[EndpointClass, Test]> = [
   ['cloud-iam.gcp', (c) => /^iam\.googleapis\.com$|^admin\.googleapis\.com$/.test(c.host ?? '')],
 ]
 
+/** Endpoint classes the platform profiles add. They run after the shared rules, so a profile never overrides a shared class. */
+const platformRules: Array<[EndpointClass, Test]> = PLATFORM_PROFILES.flatMap((profile) => profile.endpointRules ?? [])
+
 /**
  * Classifies a request by what it does for identity. Only the method, the normalized path, the host and parameter
  * names decide, never values. Returns `unknown` for requests that are not identity endpoints.
  */
 export function classifyEndpoint(context: EndpointContext): EndpointClass {
   for (const [endpointClass, test] of rules) if (test(context)) return endpointClass
+  for (const [endpointClass, test] of platformRules) if (test(context)) return endpointClass
   return 'unknown'
 }
 

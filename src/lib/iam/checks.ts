@@ -5,6 +5,7 @@ import { checkOAuth } from './oauth'
 import { checkPam } from './pam'
 import { checkRevocationCoverage } from './revocation'
 import { checkAdminPlane } from './admin'
+import { checkPlatforms } from './platforms/check'
 import { checkGovernance } from './governance'
 import { checkLifecycle } from './lifecycle'
 import { checkSamlAndSessions } from './saml'
@@ -40,4 +41,5 @@ export function runIdentityChecks(
     checkPam(parsed, profile, out)
     checkAdminPlane(parsed, profile, out)
   }
+  if (packs.has('iam-platform')) checkPlatforms(parsed, profile, out)
 }
