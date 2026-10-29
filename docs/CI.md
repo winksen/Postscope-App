@@ -8,13 +8,13 @@ This guide covers GitHub Actions, GitLab CI, Azure DevOps and a pre-commit hook.
 
 ## 1. Get the command
 
-PostScope compiles to one JavaScript file that runs with plain `node` (20.6 or newer). No TypeScript toolchain and no `node_modules` are needed to run it.
+PostScope compiles to one JavaScript file that runs with plain `node` (22 or newer). No TypeScript toolchain and no `node_modules` are needed to run it.
 
 | Way | Command |
 |---|---|
 | From a clone of this repository | `npm ci && npm run build:node`, then `node dist-node/cli.js scan <paths>` |
 | As `postscope` on your PATH | `npm install -g .` in the clone after `npm run build:node` (the `bin` entry is `dist-node/cli.js`) |
-| Without installing the project | `npx --yes esbuild@0.25.12 cli/postscope.ts --bundle --platform=node --format=esm --target=node20 --outfile=postscope.mjs` from the clone, then `node postscope.mjs scan <paths>` |
+| Without installing the project | `npx --yes esbuild@0.25.12 cli/postscope.ts --bundle --platform=node --format=esm --target=node22 --outfile=postscope.mjs` from the clone, then `node postscope.mjs scan <paths>` |
 | Inside the Docker image | `docker run --rm -v "$PWD:/work" postscope:<version> node dist-node/cli.js scan /work/collections` |
 
 ---
@@ -74,7 +74,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.2.15
+        uses: winksen/Postscope-App@v0.3.0
         with:
           path: collections
           fail-on: critical
@@ -99,7 +99,7 @@ jobs:
 | `sarif-output` | `postscope.sarif` | Where the SARIF file is written |
 | `config` | empty | Project config; empty uses `.postscope.json` discovery |
 | `auto-env` | `false` | Analyze environment files next to each collection |
-| `node-version` | `20` | Node.js version used to run the scan |
+| `node-version` | `22` | Node.js version used to run the scan |
 
 Outputs: `sarif-file` and `exit-code`. SARIF results carry the line and column of the offending value, so alerts open on the right line of the collection file.
 
@@ -113,7 +113,7 @@ JUnit output feeds the "Tests" tab of the pipeline: each finding at or above `--
 
 ```yaml
 postscope:
-  image: node:20-alpine
+  image: node:24-alpine
   stage: test
   script:
     - npm ci

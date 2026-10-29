@@ -94,7 +94,7 @@ function privilegedAccountKind(value: string): string | null {
 export function grantsFullPermissions(rawBody: string, value: unknown): boolean {
   // A policy sits inside a JSON string, so its quotes arrive escaped.
   const raw = rawBody.replace(/\\"/g, '"')
-  if (/capabilities\s*[=:]\s*\[[^\]]*sudo/i.test(raw)) return true
+  if (/capabilities\s*[=:]\s*\[[^\]]*\bsudo\b/i.test(raw)) return true
   if (/path\s*["']\*["']/i.test(raw) && /capabilities/i.test(raw)) return true
   const walk = (node: unknown, depth = 0): boolean => {
     if (depth > 6 || !node || typeof node !== 'object') return false

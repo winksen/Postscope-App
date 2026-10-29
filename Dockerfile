@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -11,10 +11,10 @@ COPY . .
 # Web bundle (dist/) and the compiled server and CLI (dist-node/).
 RUN npm run build && npm run build:node
 
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
-ARG APP_VERSION=0.2.15
+ARG APP_VERSION=0.3.0
 
 LABEL org.opencontainers.image.title="PostScope"
 LABEL org.opencontainers.image.description="Offline-capable Postman collection analyzer"

@@ -19,7 +19,7 @@ const shared = {
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node20',
+  target: 'node22',
   legalComments: 'none',
   logLevel: 'warning',
 }

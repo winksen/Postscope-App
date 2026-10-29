@@ -35,9 +35,9 @@ inputs:
     required: false
     default: 'false'
   node-version:
-    description: Node.js version used to run the scan (20.6 or newer).
+    description: Node.js version used to run the scan (22 or newer).
     required: false
-    default: '20'
+    default: '22'
 
 outputs:
   sarif-file:
@@ -61,7 +61,7 @@ runs:
       run: |
         # Same options as scripts/build-node.mjs: one self-contained JavaScript file, no dependencies at run time.
         npx --yes esbuild@0.25.12 "$ACTION_PATH/cli/postscope.ts" \
-          --bundle --platform=node --format=esm --target=node20 --legal-comments=none --log-level=warning \
+          --bundle --platform=node --format=esm --target=node22 --legal-comments=none --log-level=warning \
           --banner:js='#!/usr/bin/env node' --outfile="$ACTION_PATH/dist-node/cli.js"
 
     - name: Scan collections

@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,10 +38,10 @@ jobs:
       - name: Typecheck and build
         run: npm run build
       - name: Performance budgets
-        if: matrix.node == 20
+        if: matrix.node == 22
         run: npm run bench -- --check --report bench-report.json
       - name: Upload performance report
-        if: matrix.node == 20 && always()
+        if: matrix.node == 22 && always()
         uses: actions/upload-artifact@v4
         with:
           name: bench-report
@@ -54,13 +54,13 @@ jobs:
       - name: Scan with the compiled CLI (folder, junit)
         run: node dist-node/cli.js scan public/samples --fail-on none --format junit --output postscope-junit.xml
       - name: Install the browser for the smoke tests
-        if: matrix.node == 20
+        if: matrix.node == 22
         run: npx playwright install --with-deps chromium
       - name: Browser smoke tests
-        if: matrix.node == 20
+        if: matrix.node == 22
         run: npm run test:e2e
       - name: Upload the browser test report
-        if: matrix.node == 20 && failure()
+        if: matrix.node == 22 && failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

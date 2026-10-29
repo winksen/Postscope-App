@@ -76,7 +76,7 @@ test('the IAM samples are registered, valid and use fictional hosts', () => {
     assert.ok(entry, `${id} is in the sample list`)
     assert.equal(entry.path, `/samples/${file}`)
     const text = fs.readFileSync(path.join(dir, file), 'utf8')
-    assert.ok(!/[—]/.test(text), 'no em dash')
+    assert.ok(!text.includes(String.fromCharCode(0x2014)), 'no em dash')
     for (const host of text.match(/https?:\/\/[a-z0-9.-]+/gi) ?? []) {
       assert.match(
         host,

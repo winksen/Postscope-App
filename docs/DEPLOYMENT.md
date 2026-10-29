@@ -64,7 +64,7 @@ Use this for development or a simple internal host that already has Node.js.
 
 Prerequisites:
 
-- Node.js 20.6 or newer.
+- Node.js 22 or newer (24 is the current LTS line used by the container image).
 - npm.
 
 Steps:

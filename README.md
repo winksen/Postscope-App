@@ -40,7 +40,7 @@ Collection analysis never leaves the browser. An optional Node server hosts the 
 | Charts and motion | Recharts, framer-motion |
 | Icons | Phosphor Icons (`@phosphor-icons/react`) |
 | Analysis | Pure TypeScript engine in `src/lib`, run in a Web Worker |
-| Server | Node.js `>=20.6` HTTP server (`server/`), no web framework |
+| Server | Node.js `>=22` HTTP server (`server/`), no web framework |
 | CLI | `cli/postscope.ts`: run through `tsx` in development, compiled with esbuild to `dist-node/cli.js` (plain `node`) for CI and Docker |
 | Tests | `node:test` through `tsx` |
 | Utilities | `clsx`, `tailwind-merge`, `class-variance-authority` |
@@ -97,7 +97,7 @@ Screenshots are not checked in yet. After running the app locally, capture these
 
 **Prerequisites**
 
-- [Node.js](https://nodejs.org/) 20.6 or newer (LTS recommended)
+- [Node.js](https://nodejs.org/) 22 or newer (24 LTS recommended)
 - npm (bundled with Node) or another compatible package manager
 
 **Steps**
