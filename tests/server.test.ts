@@ -362,6 +362,7 @@ test('library saves, opens and removals are written to an append-only audit log'
   fs.rmSync(auditDir, { recursive: true, force: true })
   process.env.TRUST_PROXY = 'true'
   process.env.TRUSTED_USER_HEADER = 'X-Auth-Request-Email'
+  process.env.TRUSTED_PROXY_PEERS = '127.0.0.1, ::1'
   try {
     const forwarded = { 'X-Forwarded-For': '198.51.100.23', 'X-Auth-Request-Email': 'alice@example.com' }
     const saved = await postCollection({ ...sample, info: { name: 'Audited' } }, forwarded, 'Audited collection')
@@ -410,7 +411,47 @@ test('library saves, opens and removals are written to an append-only audit log'
   } finally {
     delete process.env.TRUST_PROXY
     delete process.env.TRUSTED_USER_HEADER
+    delete process.env.TRUSTED_PROXY_PEERS
     resetLibraryCache()
+  }
+})
+
+test('a forged identity header from a peer that is not a trusted proxy is refused', async () => {
+  process.env.TRUST_PROXY = 'true'
+  process.env.TRUSTED_USER_HEADER = 'X-Auth-Request-Email'
+  process.env.TRUSTED_PROXY_PEERS = '203.0.113.10, 10.20.0.0/16'
+  try {
+    const forged = { 'X-Auth-Request-Email': 'admin@example.com', 'X-Forwarded-For': '198.51.100.9' }
+    const list = await raw('/api/collections', { headers: forged })
+    assert.equal(list.status, 403)
+    assert.ok(!list.body.includes('admin@example.com'))
+    assert.equal((await postCollection({ ...sample, info: { name: 'Forged' } }, forged, 'Forged')).status, 403)
+    assert.equal((await raw('/api/health')).status, 200, 'health stays reachable for probes')
+  } finally {
+    delete process.env.TRUST_PROXY
+    delete process.env.TRUSTED_USER_HEADER
+    delete process.env.TRUSTED_PROXY_PEERS
+  }
+})
+
+test('a trusted proxy must supply exactly one well-formed identity', async () => {
+  process.env.TRUST_PROXY = 'true'
+  process.env.TRUSTED_USER_HEADER = 'X-Auth-Request-Email'
+  process.env.TRUSTED_PROXY_PEERS = '127.0.0.1, ::1'
+  try {
+    assert.equal((await raw('/api/collections')).status, 401, 'missing actor')
+    assert.equal((await raw('/api/collections', { headers: { 'X-Auth-Request-Email': '   ' } })).status, 401, 'blank actor')
+    assert.equal(
+      (await raw('/api/collections', { headers: { 'X-Auth-Request-Email': 'a@example.com, b@example.com' } })).status,
+      401,
+      'repeated header'
+    )
+    assert.equal((await raw('/api/collections', { headers: { 'X-Auth-Request-Email': 'x'.repeat(201) } })).status, 401, 'too long')
+    assert.equal((await raw('/api/collections', { headers: { 'X-Auth-Request-Email': 'alice@example.com' } })).status, 200)
+  } finally {
+    delete process.env.TRUST_PROXY
+    delete process.env.TRUSTED_USER_HEADER
+    delete process.env.TRUSTED_PROXY_PEERS
   }
 })
 

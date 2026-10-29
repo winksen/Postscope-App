@@ -271,24 +271,33 @@ test('migration reports records it cannot read and leaves them alone', async () 
   assert.equal((await maintenance.libraryStatus(libraryDir)).byKey[crypt.keyId(KEY_A)], 1)
 })
 
-function request(headers: Record<string, string | string[]>) {
-  return { headers, socket: { remoteAddress: '10.0.0.1' } } as unknown as IncomingMessage
+function request(headers: Record<string, string | string[]>, remoteAddress = '10.0.0.1') {
+  return { headers, socket: { remoteAddress } } as unknown as IncomingMessage
 }
 
-test('the proxy user header is only honored behind a trusted proxy and is sanitized', () => {
+test('the proxy user header is only honored from a trusted proxy peer and is validated', () => {
   process.env.TRUSTED_USER_HEADER = 'X-Forwarded-User'
+  process.env.TRUSTED_PROXY_PEERS = '10.0.0.0/24, fd00::1'
   assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice' })), null, 'ignored without TRUST_PROXY')
   process.env.TRUST_PROXY = 'true'
   assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice@example.com' })), 'alice@example.com')
-  assert.equal(getProxyUser(request({ 'x-forwarded-user': ['bob', 'mallory'] })), 'bob')
-  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'ev\u0000il\r\nname‮' })), 'evilname')
-  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'x'.repeat(500) }))?.length, 200)
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice@example.com' }, '10.0.1.1')), null, 'peer outside the range')
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice@example.com' }, '::ffff:10.0.0.7')), 'alice@example.com', 'mapped IPv4')
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice@example.com' }, 'fd00::1')), 'alice@example.com', 'IPv6 peer')
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': ['bob', 'mallory'] })), null, 'duplicate values')
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'ev\u0000il\r\nname\u202e' })), null, 'control and bidi characters')
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'x'.repeat(500) })), null, 'too long')
   assert.equal(getProxyUser(request({ 'x-forwarded-user': '   ' })), null)
   assert.equal(getProxyUser(request({})), null)
+  process.env.TRUSTED_PROXY_PEERS = ''
+  assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice' })), null, 'no peers configured')
+  process.env.TRUSTED_PROXY_PEERS = '10.0.0.0/24'
   process.env.TRUSTED_USER_HEADER = 'bad header!'
   assert.equal(getProxyUser(request({ 'bad header!': 'x' })), null)
   delete process.env.TRUSTED_USER_HEADER
   assert.equal(getProxyUser(request({ 'x-forwarded-user': 'alice' })), null)
+  delete process.env.TRUSTED_PROXY_PEERS
+  delete process.env.TRUST_PROXY
 })
 
 test('the savedBy user is stored with the collection', async () => {

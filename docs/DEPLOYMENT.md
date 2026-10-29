@@ -45,7 +45,8 @@ Set these variables on the container or host process:
 | `LIBRARY_ENCRYPTION_KEY_FILE` | unset | Path to a file holding the key | Same, but reads the key from a file such as a Docker or Kubernetes secret. Takes precedence over `LIBRARY_ENCRYPTION_KEY`. |
 | `LIBRARY_ENCRYPTION_KEY_PREVIOUS`, `LIBRARY_ENCRYPTION_KEY_PREVIOUS_FILE` | unset | Comma separated keys (file: one per line) | Older keys that may still decrypt records while you rotate. |
 | `LIBRARY_AUDIT_LOG` | `true` | `true`, `false` | Appends one JSON line per library save, open and removal to `DATA_DIR/audit/library-YYYY-MM.jsonl`. |
-| `TRUSTED_USER_HEADER` | unset | A header name such as `X-Forwarded-User` or `X-Auth-Request-Email` | Records the signed-in user set by your SSO proxy as `savedBy` and in the audit log. Honored only when `TRUST_PROXY=true`. |
+| `TRUSTED_USER_HEADER` | unset | A header name such as `X-Forwarded-User` or `X-Auth-Request-Email` | Names the header in which your SSO proxy sends the signed-in user. Honored only when `TRUST_PROXY=true` and the connection comes from an address in `TRUSTED_PROXY_PEERS`. The value must appear once, without commas or control characters, and be at most 200 characters; in `hybrid` or `on` mode a request without a valid user is answered with 401. |
+| `TRUSTED_PROXY_PEERS` | unset | Comma separated IP addresses or CIDR ranges such as `10.0.0.0/8, ::1` | Socket addresses of the proxies allowed to assert a user. Required with `TRUSTED_USER_HEADER`. A request from any other address gets 403 in `hybrid` or `on` mode, so a forged header from a direct connection never becomes an identity. Separate from `TRUST_PROXY`, which only decides whether `X-Forwarded-For` is believed. |
 | `ALLOW_UNAUTHENTICATED_TEAM_STORAGE` | `false` | `true`, `false` | Lets `LOGGING_MODE=hybrid` or `on` start without `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD`. Only for a network that is already isolated; the server logs a warning at every start. |
 | `TRUST_PROXY` | `false` | `true`, `false` | Trust `X-Forwarded-For` / `X-Forwarded-Host` from a reverse proxy. Leave `false` when clients connect directly. |
 | `TRUST_PROXY_HOPS` | `1` | Integer 1 to 10 | Number of trusted proxies in front of PostScope (only with `TRUST_PROXY=true`). The client IP is the entry that many positions from the right of `X-Forwarded-For`; entries further left are client-controlled and ignored. Use `2` for a CDN plus a load balancer. |
@@ -64,7 +65,8 @@ Logging modes:
 The server validates its settings before it listens and exits with status 1 and a message naming the cause when:
 
 - only one of `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD` is set (the control would otherwise be silently off)
-- `LOGGING_MODE` is `hybrid` or `on` and no Basic auth is configured, unless `ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true`
+- `LOGGING_MODE` is `hybrid` or `on` and neither Basic auth nor proxy identity (`TRUST_PROXY`, `TRUSTED_USER_HEADER`, `TRUSTED_PROXY_PEERS`) is configured, unless `ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true`
+- `TRUSTED_USER_HEADER` is used with `TRUST_PROXY=true` but `TRUSTED_PROXY_PEERS` is empty (`PROXY_PEERS_MISSING`), or an entry of `TRUSTED_PROXY_PEERS` is not an IP address or CIDR range (`PROXY_PEERS_INVALID`)
 - `PORT` is not a number from 1 to 65535
 
 `LOGGING_MODE=off` (browser only, nothing stored on the server) needs no credentials. The messages carry stable codes (`BASIC_AUTH_PARTIAL`, `TEAM_STORAGE_UNAUTHENTICATED`, `PORT_INVALID`) and never print the password.
@@ -502,7 +504,7 @@ location / {
 }
 ```
 
-Then configure PostScope: `TRUST_PROXY=true`, `TRUST_PROXY_HOPS=1`, `TRUSTED_USER_HEADER=X-Auth-Request-Email`. The address is stored as `savedBy`, shown in the team library dialog and written to the audit log. The header is ignored when `TRUST_PROXY` is off, and PostScope must not be reachable around the proxy, otherwise anyone could send the header themselves.
+Then configure PostScope: `TRUST_PROXY=true`, `TRUST_PROXY_HOPS=1`, `TRUSTED_USER_HEADER=X-Auth-Request-Email` and `TRUSTED_PROXY_PEERS=127.0.0.1` (the address the proxy connects from; use the container network range when the proxy runs in Docker). Have the proxy overwrite the identity header on every request (nginx `proxy_set_header` replaces a client-supplied value) so it is never passed through. The address is stored as `savedBy`, shown in the team library dialog and written to the audit log. The header is ignored when `TRUST_PROXY` is off, and PostScope must not be reachable around the proxy, otherwise anyone could send the header themselves.
 
 When the proxy sits in front of PostScope, set `TRUST_PROXY=true` so rate limits and the failed sign-in lockout use the real client address, and set `TRUST_PROXY_HOPS` to the number of proxies you control (default `1`). Make sure the outermost trusted proxy appends the address it sees to `X-Forwarded-For` instead of passing a client-supplied value through unchanged. If PostScope is also reachable directly, bypassing the proxy, do not enable `TRUST_PROXY`.
 

@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.2
+
+- Restricted identity headers to configured trusted proxy peers
+- Rejected repeated, malformed and missing user headers in team storage modes
+- Added the TRUSTED_PROXY_PEERS setting and startup checks for it
+
 ## V0.3.1
 
 - Rejected incomplete authentication and unsafe team deployment settings

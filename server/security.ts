@@ -6,6 +6,7 @@ import {
   getAllowedOrigins,
   getBasicAuthConfig,
   getRateLimits,
+  getTrustedProxyPeerEntries,
   getTrustedUserHeader,
   getTrustProxyHops,
   isHstsEnabled,
@@ -137,32 +138,93 @@ export function checkRateLimit(req: IncomingMessage, bucket: RateBucket): number
   return rateLimiter.hit(`r:${ip}`, limits.readsPerMinute, 60_000)
 }
 
+export interface ProxyPeers {
+  list: net.BlockList
+  invalid: string[]
+}
+
+/** Parses TRUSTED_PROXY_PEERS entries (an address or an address with a prefix length). */
+export function parseProxyPeers(entries: string[]): ProxyPeers {
+  const list = new net.BlockList()
+  const invalid: string[] = []
+  for (const entry of entries) {
+    const [address, prefix, ...rest] = entry.split('/')
+    const ip = normalizeIp(address)
+    const family = ip ? net.isIP(ip) : 0
+    const max = family === 4 ? 32 : 128
+    const length = prefix === undefined ? max : /^[0-9]{1,3}$/.test(prefix) ? Number(prefix) : -1
+    if (!ip || rest.length > 0 || length < 0 || length > max) {
+      invalid.push(entry)
+      continue
+    }
+    if (prefix === undefined) list.addAddress(ip, family === 4 ? 'ipv4' : 'ipv6')
+    else list.addSubnet(ip, length, family === 4 ? 'ipv4' : 'ipv6')
+  }
+  return { list, invalid }
+}
+
+/** True when the TCP peer of this request is one of the configured trusted proxies. */
+export function isTrustedProxyPeer(req: IncomingMessage): boolean {
+  const ip = normalizeIp(req.socket.remoteAddress)
+  if (!ip) return false
+  const { list } = parseProxyPeers(getTrustedProxyPeerEntries())
+  return list.check(ip, net.isIP(ip) === 4 ? 'ipv4' : 'ipv6')
+}
+
+export type ProxyActor =
+  | { status: 'ok'; user: string }
+  /** No identity is expected: proxy identity is not configured. */
+  | { status: 'disabled' }
+  /** The connection did not come from a configured trusted proxy, so any identity header is ignored. */
+  | { status: 'untrusted' }
+  | { status: 'missing' }
+  | { status: 'malformed' }
+
+/** True when the deployment asks a trusted proxy for the signed-in user. */
+export function isProxyIdentityConfigured(): boolean {
+  return isTrustProxyEnabled() && getTrustedUserHeader() !== null
+}
+
+/**
+ * Resolves the actor asserted by the trusted reverse proxy. The header is believed only when the socket peer is a
+ * configured proxy, and it must be present exactly once, free of commas (Node joins repeated headers with one), control and bidirectional characters, and at most
+ * 200 characters. Anything else is reported instead of being repaired, so a forged or mangled value never becomes an
+ * identity.
+ */
+export function resolveProxyActor(req: IncomingMessage): ProxyActor {
+  if (!isProxyIdentityConfigured()) return { status: 'disabled' }
+  if (!isTrustedProxyPeer(req)) return { status: 'untrusted' }
+  const raw = req.headers[getTrustedUserHeader() as string]
+  if (raw === undefined) return { status: 'missing' }
+  if (Array.isArray(raw)) return { status: 'malformed' }
+  const value = raw.trim()
+  if (!value) return { status: 'missing' }
+  if (value.length > 200 || value.includes(',') || hasUnsafeActorCharacter(value)) return { status: 'malformed' }
+  return { status: 'ok', user: value }
+}
+
+function hasUnsafeActorCharacter(value: string): boolean {
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0
+    if (
+      code <= 0x1f ||
+      (code >= 0x7f && code <= 0x9f) ||
+      (code >= 0x200b && code <= 0x200f) ||
+      (code >= 0x202a && code <= 0x202e) ||
+      (code >= 0x2066 && code <= 0x2069)
+    )
+      return true
+  }
+  return false
+}
+
 /**
  * The signed-in user as reported by a trusted reverse proxy (TRUSTED_USER_HEADER, for example oauth2-proxy's
- * `X-Forwarded-User`). It is only believed when TRUST_PROXY=true, because otherwise any client could send it.
- * Control characters are stripped and the value is capped, so it is safe to store and to write to logs.
+ * `X-Forwarded-User`), or null. See `resolveProxyActor` for when a value is believed.
  */
 export function getProxyUser(req: IncomingMessage): string | null {
-  if (!isTrustProxyEnabled()) return null
-  const header = getTrustedUserHeader()
-  if (!header) return null
-  const raw = req.headers[header]
-  const value = (Array.isArray(raw) ? raw[0] : raw) ?? ''
-  const cleaned = [...value]
-    .filter((char) => {
-      const code = char.codePointAt(0) ?? 0
-      return (
-        code > 0x1f &&
-        !(code >= 0x7f && code <= 0x9f) &&
-        !(code >= 0x200b && code <= 0x200f) &&
-        !(code >= 0x202a && code <= 0x202e) &&
-        !(code >= 0x2066 && code <= 0x2069)
-      )
-    })
-    .join('')
-    .trim()
-    .slice(0, 200)
-  return cleaned || null
+  const actor = resolveProxyActor(req)
+  return actor.status === 'ok' ? actor.user : null
 }
 
 const AUTH_WINDOW_MS = 15 * 60_000

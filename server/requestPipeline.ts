@@ -1,9 +1,18 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleConfigApi, handleHealthApi, handleLibraryApi } from './apiHandlers'
 import { parseRequestUrl, sendJson } from './http'
-import { applySecurityHeaders, checkBasicAuth, checkRateLimit, getClientIp, newRequestId, sendAuthChallenge } from './security'
+import {
+  applySecurityHeaders,
+  checkBasicAuth,
+  checkRateLimit,
+  getClientIp,
+  newRequestId,
+  resolveProxyActor,
+  sendAuthChallenge,
+} from './security'
 import { serveStatic } from './staticFiles'
 import { isAccessLogEnabled } from './runtimeConfig'
+import { isUploadAllowed } from './loggingConfig'
 import { errorFields, log } from './logger'
 
 export interface PipelineOptions {
@@ -52,6 +61,19 @@ export function createRequestHandler(options: PipelineOptions) {
       if (auth === 'challenge' || auth === 'locked' || auth === 'backoff') {
         sendAuthChallenge(res, auth !== 'challenge', auth === 'backoff' ? 60 : 900)
         return
+      }
+
+      if (isApi && isUploadAllowed()) {
+        // Team storage with proxy identity: a request without a verified actor never reaches the library.
+        const actor = resolveProxyActor(req)
+        if (actor.status === 'untrusted') {
+          sendJson(res, 403, { error: 'Requests must come through the configured identity proxy.' })
+          return
+        }
+        if (actor.status === 'missing' || actor.status === 'malformed') {
+          sendJson(res, 401, { error: 'Authentication required.' })
+          return
+        }
       }
 
       if (isApi) {

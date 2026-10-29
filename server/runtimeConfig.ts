@@ -224,6 +224,18 @@ export function getTrustedUserHeader(): string | null {
   return name.toLowerCase()
 }
 
+/**
+ * Socket addresses of the reverse proxies allowed to assert a user (TRUSTED_PROXY_PEERS, comma separated IPs or CIDR
+ * ranges such as `10.0.0.0/8`). Trusting the forwarded client address (TRUST_PROXY) is a separate decision: the
+ * identity header is believed only when the TCP peer itself is listed here.
+ */
+export function getTrustedProxyPeerEntries(): string[] {
+  return (env('TRUSTED_PROXY_PEERS') ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
 /** Only http(s) URLs are allowed for outbound links so a misconfiguration cannot inject `javascript:` URLs. */
 export function sanitizeExternalUrl(value: string | undefined, fallback: string): string {
   if (!value) return fallback

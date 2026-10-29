@@ -1,10 +1,11 @@
 import { ensureAppEnv } from './loadEnv'
 import { getLoggingMode } from './loggingConfig'
-import { getBasicAuthConfig, isUnauthenticatedTeamStorageAllowed } from './runtimeConfig'
+import { getBasicAuthConfig, getTrustedProxyPeerEntries, isUnauthenticatedTeamStorageAllowed } from './runtimeConfig'
+import { isProxyIdentityConfigured, parseProxyPeers } from './security'
 
 export interface StartupIssue {
   /** Stable identifier used by documentation and tests. */
-  code: 'BASIC_AUTH_PARTIAL' | 'TEAM_STORAGE_UNAUTHENTICATED' | 'PORT_INVALID'
+  code: 'BASIC_AUTH_PARTIAL' | 'TEAM_STORAGE_UNAUTHENTICATED' | 'PORT_INVALID' | 'PROXY_PEERS_INVALID' | 'PROXY_PEERS_MISSING'
   message: string
 }
 
@@ -43,9 +44,22 @@ export function validateRuntimeSettings(): StartupReport {
     }
   }
 
+  const peers = getTrustedProxyPeerEntries()
+  const parsedPeers = parseProxyPeers(peers)
+  if (parsedPeers.invalid.length > 0) {
+    errors.push({ code: 'PROXY_PEERS_INVALID', message: `TRUSTED_PROXY_PEERS has invalid entries: ${parsedPeers.invalid.join(', ')}.` })
+  }
+  const proxyIdentity = isProxyIdentityConfigured()
+  if (proxyIdentity && peers.length === 0) {
+    errors.push({
+      code: 'PROXY_PEERS_MISSING',
+      message: 'TRUSTED_USER_HEADER with TRUST_PROXY=true needs TRUSTED_PROXY_PEERS listing the proxy addresses that may assert a user.',
+    })
+  }
+
   const mode = getLoggingMode()
   if (mode !== 'off') {
-    if (!getBasicAuthConfig() && !(user && password)) {
+    if (!getBasicAuthConfig() && !(user && password) && !(proxyIdentity && peers.length > 0)) {
       if (isUnauthenticatedTeamStorageAllowed()) {
         warnings.push(
           `LOGGING_MODE=${mode} stores collections on the server without authentication because ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true. Keep the network isolated.`
@@ -53,7 +67,7 @@ export function validateRuntimeSettings(): StartupReport {
       } else {
         errors.push({
           code: 'TEAM_STORAGE_UNAUTHENTICATED',
-          message: `LOGGING_MODE=${mode} stores collections on the server but no authentication is configured. Set BASIC_AUTH_USER and BASIC_AUTH_PASSWORD, use LOGGING_MODE=off, or set ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true on an isolated network.`,
+          message: `LOGGING_MODE=${mode} stores collections on the server but no authentication is configured. Set BASIC_AUTH_USER and BASIC_AUTH_PASSWORD, configure proxy identity (TRUST_PROXY, TRUSTED_USER_HEADER, TRUSTED_PROXY_PEERS), use LOGGING_MODE=off, or set ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true on an isolated network.`,
         })
       }
     }
