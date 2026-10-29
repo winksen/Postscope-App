@@ -26,6 +26,7 @@ import { expandInputs, findSiblingEnvironments } from './inputs'
 import { attachEvidencePointers } from '../src/lib/evidencePointers'
 import { redactCollection, redactEnvironment } from '../src/lib/redaction'
 import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src/lib/projectConfig'
+import { formatDoctorReport, inspectDeployment } from '../server/doctor'
 import { applyReportProfile, isReportProfile, REPORT_PROFILES, type ReportProfile } from '../src/lib/reportPrivacy'
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
@@ -78,6 +79,7 @@ interface CliOptions {
 const HELP = `PostScope CLI: audit Postman collections for secrets, auth gaps, and hygiene.
 
 Usage: postscope [scan] [options] <collection.json | folder | glob ...>   (use "-" to read stdin)
+       postscope doctor [--json] [--strict]   (check the deployment settings of the server, see "postscope doctor --help")
        postscope diff <old.json> <new.json> [options]   (compare two versions, see "postscope diff --help")
        npm run scan -- [options] <...>
 
@@ -672,9 +674,46 @@ function runDiff(argv: string[], appVersion: string): number {
   return passed ? 0 : 1
 }
 
+const DOCTOR_HELP = `PostScope doctor: check the effective deployment settings of the server.
+
+Usage: postscope doctor [options]
+
+Reads the same environment and .env file as the server and reports the deployment type (browser only, isolated team or
+authenticated team), the effective settings that carry no secret and anything unsafe. Passwords, keys and identifiers
+are never printed; they appear only as "set" or as a count.
+
+Options:
+      --json      Print the report as JSON
+      --strict    Exit with 1 on warnings too (default: only on errors)
+  -h, --help      Show this help
+
+Exit codes: 0 no errors, 1 the server would refuse to start or a setting is unusable, 2 usage error.
+`
+
+function runDoctor(argv: string[]): number {
+  let json = false
+  let strict = false
+  for (const arg of argv) {
+    if (arg === '--json') json = true
+    else if (arg === '--strict') strict = true
+    else if (arg === '-h' || arg === '--help') {
+      process.stdout.write(DOCTOR_HELP)
+      return 0
+    } else {
+      process.stderr.write(`Error: unknown option "${arg}"\n\n${DOCTOR_HELP}`)
+      return 2
+    }
+  }
+  const report = inspectDeployment()
+  process.stdout.write(json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctorReport(report))
+  const failing = report.issues.some((issue) => issue.level === 'error' || (strict && issue.level === 'warning'))
+  return failing ? 1 : 0
+}
+
 export function main(argv: string[]): number {
   const appVersion = readVersion()
   if (argv[0] === 'diff') return runDiff(argv.slice(1), appVersion)
+  if (argv[0] === 'doctor') return runDoctor(argv.slice(1))
   let options: ReturnType<typeof parseArgs>
   try {
     options = parseArgs(argv)

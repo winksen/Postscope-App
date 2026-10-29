@@ -108,6 +108,17 @@ function startRefused(extra: Record<string, string>) {
   })
 }
 
+test('the compiled CLI runs the deployment check without node_modules', () => {
+  const result = spawnSync(process.execPath, [path.join(outdir, 'cli.js'), 'doctor', '--json'], {
+    cwd: work,
+    env: { ...process.env, LOGGING_MODE: 'hybrid', BASIC_AUTH_USER: '', BASIC_AUTH_PASSWORD: '' },
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 1, result.stderr)
+  const report = JSON.parse(result.stdout) as { deployment: string; issues: Array<{ code: string }> }
+  assert.ok(report.issues.some((issue) => issue.code === 'TEAM_STORAGE_UNAUTHENTICATED'))
+})
+
 test('the compiled server refuses partial credentials and unauthenticated team storage', () => {
   const partial = startRefused({ LOGGING_MODE: 'off', BASIC_AUTH_USER: 'admin' })
   assert.equal(partial.status, 1)

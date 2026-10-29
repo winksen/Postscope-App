@@ -1,4 +1,4 @@
- `3537ebc` |`def5f38` |`da3f4dd` |`9ae0b40` |`e942d42` |`841de68` |# PostScope Roadmap
+ `47ee8f2` |`3537ebc` |`def5f38` |`da3f4dd` |`9ae0b40` |`e942d42` |`841de68` |# PostScope Roadmap
 
 > **Audience:** the agent or engineer implementing the next releases, plus reviewers who want to know what is coming and why.
 > **Historical baseline for Tracks A and B:** `Update V0.1.24` (commit `e97a99c`, 2026-10-08). Every item below was derived from a read of the code and docs at that commit.

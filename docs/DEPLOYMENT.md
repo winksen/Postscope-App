@@ -72,6 +72,59 @@ The server validates its settings before it listens and exits with status 1 and 
 
 `LOGGING_MODE=off` (browser only, nothing stored on the server) needs no credentials. The messages carry stable codes (`BASIC_AUTH_PARTIAL`, `TEAM_STORAGE_UNAUTHENTICATED`, `PORT_INVALID`) and never print the password.
 
+## Deployment recipes and checklist
+
+Pick the recipe that matches who may reach the app and whether it stores collections. Run `postscope doctor` (or `node dist-node/cli.js doctor` in the container) with the same environment before you start the server; it prints the deployment type, the effective settings that carry no secret and anything unsafe, and exits with 1 when the server would refuse to start. Passwords, keys and identifiers are never printed. `--strict` also fails on warnings and `--json` gives a machine-readable report.
+
+| Recipe | Who reaches it | Stores collections | Settings that make it this recipe | `doctor` says |
+|---|---|---|---|---|
+| Browser only | Anyone, including the public internet | No | `LOGGING_MODE=off` (the default) | `browser only`, nothing to fix |
+| Isolated team | Only a network you already control (VPN, private subnet) | Yes | `LOGGING_MODE=hybrid` or `on` with `ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true` | `isolated team`, a warning that network access is the only control |
+| Authenticated team | Signed-in people | Yes | `LOGGING_MODE=hybrid` or `on` with Basic auth, or a trusted proxy identity | `authenticated team` |
+
+Browser only needs no further settings.
+
+Isolated team adds nothing to the storage settings, but keep `HOST` on a private address and restrict the port in the firewall:
+
+```bash
+LOGGING_MODE=hybrid ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true HOST=10.0.0.5 npm run start:node
+```
+
+Authenticated team, with Basic auth and a protected library:
+
+```bash
+LOGGING_MODE=hybrid
+BASIC_AUTH_USER=postscope-admin
+BASIC_AUTH_PASSWORD=<at least 12 random characters>
+LIBRARY_ENCRYPTION_KEY=<64 hex characters>
+LIBRARY_REDACT_SECRETS=true
+LIBRARY_RETENTION_DAYS=90
+ENABLE_HSTS=true
+```
+
+Authenticated team, with an identity proxy instead of Basic auth:
+
+```bash
+LOGGING_MODE=on
+TRUST_PROXY=true
+TRUSTED_USER_HEADER=X-Auth-Request-Email
+TRUSTED_PROXY_PEERS=10.0.0.0/8
+ALLOWED_ORIGINS=https://postscope.example.com
+LIBRARY_ENCRYPTION_KEY=<64 hex characters>
+LIBRARY_REDACT_SECRETS=true
+LIBRARY_RETENTION_DAYS=90
+ENABLE_HSTS=true
+```
+
+Checklist before you tell people about the URL:
+
+- [ ] `postscope doctor --strict` exits with 0, or you accept each remaining warning on purpose
+- [ ] No password or key in the repository, the shell history or the image: use environment variables or secret files (`LIBRARY_ENCRYPTION_KEY_FILE`)
+- [ ] The password is not a value copied from this page (`doctor` flags the documentation examples)
+- [ ] The port is reachable only through the proxy or the isolated network
+- [ ] The data volume is backed up and the backup is encrypted
+- [ ] You opened the app, imported a sample and checked that the import screen describes what you configured
+
 ## Option 1: Run From Source
 
 Use this for development or a simple internal host that already has Node.js.

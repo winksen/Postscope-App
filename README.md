@@ -145,6 +145,7 @@ None are required for local development or a static production build. The Node s
 | `npm run scan -- <collection.json>` | Audit a collection from the command line (see `--help`; formats text, json, sarif, markdown, html); supports folders and globs, `postscope diff <old> <new>` to compare two versions, `--format junit`, `--auto-env`, `--environment`, `--globals`, `--weights`, `--min-score`, `--config`, `--baseline` and `--write-baseline` |
 | `npm run bench` | Parse and audit time on a 6000-request collection plus bundle sizes; `-- --check` fails when a number is more than 20 percent worse than `scripts/bench-baseline.json`, `-- --update` records a new baseline, `-- --report file` writes JSON |
 | `npm run audit:deps` | Audit runtime dependencies for known vulnerabilities |
+| `postscope doctor` | Check the effective server settings and report unsafe ones without printing secrets (see [Deployment recipes](docs/DEPLOYMENT.md#deployment-recipes-and-checklist)) |
 | `npm run release:check` | Verify that package, Docker and compose versions match the changelog |
 
 ---
