@@ -19,7 +19,14 @@ const RepairPage = lazyPage(() => import('./RepairPage'), 'RepairPage')
 const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
 const IdentityPage = lazyPage(() => import('./IdentityPage'), 'IdentityPage')
 import { checkInputBytes, checkInputText, INPUT_LIMITS, utf8ByteLength } from '../lib/inputLimits'
-import { analyzeCollectionText, auditAgain, describeAnalysisError, isAnalysisCancelled, type AnalysisStage } from '../lib/analyzeCollection'
+import {
+  analyzeCollectionText,
+  auditAgain,
+  describeAnalysisError,
+  isAnalysisCancelled,
+  type AnalysisResult,
+  type AnalysisStage,
+} from '../lib/analyzeCollection'
 import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
 import {
   clearCollectionSession,
@@ -154,7 +161,7 @@ export function AnalyzeApp({
   const [savingToLibrary, setSavingToLibrary] = useState(false)
   /** Older version used by the Compare page. It is analyzed with the current rule settings and never saved. */
   const [referenceRaw, setReferenceRaw] = useState<string | null>(null)
-  const [reference, setReference] = useState<CompareInput | null>(null)
+  const [reference, setReference] = useState<(CompareInput & { options: AuditOptions }) | null>(null)
   const [referenceLoading, setReferenceLoading] = useState(false)
   const [storageMode, setStorageModeState] = useState<StorageMode>(() => getStorageMode())
   // Consent covers one origin and one upload policy; a change to either asks again.
@@ -187,6 +194,18 @@ export function AnalyzeApp({
   rawJsonRef.current = rawJson
   /** Incremented for every analysis; results from superseded analyses are discarded. */
   const analysisSeq = useRef(0)
+  /**
+   * Counts every change to what is on screen: an import, a repair, a rule change and the choice of an environment.
+   * An audit result is applied only when no later change has happened since it started.
+   */
+  const viewGeneration = useRef(0)
+  /** The environment the person chose. The header shows it at once; the findings follow when their audit returns. */
+  const [selectedEnvironment, setSelectedEnvironment] = useState<number | undefined>(undefined)
+  const selectedEnvironmentRef = useRef<number | undefined>(undefined)
+  const chooseEnvironment = useCallback((index: number | undefined) => {
+    selectedEnvironmentRef.current = index
+    setSelectedEnvironment(index)
+  }, [])
   const restoreAttempted = useRef(false)
   /** Reports for readers outside the organization replace names, hosts, paths and credentials. */
   const [externalProfile, setExternalProfile] = useState(false)
@@ -236,47 +255,60 @@ export function AnalyzeApp({
     return analyzeCollectionText(raw, options, { environments: environmentTextsRef.current, activeEnvironment })
   }, [])
 
+  /**
+   * Audits the collection on screen again with the latest rule settings and the environment the person chose. Only the
+   * newest request may change the screen: an older one that returns late is dropped, so the findings always belong to
+   * the settings and environment that are currently selected.
+   */
+  const refreshView = useCallback(
+    (onApplied?: (result: AnalysisResult) => void, onError?: (error: unknown) => void) => {
+      if (!parsedRef.current) return
+      const generation = ++viewGeneration.current
+      const seq = analysisSeq.current
+      reaudit(auditOptionsRef.current, selectedEnvironmentRef.current)
+        .then((result) => {
+          // A newer import, repair, rule change or environment choice replaced this request while it ran.
+          if (!result || seq !== analysisSeq.current || generation !== viewGeneration.current) return
+          setParsed(result.parsed)
+          setFindings(result.findings)
+          setSuppressed(result.suppressed)
+          onApplied?.(result)
+        })
+        .catch((e) => (onError ?? console.error)(e))
+    },
+    [reaudit]
+  )
+
   const lastAuditOptions = useRef(auditOptions)
   useEffect(() => {
     if (lastAuditOptions.current === auditOptions) return
     lastAuditOptions.current = auditOptions
-    const current = parsedRef.current
-    if (!current) return
-    const seq = analysisSeq.current
-    reaudit(auditOptions, current.activeEnvironment)
-      .then((result) => {
-        // A newer import or repair replaced the collection while the audit ran.
-        if (!result || seq !== analysisSeq.current) return
-        setParsed(result.parsed)
-        setFindings(result.findings)
-        setSuppressed(result.suppressed)
-      })
-      .catch((e) => console.error(e))
-  }, [auditOptions, reaudit])
+    refreshView()
+  }, [auditOptions, refreshView])
 
   useEffect(() => {
     if (referenceRaw === null) {
       setReference(null)
       return
     }
-    let cancelled = false
+    // One request per input and rule settings. Replacing them aborts the previous request (its worker is replaced) and
+    // its result, if it still arrives, is ignored.
+    const controller = new AbortController()
     setReferenceLoading(true)
-    analyzeCollectionText(referenceRaw, auditOptions, { slot: 'reference' })
+    analyzeCollectionText(referenceRaw, auditOptions, { slot: 'reference', signal: controller.signal })
       .then((result) => {
-        if (!cancelled) setReference({ parsed: result.parsed, findings: result.findings })
+        if (!controller.signal.aborted) setReference({ parsed: result.parsed, findings: result.findings, options: auditOptions })
       })
       .catch((e) => {
-        if (cancelled) return
+        if (controller.signal.aborted || isAnalysisCancelled(e)) return
         console.error(e)
         setReferenceRaw(null)
         notify({ variant: 'error', title: 'Could not analyze the older version', description: describeAnalysisError(e) })
       })
       .finally(() => {
-        if (!cancelled) setReferenceLoading(false)
+        if (!controller.signal.aborted) setReferenceLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
+    return () => controller.abort()
   }, [referenceRaw, auditOptions, notify])
 
   const handleStorageModeChange = useCallback(
@@ -347,6 +379,7 @@ export function AnalyzeApp({
       restoring = false
     ): Promise<boolean> => {
       const seq = ++analysisSeq.current
+      viewGeneration.current += 1
       importController.current?.abort()
       const controller = new AbortController()
       importController.current = controller
@@ -360,6 +393,7 @@ export function AnalyzeApp({
       })
       if (seq !== analysisSeq.current) return false
       setAnalysisStage(null)
+      chooseEnvironment(analysis.parsed.activeEnvironment)
       const p = analysis.parsed
       const f = analysis.findings
       const s = analysis.suppressed
@@ -404,7 +438,7 @@ export function AnalyzeApp({
       }
       return true
     },
-    [loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify, notifyParseWarnings, goTo]
+    [loggingMode, storageMode, uploadConsent, refreshSavedCollections, notify, notifyParseWarnings, goTo, chooseEnvironment]
   )
 
   useEffect(() => {
@@ -587,6 +621,8 @@ export function AnalyzeApp({
 
   const handleAnalyzeAnother = useCallback(() => {
     analysisSeq.current += 1
+    viewGeneration.current += 1
+    chooseEnvironment(undefined)
     clearCollectionSession()
     setSessionExpiresAt(null)
     setParsed(null)
@@ -601,7 +637,7 @@ export function AnalyzeApp({
     setSearchOpen(false)
     setLandingLoading(false)
     goTo({ page: 'overview' }, true)
-  }, [goTo])
+  }, [goTo, chooseEnvironment])
 
   const handleLoadFromLibrary = useCallback(
     async (id: string) => {
@@ -705,11 +741,12 @@ export function AnalyzeApp({
   const handleApplyRepairedCollection = useCallback(
     async (raw: string) => {
       const seq = ++analysisSeq.current
+      viewGeneration.current += 1
       const environments = environmentTextsRef.current
-      // The environment the user selected stays selected after a repair.
+      // The environment the user selected stays selected after a repair, including one whose audit has not returned yet.
       const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, {
         environments,
-        activeEnvironment: parsedRef.current?.activeEnvironment,
+        activeEnvironment: selectedEnvironmentRef.current ?? parsedRef.current?.activeEnvironment,
       })
       const p = analysis.parsed
       const f = analysis.findings
@@ -814,24 +851,23 @@ export function AnalyzeApp({
   const handleSelectEnvironment = useCallback(
     (index: number) => {
       const current = parsedRef.current
-      if (!current || current.environments?.[index]?.kind !== 'environment' || current.activeEnvironment === index) return
-      const seq = analysisSeq.current
-      reaudit(auditOptionsRef.current, index)
-        .then((result) => {
-          if (!result || seq !== analysisSeq.current) return
-          setParsed(result.parsed)
-          setFindings(result.findings)
-          setSuppressed(result.suppressed)
+      // Compare with the choice, not with what is displayed: switching A, B, A quickly must end on A.
+      const chosen = selectedEnvironmentRef.current ?? current?.activeEnvironment
+      if (!current || current.environments?.[index]?.kind !== 'environment' || chosen === index) return
+      chooseEnvironment(index)
+      refreshView(
+        () => {
           const raw = rawJsonRef.current
           if (raw && shouldPersistSession(loggingMode, storageMode, keepSessionRef.current))
-            setSessionExpiresAt(saveCollectionSession(raw, result.parsed.name, environmentTextsRef.current, index))
-        })
-        .catch((e) => {
+            setSessionExpiresAt(saveCollectionSession(raw, parsedRef.current?.name ?? '', environmentTextsRef.current, index))
+        },
+        (e) => {
           console.error(e)
           notify({ variant: 'error', title: 'Could not switch environment', description: describeAnalysisError(e) })
-        })
+        }
+      )
     },
-    [reaudit, loggingMode, storageMode, notify]
+    [chooseEnvironment, refreshView, loggingMode, storageMode, notify]
   )
 
   const environmentOptions = useMemo<EnvironmentOption[]>(
@@ -934,7 +970,7 @@ export function AnalyzeApp({
         onOpenRules={() => setRulesOpen(true)}
         customRulesActive={userAuditPrefs !== null && isCustomized(auditOptions)}
         environments={environmentOptions}
-        activeEnvironment={parsed.activeEnvironment}
+        activeEnvironment={selectedEnvironment ?? parsed.activeEnvironment}
         onEnvironmentChange={handleSelectEnvironment}
         hasEnvironmentFiles={environmentTexts.length > 0}
         hasIdentity={showIdentity}
@@ -980,8 +1016,8 @@ export function AnalyzeApp({
           {active === 'compare' && (
             <ComparePage
               current={{ parsed, findings, score }}
-              reference={reference}
-              loading={referenceLoading}
+              reference={reference && reference.options === auditOptions ? reference : null}
+              loading={referenceLoading || (reference !== null && reference.options !== auditOptions)}
               library={teamLibraryVisible ? savedCollections : []}
               currentLibraryId={currentLibraryId}
               onChooseFile={(file) => void handleChooseReferenceFile(file)}
