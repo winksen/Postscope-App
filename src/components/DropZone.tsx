@@ -48,6 +48,9 @@ interface DropZoneProps {
   serverRedactsSecrets?: boolean
   /** The server encrypts stored collections at rest. */
   serverEncrypts?: boolean
+  /** Keep a copy for refresh in this tab (off by default). */
+  keepSession?: boolean
+  onKeepSessionChange?: (enabled: boolean) => void
   savedCollections?: SavedCollectionMeta[]
   onOpenLibrary?: () => void
   onLoadSaved?: (id: string) => void
@@ -65,6 +68,8 @@ export function DropZone({
   onUploadConsentChange,
   serverRedactsSecrets = false,
   serverEncrypts = false,
+  keepSession = false,
+  onKeepSessionChange,
   savedCollections = [],
   onOpenLibrary,
   onLoadSaved,
@@ -147,7 +152,7 @@ export function DropZone({
   const importBlocked = canChoosePrivacyMode(loggingMode) && requiresUploadConsent(loggingMode, storageMode) && !uploadConsent
 
   const privacyDescription = getPrivacyModeDescription(loggingMode, storageMode)
-  const dataHandling = describeDataHandling(loggingMode, storageMode, { serverRedactsSecrets, serverEncrypts })
+  const dataHandling = describeDataHandling(loggingMode, storageMode, { serverRedactsSecrets, serverEncrypts, keepSession })
   const remainingSavedCount = Math.max(savedCollections.length - 5, 0)
 
   return (
@@ -241,6 +246,15 @@ export function DropZone({
               </div>
             ))}
           </dl>
+
+          {dataHandling.canKeepSession && onKeepSessionChange && (
+            <div className="mt-2.5 flex items-center gap-2.5 px-4">
+              <Checkbox id="keep-session" checked={keepSession} onCheckedChange={(checked) => onKeepSessionChange(checked === true)} />
+              <Label htmlFor="keep-session" className="cursor-pointer text-xs font-normal leading-snug text-muted-foreground">
+                Keep this collection for refresh (60 minutes, this tab only)
+              </Label>
+            </div>
+          )}
 
           <AnimatePresence initial={false}>
             {isTeamLoggingRequired(loggingMode) && (

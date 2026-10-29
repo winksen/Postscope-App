@@ -38,6 +38,8 @@ interface AppHeaderProps {
   search: string
   onOpenSearch: () => void
   onAnalyzeAnother: () => void
+  sessionExpiresAt?: number | null
+  onForget?: () => void
   onSaveToLibrary?: () => void
   isSavedToLibrary: boolean
   savingToLibrary: boolean
@@ -60,6 +62,8 @@ export function AppHeader({
   search,
   onOpenSearch,
   onAnalyzeAnother,
+  sessionExpiresAt,
+  onForget,
   onSaveToLibrary,
   isSavedToLibrary,
   savingToLibrary,
@@ -206,6 +210,17 @@ export function AppHeader({
             </TooltipTrigger>
             <TooltipContent>{savingToLibrary ? 'Saving…' : 'Save to library'}</TooltipContent>
           </Tooltip>
+        )}
+
+        {sessionExpiresAt != null && onForget && (
+          <>
+            <span data-testid="session-expiry" className="hidden whitespace-nowrap text-xs text-muted-foreground xl:inline">
+              Kept until {new Date(sessionExpiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={onForget}>
+              Forget
+            </Button>
+          </>
         )}
 
         <Button

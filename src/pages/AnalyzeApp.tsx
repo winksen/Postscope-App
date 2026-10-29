@@ -20,7 +20,13 @@ const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
 const IdentityPage = lazyPage(() => import('./IdentityPage'), 'IdentityPage')
 import { analyzeCollectionText, auditAgain, describeAnalysisError } from '../lib/analyzeCollection'
 import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
-import { clearCollectionSession, loadCollectionSession, saveCollectionSession } from '../lib/collectionSession'
+import {
+  clearCollectionSession,
+  isSessionRetentionEnabled,
+  loadCollectionSession,
+  saveCollectionSession,
+  setSessionRetention,
+} from '../lib/collectionSession'
 import { getSavedCollection, listSavedCollections, saveToLibrary, type SavedCollectionMeta } from '../lib/collectionLibrary'
 import { getStorageMode, setStorageMode, hasUploadConsent, setUploadConsent, type StorageMode } from '../lib/storagePreferences'
 import {
@@ -147,6 +153,30 @@ export function AnalyzeApp({
   /** Incremented for every analysis; results from superseded analyses are discarded. */
   const analysisSeq = useRef(0)
   const restoreAttempted = useRef(false)
+  /** The person chose to keep a copy for refresh; off until they turn it on. */
+  const [keepSession, setKeepSession] = useState(() => isSessionRetentionEnabled())
+  const keepSessionRef = useRef(keepSession)
+  keepSessionRef.current = keepSession
+  /** When the stored session copy expires, shown in the header so it is never a surprise. */
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (sessionExpiresAt === null) return
+    const timer = setTimeout(
+      () => {
+        clearCollectionSession()
+        setSessionExpiresAt(null)
+      },
+      Math.max(0, sessionExpiresAt - Date.now())
+    )
+    return () => clearTimeout(timer)
+  }, [sessionExpiresAt])
+
+  const handleKeepSessionChange = useCallback((enabled: boolean) => {
+    setSessionRetention(enabled)
+    setKeepSession(enabled)
+    if (!enabled) setSessionExpiresAt(null)
+  }, [])
 
   useEffect(() => {
     const forced = getForcedStorageMode(loggingMode)
@@ -293,10 +323,11 @@ export function AnalyzeApp({
       setSearch('')
       notifyParseWarnings(p)
 
-      if (shouldPersistSession(loggingMode, storageMode)) {
-        if (!saveCollectionSession(raw, p.name, environments, p.activeEnvironment)) {
+      if (shouldPersistSession(loggingMode, storageMode, keepSessionRef.current)) {
+        const expiresAt = saveCollectionSession(raw, p.name, environments, p.activeEnvironment)
+        if (expiresAt === null) {
           notify({ title: 'Collection not kept for refresh', description: 'It is larger than the browser session storage limit.' })
-        }
+        } else setSessionExpiresAt(expiresAt)
       }
 
       if (libraryId) {
@@ -327,7 +358,10 @@ export function AnalyzeApp({
   useEffect(() => {
     if (restoreAttempted.current) return
     restoreAttempted.current = true
-    if (!shouldPersistSession(loggingMode, storageMode)) {
+    // The storage choice in hybrid mode is not remembered across a refresh, so a kept copy is restored whenever the
+    // person opted in and the deployment allows copies; anything else is removed rather than left behind.
+    if (!keepSessionRef.current || loggingMode === 'off') {
+      clearCollectionSession()
       setRestoringSession(false)
       return
     }
@@ -336,6 +370,7 @@ export function AnalyzeApp({
       setRestoringSession(false)
       return
     }
+    setSessionExpiresAt(session.expiresAt ?? null)
     void applyCollectionJson(session.rawJson, null, session.environments ?? [], session.activeEnvironment, true)
       .catch((e) => {
         console.error(e)
@@ -474,6 +509,7 @@ export function AnalyzeApp({
   const handleAnalyzeAnother = useCallback(() => {
     analysisSeq.current += 1
     clearCollectionSession()
+    setSessionExpiresAt(null)
     setParsed(null)
     setFindings([])
     setSuppressed([])
@@ -598,8 +634,8 @@ export function AnalyzeApp({
         goTo({ page: 'repair' }, true)
         setSearch('')
 
-        if (shouldPersistSession(loggingMode, storageMode)) {
-          saveCollectionSession(raw, p.name, environments, p.activeEnvironment)
+        if (shouldPersistSession(loggingMode, storageMode, keepSessionRef.current)) {
+          setSessionExpiresAt(saveCollectionSession(raw, p.name, environments, p.activeEnvironment))
         }
       }
 
@@ -696,8 +732,8 @@ export function AnalyzeApp({
           setFindings(result.findings)
           setSuppressed(result.suppressed)
           const raw = rawJsonRef.current
-          if (raw && shouldPersistSession(loggingMode, storageMode))
-            saveCollectionSession(raw, result.parsed.name, environmentTextsRef.current, index)
+          if (raw && shouldPersistSession(loggingMode, storageMode, keepSessionRef.current))
+            setSessionExpiresAt(saveCollectionSession(raw, result.parsed.name, environmentTextsRef.current, index))
         })
         .catch((e) => {
           console.error(e)
@@ -748,6 +784,8 @@ export function AnalyzeApp({
           onUploadConsentChange={handleUploadConsentChange}
           serverRedactsSecrets={libraryRedactSecrets}
           serverEncrypts={libraryEncrypted}
+          keepSession={keepSession}
+          onKeepSessionChange={handleKeepSessionChange}
           savedCollections={teamLibraryVisible ? savedCollections : []}
           onOpenLibrary={teamLibraryVisible ? () => setLibraryOpen(true) : undefined}
           onLoadSaved={teamLibraryVisible ? (id) => void handleLoadFromLibrary(id) : undefined}
@@ -786,6 +824,8 @@ export function AnalyzeApp({
         search={search}
         onOpenSearch={() => setSearchOpen(true)}
         onAnalyzeAnother={handleAnalyzeAnother}
+        sessionExpiresAt={sessionExpiresAt}
+        onForget={handleAnalyzeAnother}
         onSaveToLibrary={canSave ? () => void handleSaveCurrentToLibrary() : undefined}
         isSavedToLibrary={teamLibraryVisible && isSavedToLibrary}
         savingToLibrary={savingToLibrary}

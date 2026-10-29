@@ -17,7 +17,7 @@ PostScope **parses a collection in the browser**, analyzes it in a Web Worker wi
 - A **score** view with grade and category breakdowns (secrets, variables, auth, hygiene)
 - Exports as JSON, SARIF and Markdown, and a **CLI** (`npm run scan`) for CI
 
-Collection analysis always runs in the browser. An optional Node server hosts the built app and can keep a shared **team library** of past collections (see [Deployment](#deployment)): with `LOGGING_MODE=off` nothing is sent, with `hybrid` the collection is sent only when you choose Save to history and accept the upload warning, and with `on` every import is sent. Environment files are never sent. Where a session copy applies (`on`, or `hybrid` with Save to history) the collection and environment files are restored from **session storage** after a refresh (same tab, about 4.5 MB limit); with `off` or incognito nothing is kept. The import screen shows which of these applies.
+Collection analysis always runs in the browser. An optional Node server hosts the built app and can keep a shared **team library** of past collections (see [Deployment](#deployment)): with `LOGGING_MODE=off` nothing is sent, with `hybrid` the collection is sent only when you choose Save to history and accept the upload warning, and with `on` every import is sent. Environment files are never sent. Nothing is kept for a refresh unless you tick **Keep this collection for refresh** (offered in `on` and `hybrid` with Save to history): the collection and environment files then stay in **session storage** for this tab for 60 minutes (about 4.5 MB limit), the header shows when they expire and **Forget** removes them at once. With `off` or incognito nothing is ever kept. The import screen shows which of these applies.
 
 ### Limitations (by design)
 
@@ -195,7 +195,7 @@ Postscope-App/
 5. Use the header **search** to filter content where supported.
 6. Use **Analyze another** to clear state and import a new file.
 
-In `LOGGING_MODE=on`, or `hybrid` with Save to history, refreshing the page keeps the current collection and environment files in this browser tab (session storage) and closing the tab clears them. In `off` mode and in incognito nothing is kept, so a refresh returns to the import screen.
+Refreshing the page returns to the import screen, unless you ticked **Keep this collection for refresh** (only in `on` and `hybrid` modes). Then the collection and environment files stay in this browser tab (session storage) for 60 minutes, the header shows the expiry and **Forget** removes them immediately. Closing the tab also clears them. In `off` mode and in incognito nothing is kept.
 
 If parsing fails, confirm the file is valid JSON and a Postman collection (schema in `info.schema` is expected for real exports).
 

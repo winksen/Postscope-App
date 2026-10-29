@@ -12,7 +12,13 @@ test('the summary follows the same predicates that decide uploads and session co
     for (const storage of STORAGE) {
       const summary = describeDataHandling(mode, storage)
       assert.equal(summary.uploadsCollection, canSaveToAppStorage(mode, storage, true), `${mode}/${storage} upload`)
-      assert.equal(summary.keepsSessionCopy, shouldPersistSession(mode, storage), `${mode}/${storage} session`)
+      assert.equal(summary.canKeepSession, shouldPersistSession(mode, storage, true), `${mode}/${storage} eligible`)
+      assert.equal(summary.keepsSessionCopy, false, `${mode}/${storage} nothing is kept until the person opts in`)
+      assert.equal(
+        describeDataHandling(mode, storage, { keepSession: true }).keepsSessionCopy,
+        shouldPersistSession(mode, storage, true),
+        `${mode}/${storage} session`
+      )
       assert.equal(summary.uploadsEnvironments, false)
     }
   }
@@ -27,7 +33,16 @@ test('off mode and incognito say nothing is sent and nothing is kept', () => {
     const text = summary.rows.map((row) => row.value).join(' ')
     assert.match(text, /not sent to the app server/)
     assert.match(text, /Nothing is kept/)
+    assert.equal(describeDataHandling(mode, storage, { keepSession: true }).keepsSessionCopy, false, 'no copy is allowed here')
   }
+})
+
+test('team modes offer keep for refresh, off by default, and state the expiry once on', () => {
+  const offered = describeDataHandling('on', 'history')
+  assert.equal(offered.canKeepSession, true)
+  assert.match(offered.rows.find((row) => row.id === 'refresh')?.value ?? '', /Nothing is kept. Turn on keep for refresh/)
+  const kept = describeDataHandling('on', 'history', { keepSession: true, sessionExpiresAt: Date.now() + 60_000 })
+  assert.match(kept.rows.find((row) => row.id === 'refresh')?.value ?? '', /until .*restored after a refresh/)
 })
 
 test('team modes say the collection is shared and describe the server protections', () => {

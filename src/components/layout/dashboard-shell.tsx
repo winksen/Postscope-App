@@ -14,6 +14,9 @@ interface DashboardShellProps {
   search: string
   onOpenSearch: () => void
   onAnalyzeAnother: () => void
+  /** When the kept session copy expires, and the action that removes it now. */
+  sessionExpiresAt?: number | null
+  onForget?: () => void
   onSaveToLibrary?: () => void
   isSavedToLibrary: boolean
   savingToLibrary: boolean
@@ -43,6 +46,8 @@ export function DashboardShell({
   search,
   onOpenSearch,
   onAnalyzeAnother,
+  sessionExpiresAt,
+  onForget,
   onSaveToLibrary,
   isSavedToLibrary,
   savingToLibrary,
@@ -90,6 +95,8 @@ export function DashboardShell({
         search={search}
         onOpenSearch={onOpenSearch}
         onAnalyzeAnother={onAnalyzeAnother}
+        sessionExpiresAt={sessionExpiresAt}
+        onForget={onForget}
         onSaveToLibrary={onSaveToLibrary}
         isSavedToLibrary={isSavedToLibrary}
         savingToLibrary={savingToLibrary}

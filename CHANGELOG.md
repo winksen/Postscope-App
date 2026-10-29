@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.4
+
+- Added explicit session retention that stays off until the person turns it on
+- Added a visible expiry and a Forget action that remove the stored collection and environment files
+- Discarded kept copies that have expired or that predate the expiry
+
 ## V0.3.3
 
 - Explained browser memory, session storage and server uploads before import

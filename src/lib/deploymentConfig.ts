@@ -122,7 +122,12 @@ export function canSaveToAppStorage(loggingMode: LoggingMode, storageMode: Stora
   return storageMode === 'history' && hasConsent
 }
 
-export function shouldPersistSession(loggingMode: LoggingMode, storageMode: StorageMode): boolean {
+/**
+ * Whether a copy of the collection and environment files is kept in this tab's session storage. The deployment mode
+ * decides whether a copy is allowed at all; the person must also have turned on "keep for refresh".
+ */
+export function shouldPersistSession(loggingMode: LoggingMode, storageMode: StorageMode, keepSession: boolean): boolean {
+  if (!keepSession) return false
   if (loggingMode === 'on') return true
   if (loggingMode === 'off') return false
   return storageMode === 'history'
