@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.6
+
+- Added separate internal and external sharing profiles for every report format
+- Added the external profile to the export menu, the CLI and the project config
+- Added operator-defined internal identifiers that external reports never contain
+
 ## V0.3.5
 
 - Renewed upload consent when the destination or storage policy changes

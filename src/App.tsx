@@ -59,6 +59,7 @@ export default function App() {
       libraryEncrypted={config.libraryEncrypted}
       libraryRedactSecrets={config.libraryRedactSecrets}
       libraryRetentionDays={config.libraryRetentionDays}
+      internalIdentifiers={config.internalIdentifiers}
       auditPolicy={config.auditPolicy}
     />
   )

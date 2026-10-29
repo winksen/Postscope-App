@@ -12,13 +12,21 @@ import { fileURLToPath } from 'node:url'
 import { parseCollection } from '../src/lib/parser'
 import { runAuditDetailed, sanitizeAuditOptions, type AuditOptions, type Finding } from '../src/lib/auditor'
 import { calculateScore } from '../src/lib/scorer'
-import { buildJsonReport, buildMarkdownReport, buildReport, buildSarifReport, type ReportContext } from '../src/lib/reportExport'
+import {
+  buildJsonReport,
+  buildMarkdownReport,
+  buildReport,
+  buildSarifReport,
+  type ReportContext,
+  type ReportFormat,
+} from '../src/lib/reportExport'
 import { renderHtmlReports } from '../src/lib/htmlReport'
 import { buildJunitReport } from '../src/lib/junitReport'
 import { expandInputs, findSiblingEnvironments } from './inputs'
 import { attachEvidencePointers } from '../src/lib/evidencePointers'
 import { redactCollection, redactEnvironment } from '../src/lib/redaction'
 import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src/lib/projectConfig'
+import { applyReportProfile, isReportProfile, REPORT_PROFILES, type ReportProfile } from '../src/lib/reportPrivacy'
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
 import { attachEnvironments, detectEnvironmentKind, parseEnvironment, type EnvironmentKind } from '../src/lib/environment'
 import { RULE_LIST } from '../src/lib/rules'
@@ -56,6 +64,10 @@ interface CliOptions {
   compliance?: ComplianceFramework
   /** Also remove personal data from the sanitized copy (`--redact-pii`). */
   redactPii: boolean
+  /** Sharing profile (`--profile`); `external` replaces names, hosts, paths and credentials in every report format. */
+  profile?: ReportProfile
+  /** Extra identifiers that must not appear in an external report (`--internal-identifier`, repeatable). */
+  internalIdentifiers: string[]
   /** Postman environment and globals export files (applied to every collection). */
   environments: Array<{ file: string; globals: boolean }>
   /** Also analyze the environment and globals files stored next to each collection. */
@@ -95,6 +107,10 @@ Options:
                                            Environment files are written next to it as <name>.sanitized.postman_environment.json
       --compliance <nist-800-53|iso-27001|cis-v8>
                                            Group the markdown, html and json reports by the controls of a framework
+      --profile <internal|external>        Sharing profile. external replaces collection, folder, request and environment names, hosts,
+                                           URL paths, client ids and credentials in every report format (default: internal)
+      --internal-identifier <text>         A string that must not appear in an external report (repeatable; also in .postscope.json under
+                                           privacy.internalIdentifiers)
       --redact-pii                         With --sanitize, also replace personal data (emails, phone and card numbers, IBANs, national ids,
                                            dates of birth, employee ids) in request bodies and saved examples
       --auto-env                           Also use the *.postman_environment.json and *.postman_globals.json next to each collection
@@ -125,6 +141,7 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
     noConfig: false,
     quiet: false,
     redactPii: false,
+    internalIdentifiers: [],
   }
   const disabled: string[] = []
   const overrides: Record<string, string> = {}
@@ -217,6 +234,18 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
         if (!isComplianceFramework(framework))
           throw new UsageError(`Unknown --compliance framework "${framework}" (use ${COMPLIANCE_FRAMEWORKS.join(', ')})`)
         options.compliance = framework
+        break
+      }
+      case '--profile': {
+        const profile = value()
+        if (!isReportProfile(profile)) throw new UsageError(`Unknown --profile "${profile}" (use ${REPORT_PROFILES.join(', ')})`)
+        options.profile = profile
+        break
+      }
+      case '--internal-identifier': {
+        const identifier = value().trim()
+        if (identifier.length < 3) throw new UsageError('--internal-identifier needs at least 3 characters')
+        options.internalIdentifiers.push(identifier)
         break
       }
       case '--redact-pii':
@@ -396,6 +425,10 @@ function analyzeFile(
         baselined: applied?.hidden,
         sourceText,
         compliance: options.compliance,
+        privacy: {
+          profile: options.profile ?? config?.privacy?.profile ?? 'internal',
+          internalIdentifiers: [...(config?.privacy?.internalIdentifiers ?? []), ...options.internalIdentifiers],
+        },
       },
     },
     json,
@@ -433,15 +466,24 @@ function textReport(files: AnalyzedFile[], appVersion: string): string {
   return lines.join('\n')
 }
 
+/** Formats that are not built from one report context each get the sharing profile applied to their finished text. */
+function withProfile(files: AnalyzedFile[], format: ReportFormat, text: string): string {
+  return files.reduce((result, { ctx }) => applyReportProfile(format, result, ctx), text)
+}
+
 function render(files: AnalyzedFile[], format: Format, appVersion: string, failOn: FailOn): string {
-  if (format === 'text') return textReport(files, appVersion)
+  if (format === 'text') return withProfile(files, 'markdown', textReport(files, appVersion))
   if (format === 'markdown') return files.map(({ ctx }) => buildMarkdownReport(ctx)).join('\n\n---\n\n')
-  if (format === 'html') return renderHtmlReports(files.map(({ ctx }) => ctx))
+  if (format === 'html') return withProfile(files, 'html', renderHtmlReports(files.map(({ ctx }) => ctx)))
   if (format === 'identity-csv') return files.map(({ ctx }) => buildReport('identity-csv', ctx)).join('\r\n')
   if (format === 'junit')
-    return buildJunitReport(
-      files.map(({ ctx }) => ctx),
-      { failOn }
+    return withProfile(
+      files,
+      'markdown',
+      buildJunitReport(
+        files.map(({ ctx }) => ctx),
+        { failOn }
+      )
     )
   if (format === 'json') {
     const reports = files.map(({ ctx }) => JSON.parse(buildJsonReport(ctx)) as unknown)
@@ -598,6 +640,7 @@ function runDiff(argv: string[], appVersion: string): number {
       config: options.config,
       quiet: true,
       redactPii: false,
+      internalIdentifiers: [],
     }
     const [older, newer] = [options.before, options.after].map((input) => analyzeFile(input, scanOptions, appVersion, []).result.ctx)
     const comparison = compareCollections(older, newer)

@@ -2,6 +2,7 @@ import { isRuleId } from './rules'
 import { isRulePackId, RULE_PACKS, sanitizeRulePacks, type RulePackSettings } from './rulePacks'
 import { isSeverity, type ScoreWeights, type Severity, SEVERITY_ORDER, sanitizeScoreWeights } from './severity'
 import { isValidDate, type ConfigSuppression } from './suppressions'
+import { isReportProfile, REPORT_PROFILES, type ReportPrivacy } from './reportPrivacy'
 
 /** Name of the project file the CLI looks for, from the scanned file's folder upwards. */
 export const CONFIG_FILE_NAME = '.postscope.json'
@@ -13,9 +14,12 @@ export interface ProjectConfig {
   /** Rule pack selection: `{ "enabled": ["iam-am"], "disabled": ["iam-pam"] }`. Packs in neither list follow `auto`. */
   rulePacks?: RulePackSettings
   suppressions?: ConfigSuppression[]
+  /** Sharing profile and the identifiers that must not leave the organization (see `reportPrivacy.ts`). */
+  privacy?: Partial<ReportPrivacy>
 }
 
-const KEYS = new Set(['disabledRules', 'severityOverrides', 'weights', 'rulePacks', 'suppressions'])
+const KEYS = new Set(['disabledRules', 'severityOverrides', 'weights', 'rulePacks', 'suppressions', 'privacy'])
+const PRIVACY_KEYS = new Set(['profile', 'internalIdentifiers'])
 const SUPPRESSION_KEYS = new Set(['ruleId', 'request', 'location', 'reason', 'expires'])
 
 /**
@@ -89,6 +93,26 @@ export function parseProjectConfig(input: unknown): { config: ProjectConfig; err
         }
       }
       config.rulePacks = sanitizeRulePacks(packs)
+    }
+  }
+
+  if (raw.privacy !== undefined) {
+    const privacy = raw.privacy
+    if (!privacy || typeof privacy !== 'object' || Array.isArray(privacy)) errors.push('"privacy" must be an object')
+    else {
+      const entries = privacy as Record<string, unknown>
+      for (const key of Object.keys(entries)) if (!PRIVACY_KEYS.has(key)) errors.push(`"privacy" has unknown key "${key}"`)
+      config.privacy = {}
+      if (entries.profile !== undefined) {
+        if (!isReportProfile(entries.profile)) errors.push(`"privacy.profile" must be one of ${REPORT_PROFILES.join(', ')}`)
+        else config.privacy.profile = entries.profile
+      }
+      if (entries.internalIdentifiers !== undefined) {
+        const ids = entries.internalIdentifiers
+        if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string' || id.trim().length < 3))
+          errors.push('"privacy.internalIdentifiers" must be an array of strings with at least 3 characters')
+        else config.privacy.internalIdentifiers = ids.map((id) => String(id).trim())
+      }
     }
   }
 

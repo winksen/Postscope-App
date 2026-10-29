@@ -56,6 +56,7 @@ import { createRepairPlan } from '../lib/repairEngine'
 import type { AuditOptions, Finding } from '../lib/auditor'
 import type { SuppressedFinding } from '../lib/suppressions'
 import { buildReport, reportFileName, reportMimeType, safeFileStem, type ReportFormat } from '../lib/reportExport'
+import type { ReportPrivacy } from '../lib/reportPrivacy'
 import { redactCollection, redactEnvironment } from '../lib/redaction'
 import { isEmptyProfile } from '../lib/iam/types'
 import { attachEvidencePointers } from '../lib/evidencePointers'
@@ -82,10 +83,12 @@ interface AnalyzeAppProps {
   libraryEncrypted?: boolean
   libraryRedactSecrets?: boolean
   libraryRetentionDays?: number
+  internalIdentifiers?: string[]
   auditPolicy?: AuditOptions
 }
 
 const EMPTY_POLICY: AuditOptions = {}
+const NO_IDENTIFIERS: string[] = []
 
 function formatMegabytes(bytes: number): string {
   return `${Math.round((bytes / 1_000_000) * 10) / 10} MB`
@@ -103,6 +106,7 @@ export function AnalyzeApp({
   libraryEncrypted = false,
   libraryRedactSecrets = false,
   libraryRetentionDays = 0,
+  internalIdentifiers = NO_IDENTIFIERS,
   auditPolicy = EMPTY_POLICY,
 }: AnalyzeAppProps) {
   const { notify } = useToast()
@@ -178,6 +182,8 @@ export function AnalyzeApp({
   /** Incremented for every analysis; results from superseded analyses are discarded. */
   const analysisSeq = useRef(0)
   const restoreAttempted = useRef(false)
+  /** Reports for readers outside the organization replace names, hosts, paths and credentials. */
+  const [externalProfile, setExternalProfile] = useState(false)
   /** The person chose to keep a copy for refresh; off until they turn it on. */
   const [keepSession, setKeepSession] = useState(() => isSessionRetentionEnabled())
   const keepSessionRef = useRef(keepSession)
@@ -731,6 +737,7 @@ export function AnalyzeApp({
           return
         }
         const reportFormat: ReportFormat = format
+        const privacy: ReportPrivacy = { profile: externalProfile ? 'external' : 'internal', internalIdentifiers }
         const source = JSON.parse(rawJson) as unknown
         const content = buildReport(reportFormat, {
           parsed,
@@ -739,14 +746,15 @@ export function AnalyzeApp({
           score,
           appVersion,
           sourceText: rawJson,
+          privacy,
         })
-        downloadTextFile(reportFileName(parsed.name, reportFormat), content, reportMimeType(reportFormat))
+        downloadTextFile(reportFileName(externalProfile ? 'collection' : parsed.name, reportFormat), content, reportMimeType(reportFormat))
       } catch (e) {
         console.error(e)
         notify({ variant: 'error', title: 'Export failed', description: e instanceof Error ? e.message : undefined })
       }
     },
-    [parsed, score, rawJson, findings, suppressed, appVersion, environmentTexts, notify]
+    [parsed, score, rawJson, findings, suppressed, appVersion, environmentTexts, externalProfile, internalIdentifiers, notify]
   )
 
   const handleSelectEnvironment = useCallback(
@@ -855,6 +863,8 @@ export function AnalyzeApp({
         search={search}
         onOpenSearch={() => setSearchOpen(true)}
         onAnalyzeAnother={handleAnalyzeAnother}
+        externalProfile={externalProfile}
+        onExternalProfileChange={setExternalProfile}
         sessionExpiresAt={sessionExpiresAt}
         onForget={handleAnalyzeAnother}
         onSaveToLibrary={canSave ? () => void handleSaveCurrentToLibrary() : undefined}

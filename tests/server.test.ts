@@ -507,4 +507,11 @@ test('the audit log can be switched off and config reports whether the library i
   }
   assert.equal(JSON.parse((await raw('/api/config')).body).libraryEncrypted, false)
   assert.equal(typeof JSON.parse((await raw('/api/config')).body).libraryRetentionDays, 'number')
+  assert.deepEqual(JSON.parse((await raw('/api/config')).body).internalIdentifiers, [])
+  process.env.PRIVACY_INTERNAL_IDENTIFIERS = ' acme-corp , ab, Project Falcon '
+  try {
+    assert.deepEqual(JSON.parse((await raw('/api/config')).body).internalIdentifiers, ['acme-corp', 'Project Falcon'])
+  } finally {
+    delete process.env.PRIVACY_INTERNAL_IDENTIFIERS
+  }
 })

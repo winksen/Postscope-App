@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -40,6 +41,9 @@ interface AppHeaderProps {
   onAnalyzeAnother: () => void
   sessionExpiresAt?: number | null
   onForget?: () => void
+  /** Reports replace names, hosts, paths and credentials for readers outside the organization. */
+  externalProfile?: boolean
+  onExternalProfileChange?: (external: boolean) => void
   onSaveToLibrary?: () => void
   isSavedToLibrary: boolean
   savingToLibrary: boolean
@@ -64,6 +68,8 @@ export function AppHeader({
   onAnalyzeAnother,
   sessionExpiresAt,
   onForget,
+  externalProfile = false,
+  onExternalProfileChange,
   onSaveToLibrary,
   isSavedToLibrary,
   savingToLibrary,
@@ -160,6 +166,17 @@ export function AppHeader({
               <TooltipContent>Export</TooltipContent>
             </Tooltip>
             <DropdownMenuContent align="end" className="w-60">
+              {onExternalProfileChange && (
+                <>
+                  <DropdownMenuCheckboxItem
+                    checked={externalProfile}
+                    onCheckedChange={(checked) => onExternalProfileChange(checked === true)}
+                  >
+                    Share outside the organization
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuLabel className="text-xs text-muted-foreground">Findings report</DropdownMenuLabel>
               <DropdownMenuItem onSelect={() => onExport('markdown')}>
                 <FileText weight="fill" /> Markdown (.md)

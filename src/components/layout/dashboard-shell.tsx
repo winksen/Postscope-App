@@ -17,6 +17,8 @@ interface DashboardShellProps {
   /** When the kept session copy expires, and the action that removes it now. */
   sessionExpiresAt?: number | null
   onForget?: () => void
+  externalProfile?: boolean
+  onExternalProfileChange?: (external: boolean) => void
   onSaveToLibrary?: () => void
   isSavedToLibrary: boolean
   savingToLibrary: boolean
@@ -48,6 +50,8 @@ export function DashboardShell({
   onAnalyzeAnother,
   sessionExpiresAt,
   onForget,
+  externalProfile,
+  onExternalProfileChange,
   onSaveToLibrary,
   isSavedToLibrary,
   savingToLibrary,
@@ -97,6 +101,8 @@ export function DashboardShell({
         onAnalyzeAnother={onAnalyzeAnother}
         sessionExpiresAt={sessionExpiresAt}
         onForget={onForget}
+        externalProfile={externalProfile}
+        onExternalProfileChange={onExternalProfileChange}
         onSaveToLibrary={onSaveToLibrary}
         isSavedToLibrary={isSavedToLibrary}
         savingToLibrary={savingToLibrary}

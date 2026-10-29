@@ -10,6 +10,7 @@ import { findingOccurrences, occurrenceFingerprint } from './occurrences'
 import type { SuppressedFinding } from './suppressions'
 import { locatePointers } from './jsonPositions'
 import { buildHtmlReport } from './htmlReport'
+import { applyReportProfile, type ReportPrivacy } from './reportPrivacy'
 
 export type ReportFormat = 'json' | 'sarif' | 'markdown' | 'html' | 'identity-csv'
 
@@ -35,6 +36,8 @@ export interface ReportContext {
   sourceText?: string
   /** Group the report by the controls of this framework (`--compliance`). */
   compliance?: ComplianceFramework
+  /** Sharing profile. Without it, or with `internal`, the report keeps names, hosts and paths as they are. */
+  privacy?: ReportPrivacy
 }
 
 const TOOL_NAME = 'PostScope'
@@ -114,6 +117,10 @@ function severityCounts(findings: Finding[]): Record<Finding['severity'], number
 
 /** Machine-readable report. Evidence previews are already masked by the auditor. */
 export function buildJsonReport(ctx: ReportContext): string {
+  return applyReportProfile('json', buildJsonReportBase(ctx), ctx)
+}
+
+function buildJsonReportBase(ctx: ReportContext): string {
   const labels = labelMap(ctx.parsed.requests)
   return JSON.stringify(
     {
@@ -204,6 +211,10 @@ function fingerprint(value: string): string {
 
 /** SARIF 2.1.0 log for GitHub code scanning, Azure DevOps, and other CI dashboards. */
 export function buildSarifReport(ctx: ReportContext): string {
+  return applyReportProfile('sarif', buildSarifReportBase(ctx), ctx)
+}
+
+function buildSarifReportBase(ctx: ReportContext): string {
   const labels = labelMap(ctx.parsed.requests)
   const uri = ctx.sourceName ?? `${safeFileStem(ctx.parsed.name)}.postman_collection.json`
   const ruleIndex = new Map(RULE_LIST.map((rule, index) => [rule.id, index]))
@@ -345,6 +356,10 @@ export function escapeMarkdown(text: string): string {
 
 /** Human-readable report for pull requests, tickets, and audits. */
 export function buildMarkdownReport(ctx: ReportContext): string {
+  return applyReportProfile('markdown', buildMarkdownReportBase(ctx), ctx)
+}
+
+function buildMarkdownReportBase(ctx: ReportContext): string {
   const labels = labelMap(ctx.parsed.requests)
   const counts = severityCounts(ctx.findings)
   const lines: string[] = []
@@ -453,7 +468,7 @@ export function buildMarkdownReport(ctx: ReportContext): string {
 export function buildReport(format: ReportFormat, ctx: ReportContext): string {
   if (format === 'sarif') return buildSarifReport(ctx)
   if (format === 'markdown') return buildMarkdownReport(ctx)
-  if (format === 'html') return buildHtmlReport(ctx)
-  if (format === 'identity-csv') return buildIdentityInventoryCsv(ctx.parsed, ctx.findings)
+  if (format === 'html') return applyReportProfile('html', buildHtmlReport(ctx), ctx)
+  if (format === 'identity-csv') return applyReportProfile('identity-csv', buildIdentityInventoryCsv(ctx.parsed, ctx.findings), ctx)
   return buildJsonReport(ctx)
 }

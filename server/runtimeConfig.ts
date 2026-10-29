@@ -236,6 +236,17 @@ export function getTrustedProxyPeerEntries(): string[] {
     .filter(Boolean)
 }
 
+/**
+ * Strings that must not appear in a report shared outside the organization (PRIVACY_INTERNAL_IDENTIFIERS, comma
+ * separated): tenant names, domains, project codes. The browser sends them to the external sharing profile.
+ */
+export function getInternalIdentifiers(): string[] {
+  return (env('PRIVACY_INTERNAL_IDENTIFIERS') ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length >= 3)
+}
+
 /** Only http(s) URLs are allowed for outbound links so a misconfiguration cannot inject `javascript:` URLs. */
 export function sanitizeExternalUrl(value: string | undefined, fallback: string): string {
   if (!value) return fallback

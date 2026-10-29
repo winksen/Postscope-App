@@ -25,6 +25,8 @@ export interface AppConfig {
   libraryEncrypted: boolean
   /** Stored collections are deleted after this many days (0 keeps them until removed). */
   libraryRetentionDays: number
+  /** Operator-defined strings that the external sharing profile removes from reports. */
+  internalIdentifiers: string[]
   /** Team audit policy defaults (disabled rules, severity overrides). */
   auditPolicy: AuditOptions
   /** Points per finding severity used by the score (scoring model v2). */
@@ -43,6 +45,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   libraryRedactSecrets: false,
   libraryEncrypted: false,
   libraryRetentionDays: 0,
+  internalIdentifiers: [],
   auditPolicy: {},
   scoreWeights: DEFAULT_SCORE_WEIGHTS,
 }
@@ -85,6 +88,9 @@ export async function fetchAppConfig(): Promise<AppConfig> {
       libraryAllowDelete: body.libraryAllowDelete !== false,
       libraryRedactSecrets: body.libraryRedactSecrets === true,
       libraryEncrypted: body.libraryEncrypted === true,
+      internalIdentifiers: Array.isArray(body.internalIdentifiers)
+        ? body.internalIdentifiers.filter((id): id is string => typeof id === 'string' && id.length >= 3).slice(0, 200)
+        : [],
       libraryRetentionDays: Number.isFinite(Number(body.libraryRetentionDays)) ? Math.max(0, Number(body.libraryRetentionDays)) : 0,
       auditPolicy: sanitizeAuditOptions(body.auditPolicy),
       scoreWeights: sanitizeScoreWeights(body.scoreWeights),

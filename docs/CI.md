@@ -41,6 +41,8 @@ Useful options (all in `postscope --help`):
 | `--baseline file` / `--write-baseline file` | Fail only on findings that are new compared with a committed baseline |
 | `--config file` | Project config (`.postscope.json`), otherwise the nearest one above each collection is used |
 | `--sanitize file` with `--redact-pii` | Write a sanitized copy that also replaces personal data (emails, phone and card numbers, IBANs, national ids, dates of birth, employee ids) in request bodies and saved examples |
+| `--profile internal\|external` | Sharing profile for every report format (`text`, `json`, `sarif`, `markdown`, `html`, `junit`, `identity-csv`). `external` replaces collection, folder, request and environment names, hosts, URL paths, client ids and credentials with stable placeholders and keeps rule ids, titles, severities, scores and counts. Default `internal`. |
+| `--internal-identifier <text>` | A string that must not appear in an external report (repeatable, 3 characters or more). The same list can live in `.postscope.json` as `"privacy": { "internalIdentifiers": [...], "profile": "external" }`. |
 | `--compliance nist-800-53\|iso-27001\|cis-v8` | Group the text, Markdown, HTML and JSON reports by the controls of one framework. Every report already has a compliance mapping table per finding |
 | `--format identity-csv` | Write `identity-inventory.csv` for access reviews and audits: endpoint class, platform, method, URL without query, request and related findings |
 | `--packs auto\|none\|PACK,-PACK` | Rule packs. `auto` (default) turns the identity packs on when the collection shows identity signals; list packs (`iam-am`, `iam-iga`, `iam-pam`, `iam-platform`) to force them on, prefix with `-` to force them off |
@@ -74,7 +76,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.3.5
+        uses: winksen/Postscope-App@v0.3.6
         with:
           path: collections
           fail-on: critical
