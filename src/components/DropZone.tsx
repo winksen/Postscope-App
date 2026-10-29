@@ -30,6 +30,7 @@ import {
   type LoggingMode,
 } from '@/lib/deploymentConfig'
 import type { StorageMode } from '@/lib/storagePreferences'
+import { describeDataHandling } from '@/lib/dataHandling'
 
 const fadeTransition = { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
 
@@ -43,6 +44,10 @@ interface DropZoneProps {
   onStorageModeChange: (mode: StorageMode) => void
   uploadConsent: boolean
   onUploadConsentChange: (accepted: boolean) => void
+  /** The server removes credentials before storing a collection. */
+  serverRedactsSecrets?: boolean
+  /** The server encrypts stored collections at rest. */
+  serverEncrypts?: boolean
   savedCollections?: SavedCollectionMeta[]
   onOpenLibrary?: () => void
   onLoadSaved?: (id: string) => void
@@ -58,6 +63,8 @@ export function DropZone({
   onStorageModeChange,
   uploadConsent,
   onUploadConsentChange,
+  serverRedactsSecrets = false,
+  serverEncrypts = false,
   savedCollections = [],
   onOpenLibrary,
   onLoadSaved,
@@ -140,6 +147,7 @@ export function DropZone({
   const importBlocked = canChoosePrivacyMode(loggingMode) && requiresUploadConsent(loggingMode, storageMode) && !uploadConsent
 
   const privacyDescription = getPrivacyModeDescription(loggingMode, storageMode)
+  const dataHandling = describeDataHandling(loggingMode, storageMode, { serverRedactsSecrets, serverEncrypts })
   const remainingSavedCount = Math.max(savedCollections.length - 5, 0)
 
   return (
@@ -216,6 +224,23 @@ export function DropZone({
               </motion.p>
             </AnimatePresence>
           </div>
+
+          <dl
+            data-testid="data-handling"
+            data-uploads={dataHandling.uploadsCollection ? 'true' : 'false'}
+            data-session={dataHandling.keepsSessionCopy ? 'true' : 'false'}
+            aria-label="What happens to your data"
+            className="mt-3 grid gap-x-4 gap-y-1.5 rounded-xl bg-muted/30 px-4 py-3 text-xs sm:grid-cols-[8.5rem_1fr]"
+          >
+            {dataHandling.rows.map((row) => (
+              <div key={row.id} className="contents">
+                <dt className="font-medium text-foreground">{row.label}</dt>
+                <dd className="text-muted-foreground" data-row={row.id}>
+                  {row.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
 
           <AnimatePresence initial={false}>
             {isTeamLoggingRequired(loggingMode) && (
@@ -311,8 +336,8 @@ export function DropZone({
               <span>Import a collection</span>
             </CardTitle>
             <CardDescription className="text-base">
-              Drop a Postman export. Parsed in your browser, never uploaded. Add environment files too to resolve variables and check them
-              for secrets, or drop two collections (older first) to compare them.
+              Drop a Postman export. It is analyzed in your browser; the summary above says whether a copy is stored. Add environment files
+              too to resolve variables and check them for secrets, or drop two collections (older first) to compare them.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

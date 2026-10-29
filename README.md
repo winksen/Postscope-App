@@ -17,7 +17,7 @@ PostScope **parses a collection in the browser**, analyzes it in a Web Worker wi
 - A **score** view with grade and category breakdowns (secrets, variables, auth, hygiene)
 - Exports as JSON, SARIF and Markdown, and a **CLI** (`npm run scan`) for CI
 
-Collection analysis never leaves the browser. An optional Node server hosts the built app and can keep a shared **team library** of past collections (see [Deployment](#deployment)). The last imported collection is restored from **session storage** after a refresh (same tab, about 4.5 MB limit).
+Collection analysis always runs in the browser. An optional Node server hosts the built app and can keep a shared **team library** of past collections (see [Deployment](#deployment)): with `LOGGING_MODE=off` nothing is sent, with `hybrid` the collection is sent only when you choose Save to history and accept the upload warning, and with `on` every import is sent. Environment files are never sent. Where a session copy applies (`on`, or `hybrid` with Save to history) the collection and environment files are restored from **session storage** after a refresh (same tab, about 4.5 MB limit); with `off` or incognito nothing is kept. The import screen shows which of these applies.
 
 ### Limitations (by design)
 
@@ -195,7 +195,7 @@ Postscope-App/
 5. Use the header **search** to filter content where supported.
 6. Use **Analyze another** to clear state and import a new file.
 
-Refreshing the page keeps the current collection in this browser tab (session storage). Closing the tab clears it.
+In `LOGGING_MODE=on`, or `hybrid` with Save to history, refreshing the page keeps the current collection and environment files in this browser tab (session storage) and closing the tab clears them. In `off` mode and in incognito nothing is kept, so a refresh returns to the import screen.
 
 If parsing fails, confirm the file is valid JSON and a Postman collection (schema in `info.schema` is expected for real exports).
 

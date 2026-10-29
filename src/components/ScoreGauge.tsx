@@ -35,17 +35,19 @@ export function ScoreGauge({ score, grade, summary }: ScoreGaugeProps) {
   useEffect(() => {
     if (animatedScore >= 90 && !hasTriggeredConfetti.current) {
       hasTriggeredConfetti.current = true
+      // The default instance draws in a blob: worker, which the content security policy (worker-src 'self') blocks.
+      const fire = confetti.create(undefined, { resize: true, useWorker: false })
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 }
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min
 
       const interval = setInterval(() => {
-        confetti({
+        void fire({
           ...defaults,
           particleCount: 30,
           origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
           colors: ['hsl(var(--chart-2))', 'hsl(var(--chart-1))', 'hsl(var(--primary))'],
         })
-        confetti({
+        void fire({
           ...defaults,
           particleCount: 30,
           origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },

@@ -67,6 +67,7 @@ interface AnalyzeAppProps {
   appVersion?: string
   libraryAllowDelete?: boolean
   libraryEncrypted?: boolean
+  libraryRedactSecrets?: boolean
   auditPolicy?: AuditOptions
 }
 
@@ -86,6 +87,7 @@ export function AnalyzeApp({
   appVersion,
   libraryAllowDelete = true,
   libraryEncrypted = false,
+  libraryRedactSecrets = false,
   auditPolicy = EMPTY_POLICY,
 }: AnalyzeAppProps) {
   const { notify } = useToast()
@@ -744,6 +746,8 @@ export function AnalyzeApp({
           onStorageModeChange={handleStorageModeChange}
           uploadConsent={uploadConsent}
           onUploadConsentChange={handleUploadConsentChange}
+          serverRedactsSecrets={libraryRedactSecrets}
+          serverEncrypts={libraryEncrypted}
           savedCollections={teamLibraryVisible ? savedCollections : []}
           onOpenLibrary={teamLibraryVisible ? () => setLibraryOpen(true) : undefined}
           onLoadSaved={teamLibraryVisible ? (id) => void handleLoadFromLibrary(id) : undefined}

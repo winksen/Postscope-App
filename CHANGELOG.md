@@ -3,6 +3,13 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.3
+
+- Explained browser memory, session storage and server uploads before import
+- Corrected the refresh and upload statements in the README
+- Fixed the score celebration being blocked by the content security policy
+- Fixed an intermittent report test that compared two timestamps
+
 ## V0.3.2
 
 - Restricted identity headers to configured trusted proxy peers

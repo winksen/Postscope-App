@@ -245,6 +245,7 @@ test('html is a report format with its own file name and media type', () => {
   assert.equal(reportFileName('My API', 'html'), 'My_API.postscope.html')
   assert.equal(reportMimeType('html'), 'text/html')
   const { ctx } = context(cleanCollection())
-  assert.equal(buildReport('html', ctx), buildHtmlReport(ctx))
+  const pinned = { ...ctx, generatedAt: new Date('2026-01-01T00:00:00Z') }
+  assert.equal(buildReport('html', pinned), buildHtmlReport(pinned))
   assert.match(buildMarkdownReport(ctx), /No findings\./)
 })

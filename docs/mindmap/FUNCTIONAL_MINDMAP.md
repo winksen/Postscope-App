@@ -84,6 +84,8 @@ mindmap
 | `hybrid` | A choice between **Incognito** and **Save to history** with an upload warning that must be accepted | Only collections the user explicitly saves |
 | `on` | "Mandatory logging" notice | Every imported collection is saved to the team library |
 
+The import screen shows a **data handling summary** for the active mode (analysis in the browser, where the collection goes, that environment files never leave the browser, what a refresh keeps) and, with encryption or redaction on the server, says so. It is generated from the same rules the app uses to upload and to keep a session copy, and a browser test checks every mode against the real requests and storage writes.
+
 `PUBLIC_LANDING_PAGE=true` adds a marketing homepage at `/` and moves the analyzer to `/analyze`.
 
 ## 2. Importing a collection

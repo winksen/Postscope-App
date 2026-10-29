@@ -8,7 +8,7 @@ This document describes PostScope's threat model, the security controls built in
 
 Postman collections routinely contain live credentials: bearer tokens, API keys, OAuth client secrets, passwords in request bodies, and tokens captured in saved example responses. PostScope's job is to find those leaks, so it handles exactly the data an attacker wants. The design goals are:
 
-1. **Collections stay in the browser by default.** Parsing and auditing run client-side (in a Web Worker). Nothing is uploaded in `LOGGING_MODE=off`.
+1. **Collections stay in the browser by default, and the import screen says what happens in the current mode.** Parsing and auditing run client-side (in a Web Worker). Nothing is uploaded in `LOGGING_MODE=off`.
 2. **Shared storage is opt-in and bounded.** `hybrid`/`on` modes store collections on the server only with explicit consent (hybrid) or an explicit operator policy (on).
 3. **Secrets are never echoed back in full.** Findings, reports, CLI output, and logs carry masked previews only.
 4. **The server is small and hostile-input safe.** Every request is size-limited, validated, rate-limited, and served with a strict browser security policy.
