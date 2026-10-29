@@ -169,6 +169,8 @@ export interface ParsedCollection {
 
 /** Nesting deeper than this is almost certainly malformed and is skipped to protect the call stack. */
 const MAX_DEPTH = 100
+/** Items read from one collection. Beyond this the rest is skipped and a warning says so. */
+const MAX_ITEMS = 100_000
 const MAX_WARNINGS = 25
 const MAX_RESPONSE_BODY_SCAN = 64_000
 const MAX_SAVED_RESPONSES_PER_REQUEST = 50
@@ -423,6 +425,8 @@ interface ParseAccumulator {
   scopedVariables: ParsedScopedVariable[]
   descriptions: ParsedDescription[]
   warnings: string[]
+  /** Items visited so far (folders and requests), for the structural limit. */
+  itemCount: number
 }
 
 function readScopedVariables(
@@ -463,6 +467,12 @@ function parseItem(rawItem: unknown, folderPath: string[], itemPath: number[], i
   }
   if (itemPath.length > MAX_DEPTH) {
     warn(acc, `Skipped items nested deeper than ${MAX_DEPTH} levels.`)
+    return
+  }
+  acc.itemCount += 1
+  if (acc.itemCount > MAX_ITEMS) {
+    if (acc.itemCount === MAX_ITEMS + 1)
+      warn(acc, `Unsupported size: only the first ${MAX_ITEMS} items were read; the rest of the collection was skipped.`)
     return
   }
 
@@ -632,6 +642,7 @@ export function parseCollection(json: unknown): ParsedCollection {
     scopedVariables: [],
     descriptions: [],
     warnings: [],
+    itemCount: 0,
   }
 
   const collectionAuth = isRecord(col.auth) && !isInheritedAuth(col.auth) ? (col.auth as PostmanAuth) : undefined

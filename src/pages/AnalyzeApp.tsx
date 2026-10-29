@@ -18,6 +18,7 @@ const ScorePage = lazyPage(() => import('./ScorePage'), 'ScorePage')
 const RepairPage = lazyPage(() => import('./RepairPage'), 'RepairPage')
 const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
 const IdentityPage = lazyPage(() => import('./IdentityPage'), 'IdentityPage')
+import { checkInputBytes, checkInputText, INPUT_LIMITS, utf8ByteLength } from '../lib/inputLimits'
 import { analyzeCollectionText, auditAgain, describeAnalysisError } from '../lib/analyzeCollection'
 import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
 import {
@@ -68,7 +69,6 @@ import { isSearchShortcut } from '../lib/keyboard'
 import { buildAppPath, parseAppLocation, type AppLocation } from '../lib/appRoutes'
 
 /** Upper bound for in-browser analysis; larger files risk exhausting tab memory. */
-const MAX_IMPORT_BYTES = 50_000_000
 
 interface AnalyzeAppProps {
   loggingMode: LoggingMode
@@ -451,19 +451,16 @@ export function AnalyzeApp({
   const handleFiles = useCallback(
     (files: File[]) => {
       if (importBlockedByConsent()) return
-      const oversized = files.find((file) => file.size > MAX_IMPORT_BYTES)
-      if (oversized) {
-        notify({
-          variant: 'error',
-          title: 'File is too large',
-          description: `${oversized.name} is ${formatMegabytes(oversized.size)}. The analyzer accepts files up to ${formatMegabytes(MAX_IMPORT_BYTES)}.`,
-        })
-        return
-      }
-      const empty = files.find((file) => file.size === 0)
-      if (empty) {
-        notify({ variant: 'error', title: 'File is empty', description: `${empty.name} has no content.` })
-        return
+      for (const file of files) {
+        const refusal = checkInputBytes(file.size, 'collection', file.name)
+        if (refusal) {
+          notify({
+            variant: 'error',
+            title: refusal.code === 'INPUT_EMPTY' ? 'File is empty' : 'File is too large',
+            description: describeAnalysisError(refusal),
+          })
+          return
+        }
       }
       setLandingLoading(true)
       Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })))
@@ -472,14 +469,31 @@ export function AnalyzeApp({
           const environments: string[] = []
           let unknown: string | null = null
           for (const { name, text } of loaded) {
+            // Size in bytes and nesting are checked before any parsing, the same way for every import path.
+            const refusal = checkInputText(text, 'collection', name)
+            if (refusal) {
+              setLandingLoading(false)
+              notify({ variant: 'error', title: 'Import refused', description: describeAnalysisError(refusal) })
+              return
+            }
             let json: unknown = null
             try {
               json = JSON.parse(text) as unknown
             } catch {
               // Not JSON: a single file is analyzed so the usual "not valid JSON" message appears.
             }
-            if (json !== null && detectEnvironmentKind(json, name)) environments.push(text)
-            else if (json === null || isCollectionJson(json)) collections.push(text)
+            if (json !== null && detectEnvironmentKind(json, name)) {
+              if (utf8ByteLength(text) > INPUT_LIMITS.environmentBytes) {
+                setLandingLoading(false)
+                notify({
+                  variant: 'error',
+                  title: 'Import refused',
+                  description: `${name} is larger than ${formatMegabytes(INPUT_LIMITS.environmentBytes)}.`,
+                })
+                return
+              }
+              environments.push(text)
+            } else if (json === null || isCollectionJson(json)) collections.push(text)
             else unknown = unknown ?? name
           }
           if (collections.length === 0 && !unknown) {
@@ -528,12 +542,9 @@ export function AnalyzeApp({
   const handleJsonText = useCallback(
     (raw: string) => {
       if (importBlockedByConsent()) return
-      if (raw.length > MAX_IMPORT_BYTES) {
-        notify({
-          variant: 'error',
-          title: 'Pasted JSON is too large',
-          description: `Paste up to ${formatMegabytes(MAX_IMPORT_BYTES)} or upload the file instead.`,
-        })
+      const refusal = checkInputText(raw, 'collection')
+      if (refusal) {
+        notify({ variant: 'error', title: 'Pasted JSON was refused', description: describeAnalysisError(refusal) })
         return
       }
       runImport(raw)
@@ -601,12 +612,22 @@ export function AnalyzeApp({
 
   const handleChooseReferenceFile = useCallback(
     async (file: File) => {
-      if (file.size === 0 || file.size > MAX_IMPORT_BYTES) {
-        notify({ variant: 'error', title: file.size === 0 ? 'File is empty' : 'File is too large', description: file.name })
+      const sizeRefusal = checkInputBytes(file.size, 'collection', file.name)
+      if (sizeRefusal) {
+        notify({
+          variant: 'error',
+          title: sizeRefusal.code === 'INPUT_EMPTY' ? 'File is empty' : 'File is too large',
+          description: describeAnalysisError(sizeRefusal),
+        })
         return
       }
       try {
         const text = await file.text()
+        const refusal = checkInputText(text, 'collection', file.name)
+        if (refusal) {
+          notify({ variant: 'error', title: 'File was refused', description: describeAnalysisError(refusal) })
+          return
+        }
         const json = JSON.parse(text) as unknown
         if (!isCollectionJson(json)) {
           notify({ variant: 'error', title: 'Not a Postman collection', description: `${file.name} needs an item array.` })

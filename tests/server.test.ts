@@ -302,6 +302,27 @@ test('health hides the version when HEALTH_EXPOSE_VERSION is false', async () =>
   }
 })
 
+test('the library refuses collections by UTF-8 bytes and by nesting with stable errors', async () => {
+  // 600,000 two byte characters are 600,000 characters but 1.2 MB, over the 1 MB limit of this test server.
+  const wide = JSON.stringify({ info: { name: 'Wide' }, item: [], note: 'é'.repeat(600_000) })
+  assert.ok(wide.length < 1_000_000, 'under the limit when counted in characters')
+  const tooWide = await raw('/api/collections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rawJson: wide, name: 'Wide' }),
+  })
+  assert.equal(tooWide.status, 413)
+  assert.match(tooWide.body, /too large/)
+  const nested = JSON.stringify({ info: { name: 'Deep' }, item: [], note: 'x' }).replace('"x"', '['.repeat(300) + ']'.repeat(300))
+  const tooDeep = await raw('/api/collections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rawJson: nested, name: 'Deep' }),
+  })
+  assert.equal(tooDeep.status, 400)
+  assert.match(tooDeep.body, /INPUT_TOO_DEEP/)
+})
+
 test('rotating X-Forwarded-For does not dodge the sign-in lockout behind a trusted proxy', async () => {
   process.env.BASIC_AUTH_USER = 'admin'
   process.env.BASIC_AUTH_PASSWORD = 'a-long-test-password'

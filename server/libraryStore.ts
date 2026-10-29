@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { INPUT_LIMITS, jsonNestingDepth, utf8ByteLength } from '../src/lib/inputLimits'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { getDataDir, getLibraryDir, getLibraryEncryption, getLibraryLimits, getMaxCollectionBytes } from './runtimeConfig'
@@ -295,7 +296,9 @@ export async function saveCollection(
 ): Promise<StoredCollectionMeta> {
   if (typeof rawJson !== 'string' || !rawJson.trim()) throw new LibraryError(400, 'rawJson is required.')
   const maxBytes = getMaxCollectionBytes()
-  if (rawJson.length > maxBytes) throw new LibraryError(413, 'Collection is too large to store.')
+  if (utf8ByteLength(rawJson) > maxBytes) throw new LibraryError(413, 'Collection is too large to store.')
+  if (jsonNestingDepth(rawJson) > INPUT_LIMITS.jsonDepth)
+    throw new LibraryError(400, `INPUT_TOO_DEEP: Collection is nested more than ${INPUT_LIMITS.jsonDepth} levels deep.`)
 
   let json: unknown
   try {

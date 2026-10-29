@@ -2,6 +2,7 @@ import { parseCollection } from './parser'
 import { runAuditDetailed, type AuditOptions } from './auditor'
 import type { SuppressedFinding } from './suppressions'
 import { attachEnvironments, withActiveEnvironment } from './environment'
+import { assertInputWithinLimits, isInputLimitError } from './inputLimits'
 import type { ParsedCollection } from './parser'
 import type { Finding } from './auditor'
 
@@ -37,6 +38,8 @@ export async function analyzeCollection(json: unknown, options?: AuditOptions, e
 /** Friendly message for invalid JSON / non-collection input. */
 export function describeAnalysisError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? '')
+  // Limit errors carry a stable code prefix for logs and tests; people read the sentence after it.
+  if (isInputLimitError(error)) return message.replace(/^[A-Z_]+: /, '')
   if (/JSON|Unexpected token|position \d+/i.test(message)) return 'The file is not valid JSON.'
   if (/Invalid Postman collection/i.test(message)) return 'This JSON does not look like a Postman collection (it needs an item array).'
   if (/timed out/i.test(message)) return message
@@ -180,6 +183,8 @@ export async function analyzeCollectionText(
   options?: AuditOptions,
   { timeoutMs = DEFAULT_TIMEOUT_MS, environments, activeEnvironment, slot = 'main' }: AnalyzeTextOptions = {}
 ): Promise<AnalysisResult> {
+  assertInputWithinLimits(raw, 'collection')
+  environments?.forEach((text) => assertInputWithinLimits(text, 'environment'))
   try {
     return await runInWorker({ type: 'analyze', slot, raw, options, environments, activeEnvironment }, timeoutMs)
   } catch (error) {

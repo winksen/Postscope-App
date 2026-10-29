@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.8
+
+- Applied consistent byte and nesting limits to every import path
+- Measured input sizes in UTF-8 bytes instead of characters
+- Added a structural item limit that reports what was skipped
+
 ## V0.3.7
 
 - Added a redacted deployment diagnostic command

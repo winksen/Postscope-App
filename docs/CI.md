@@ -41,6 +41,7 @@ Useful options (all in `postscope --help`):
 | `--baseline file` / `--write-baseline file` | Fail only on findings that are new compared with a committed baseline |
 | `--config file` | Project config (`.postscope.json`), otherwise the nearest one above each collection is used |
 | `--sanitize file` with `--redact-pii` | Write a sanitized copy that also replaces personal data (emails, phone and card numbers, IBANs, national ids, dates of birth, employee ids) in request bodies and saved examples |
+| Exit code 2 | Usage error, including an input the shared limits refuse: a collection over 50 MB, an environment file over 10 MB (UTF-8 bytes), JSON nested more than 256 levels, or an empty file. The message starts with `INPUT_TOO_LARGE`, `INPUT_TOO_DEEP` or `INPUT_EMPTY`. |
 | `--profile internal\|external` | Sharing profile for every report format (`text`, `json`, `sarif`, `markdown`, `html`, `junit`, `identity-csv`). `external` replaces collection, folder, request and environment names, hosts, URL paths, client ids and credentials with stable placeholders and keeps rule ids, titles, severities, scores and counts. Default `internal`. |
 | `--internal-identifier <text>` | A string that must not appear in an external report (repeatable, 3 characters or more). The same list can live in `.postscope.json` as `"privacy": { "internalIdentifiers": [...], "profile": "external" }`. |
 | `--compliance nist-800-53\|iso-27001\|cis-v8` | Group the text, Markdown, HTML and JSON reports by the controls of one framework. Every report already has a compliance mapping table per finding |
@@ -76,7 +77,7 @@ jobs:
 
       - name: Scan Postman collections
         id: scan
-        uses: winksen/Postscope-App@v0.3.7
+        uses: winksen/Postscope-App@v0.3.8
         with:
           path: collections
           fail-on: critical

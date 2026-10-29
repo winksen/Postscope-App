@@ -26,6 +26,7 @@ import { expandInputs, findSiblingEnvironments } from './inputs'
 import { attachEvidencePointers } from '../src/lib/evidencePointers'
 import { redactCollection, redactEnvironment } from '../src/lib/redaction'
 import { CONFIG_FILE_NAME, parseProjectConfig, type ProjectConfig } from '../src/lib/projectConfig'
+import { checkInputBytes, checkInputText } from '../src/lib/inputLimits'
 import { formatDoctorReport, inspectDeployment } from '../server/doctor'
 import { applyReportProfile, isReportProfile, REPORT_PROFILES, type ReportProfile } from '../src/lib/reportPrivacy'
 import { applyBaseline, buildBaseline, parseBaseline, type Baseline } from '../src/lib/baseline'
@@ -285,9 +286,16 @@ function parseArgs(rawArgv: string[]): CliOptions | 'help' | 'version' | 'rules'
   return options
 }
 
+/** Reads a collection after the shared size check, so an oversized file is refused before it is read. */
 function readInput(input: string): string {
-  if (input === '-') return fs.readFileSync(0, 'utf8')
-  return fs.readFileSync(input, 'utf8')
+  if (input !== '-') {
+    const refusal = checkInputBytes(fs.statSync(input).size, 'collection', input)
+    if (refusal) throw new UsageError(refusal.message)
+  }
+  const text = input === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(input, 'utf8')
+  const refusal = checkInputText(text, 'collection', input === '-' ? 'from stdin' : input)
+  if (refusal) throw new UsageError(refusal.message)
+  return text
 }
 
 interface AnalyzedFile {
@@ -355,9 +363,14 @@ function loadEnvironments(entries: CliOptions['environments']): LoadedEnvironmen
     let text: string
     let json: unknown
     try {
+      const refusal = checkInputBytes(fs.statSync(file).size, 'environment', file)
+      if (refusal) throw new UsageError(refusal.message)
       text = fs.readFileSync(file, 'utf8')
+      const depth = checkInputText(text, 'environment', file)
+      if (depth) throw new UsageError(depth.message)
       json = JSON.parse(text)
     } catch (error) {
+      if (error instanceof UsageError) throw error
       throw new UsageError(`${file}: cannot read environment file (${error instanceof Error ? error.message : String(error)})`)
     }
     const kind = detectEnvironmentKind(json, file)
