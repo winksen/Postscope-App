@@ -91,7 +91,7 @@ Placeholders (`<string>`, `changeme`, `your-api-key`, `demo-…`) and variable r
 For any deployment with `LOGGING_MODE=hybrid` or `on`:
 
 - [ ] Put PostScope behind HTTPS (reverse proxy) and set `ENABLE_HSTS=true` once HTTPS-only.
-- [ ] Set `BASIC_AUTH_USER` and a long random `BASIC_AUTH_PASSWORD`, or restrict network access to trusted users. The server logs a warning at startup when the library is enabled without authentication.
+- [ ] Set `BASIC_AUTH_USER` and a long random `BASIC_AUTH_PASSWORD`, or restrict network access to trusted users. The server refuses to start in `hybrid` or `on` mode without them, or with only one of the two, unless `ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true` is set for an isolated network.
 - [ ] If behind a proxy, set `TRUST_PROXY=true` so rate limits use the real client IP, set `TRUST_PROXY_HOPS` to the number of proxies you control, make sure PostScope is not reachable around the proxy, and add the public origin to `ALLOWED_ORIGINS` if the proxy rewrites `Host`.
 - [ ] Set `HEALTH_EXPOSE_VERSION=false` if the health endpoint is reachable from untrusted networks.
 - [ ] Choose a retention policy: `LIBRARY_RETENTION_DAYS`, `LIBRARY_MAX_ITEMS`, `LIBRARY_MAX_TOTAL_MB`.

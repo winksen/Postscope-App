@@ -1,17 +1,18 @@
 services:
   postscope:
-    image: postscope:${POSTSCOPE_VERSION:-0.3.0}
+    image: postscope:${POSTSCOPE_VERSION:-0.3.1}
     build:
       context: .
       args:
-        APP_VERSION: ${POSTSCOPE_VERSION:-0.3.0}
+        APP_VERSION: ${POSTSCOPE_VERSION:-0.3.1}
     container_name: postscope
     restart: unless-stopped
     ports:
       - "${POSTSCOPE_HOST:-127.0.0.1}:${POSTSCOPE_PORT:-3010}:3010"
     environment:
-      APP_VERSION: ${POSTSCOPE_VERSION:-0.3.0}
-      LOGGING_MODE: ${LOGGING_MODE:-hybrid}
+      APP_VERSION: ${POSTSCOPE_VERSION:-0.3.1}
+      # Team modes (hybrid, on) need BASIC_AUTH_USER and BASIC_AUTH_PASSWORD, otherwise the container exits at start.
+      LOGGING_MODE: ${LOGGING_MODE:-off}
       PUBLIC_LANDING_PAGE: ${PUBLIC_LANDING_PAGE:-false}
       PORT: 3010
       # Optional hardening (see docs/SECURITY.md). Leave empty to disable.
@@ -24,6 +25,7 @@ services:
       LIBRARY_ENCRYPTION_KEY_FILE: ${LIBRARY_ENCRYPTION_KEY_FILE:-}
       LIBRARY_ENCRYPTION_KEY_PREVIOUS: ${LIBRARY_ENCRYPTION_KEY_PREVIOUS:-}
       LIBRARY_AUDIT_LOG: ${LIBRARY_AUDIT_LOG:-true}
+      ALLOW_UNAUTHENTICATED_TEAM_STORAGE: ${ALLOW_UNAUTHENTICATED_TEAM_STORAGE:-false}
       TRUSTED_USER_HEADER: ${TRUSTED_USER_HEADER:-}
       LIBRARY_MAX_ITEMS: ${LIBRARY_MAX_ITEMS:-0}
       LIBRARY_RETENTION_DAYS: ${LIBRARY_RETENTION_DAYS:-0}

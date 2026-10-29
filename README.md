@@ -213,7 +213,7 @@ Key runtime settings:
 |----------|---------|---------|
 | `PORT` | `3010` | App server port |
 | `APP_VERSION` | package version | Release/build identifier exposed by `/api/config` |
-| `LOGGING_MODE` | `off` | `off`, `hybrid`, or `on` collection storage behavior |
+| `LOGGING_MODE` | `off` | `off`, `hybrid`, or `on` collection storage behavior; `hybrid` and `on` need Basic auth or `ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true` |
 | `PUBLIC_LANDING_PAGE` | `false` | Whether `/` shows the public landing page instead of the analyzer |
 | `SHOW_GITHUB_LINK` | `true` | Whether the analyzer sidebar shows the GitHub link |
 | `SHOW_FEEDBACK_LINK` | `true` | Whether the analyzer sidebar shows the feedback link |

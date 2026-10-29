@@ -96,6 +96,14 @@ export function getBasicAuthConfig(): BasicAuthConfig | null {
   return { username, password }
 }
 
+/**
+ * Explicit, documented override that lets team storage (LOGGING_MODE=hybrid or on) start without authentication.
+ * Only for an isolated network where reachability is already restricted; the server still logs a warning.
+ */
+export function isUnauthenticatedTeamStorageAllowed(): boolean {
+  return parseFlag(env('ALLOW_UNAUTHENTICATED_TEAM_STORAGE'), false)
+}
+
 export function getRateLimits() {
   return {
     /** Mutating API requests (save/delete) per client per minute. 0 disables. */

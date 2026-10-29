@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.1
+
+- Rejected incomplete authentication and unsafe team deployment settings
+- Added the ALLOW_UNAUTHENTICATED_TEAM_STORAGE override for isolated networks
+- Changed the compose default storage mode to off
+
 ## V0.3.0
 
 - Updated the server, CLI and CI to supported Node releases

@@ -97,6 +97,26 @@ async function freePort(): Promise<number> {
   })
 }
 
+function startRefused(extra: Record<string, string>) {
+  const dist = path.join(work, 'dist')
+  fs.mkdirSync(dist, { recursive: true })
+  return spawnSync(process.execPath, [path.join(outdir, 'server.js')], {
+    cwd: work,
+    env: { PATH: process.env.PATH ?? '', PORT: '0', HOST: '127.0.0.1', LOG_LEVEL: 'error', DATA_DIR: path.join(work, 'data'), ...extra },
+    encoding: 'utf8',
+    timeout: 20_000,
+  })
+}
+
+test('the compiled server refuses partial credentials and unauthenticated team storage', () => {
+  const partial = startRefused({ LOGGING_MODE: 'off', BASIC_AUTH_USER: 'admin' })
+  assert.equal(partial.status, 1)
+  assert.match(partial.stderr + partial.stdout, /BASIC_AUTH_PARTIAL/)
+  const open = startRefused({ LOGGING_MODE: 'hybrid' })
+  assert.equal(open.status, 1)
+  assert.match(open.stderr + open.stdout, /TEAM_STORAGE_UNAUTHENTICATED/)
+})
+
 test('the compiled server starts without node_modules and serves the app, config and health', async () => {
   const dist = path.join(work, 'dist')
   fs.mkdirSync(dist, { recursive: true })

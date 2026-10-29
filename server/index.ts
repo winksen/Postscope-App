@@ -20,6 +20,7 @@ import {
   isLibraryRedactionEnabled,
   isTrustProxyEnabled,
 } from './runtimeConfig'
+import { validateRuntimeSettings } from './startupValidation'
 import { getAppVersion } from './appVersion'
 import { errorFields, log } from './logger'
 
@@ -32,8 +33,11 @@ const HOST = process.env.HOST?.trim() || undefined
 const MAINTENANCE_INTERVAL_MS = 10 * 60_000
 const SHUTDOWN_TIMEOUT_MS = 10_000
 
-if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
-  log.error(`Invalid PORT "${process.env.PORT}". Use a number between 1 and 65535.`)
+const startup = validateRuntimeSettings()
+for (const warning of startup.warnings) log.warn(warning)
+if (startup.errors.length > 0) {
+  for (const issue of startup.errors) log.error(`[${issue.code}] ${issue.message}`)
+  log.error('Refusing to start because of the settings above.')
   process.exit(1)
 }
 
@@ -94,9 +98,6 @@ function logStartupSummary(): void {
   }
   if (getTrustedUserHeader() && !isTrustProxyEnabled()) {
     log.warn('TRUSTED_USER_HEADER is ignored because TRUST_PROXY is not enabled.')
-  }
-  if (!getBasicAuthConfig() && getLoggingMode() !== 'off') {
-    log.warn('Shared library is enabled without authentication. Set BASIC_AUTH_USER/BASIC_AUTH_PASSWORD or restrict network access.')
   }
 }
 

@@ -46,6 +46,7 @@ Set these variables on the container or host process:
 | `LIBRARY_ENCRYPTION_KEY_PREVIOUS`, `LIBRARY_ENCRYPTION_KEY_PREVIOUS_FILE` | unset | Comma separated keys (file: one per line) | Older keys that may still decrypt records while you rotate. |
 | `LIBRARY_AUDIT_LOG` | `true` | `true`, `false` | Appends one JSON line per library save, open and removal to `DATA_DIR/audit/library-YYYY-MM.jsonl`. |
 | `TRUSTED_USER_HEADER` | unset | A header name such as `X-Forwarded-User` or `X-Auth-Request-Email` | Records the signed-in user set by your SSO proxy as `savedBy` and in the audit log. Honored only when `TRUST_PROXY=true`. |
+| `ALLOW_UNAUTHENTICATED_TEAM_STORAGE` | `false` | `true`, `false` | Lets `LOGGING_MODE=hybrid` or `on` start without `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD`. Only for a network that is already isolated; the server logs a warning at every start. |
 | `TRUST_PROXY` | `false` | `true`, `false` | Trust `X-Forwarded-For` / `X-Forwarded-Host` from a reverse proxy. Leave `false` when clients connect directly. |
 | `TRUST_PROXY_HOPS` | `1` | Integer 1 to 10 | Number of trusted proxies in front of PostScope (only with `TRUST_PROXY=true`). The client IP is the entry that many positions from the right of `X-Forwarded-For`; entries further left are client-controlled and ignored. Use `2` for a CDN plus a load balancer. |
 | `HEALTH_EXPOSE_VERSION` | `true` | `true`, `false` | When `false`, the unauthenticated `/api/health` endpoint omits `version`. `/api/config` is behind Basic auth when it is enabled. |
@@ -57,6 +58,16 @@ Logging modes:
 | `off` | Incognito only. Collections are analyzed in the browser and are not saved to the app server. | Public demos, privacy-first internal use, offline kiosks without shared history. |
 | `hybrid` | Users can choose incognito or save to shared app history. | Internal team deployments where users should decide per collection. |
 | `on` | Every imported collection is saved to shared app history. | Controlled internal environments where central history is required and users understand the policy. |
+
+## Startup checks
+
+The server validates its settings before it listens and exits with status 1 and a message naming the cause when:
+
+- only one of `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD` is set (the control would otherwise be silently off)
+- `LOGGING_MODE` is `hybrid` or `on` and no Basic auth is configured, unless `ALLOW_UNAUTHENTICATED_TEAM_STORAGE=true`
+- `PORT` is not a number from 1 to 65535
+
+`LOGGING_MODE=off` (browser only, nothing stored on the server) needs no credentials. The messages carry stable codes (`BASIC_AUTH_PARTIAL`, `TEAM_STORAGE_UNAUTHENTICATED`, `PORT_INVALID`) and never print the password.
 
 ## Option 1: Run From Source
 
@@ -72,20 +83,22 @@ Steps:
 ```bash
 npm install
 npm run build
-LOGGING_MODE=hybrid PUBLIC_LANDING_PAGE=false PORT=3010 npm run start
+BASIC_AUTH_USER=postscope BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value LOGGING_MODE=hybrid PUBLIC_LANDING_PAGE=false PORT=3010 npm run start
 ```
 
 To run the compiled server (one JavaScript file that needs no dependencies, the same one the Docker image runs), build it once and start it with plain `node`:
 
 ```bash
 npm run build && npm run build:node
-LOGGING_MODE=hybrid PORT=3010 npm run start:node
+BASIC_AUTH_USER=postscope BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value LOGGING_MODE=hybrid PORT=3010 npm run start:node
 ```
 
 On Windows PowerShell:
 
 ```powershell
 $env:LOGGING_MODE = "hybrid"
+$env:BASIC_AUTH_USER = "postscope"
+$env:BASIC_AUTH_PASSWORD = "change-me-to-a-long-random-value"
 $env:PUBLIC_LANDING_PAGE = "false"
 $env:PORT = "3010"
 npm run start
@@ -130,6 +143,8 @@ docker run -d \
   --restart unless-stopped \
   -p 3010:3010 \
   -e LOGGING_MODE=hybrid \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
   postscope:<version>
@@ -143,6 +158,8 @@ docker run -d \
   --restart unless-stopped \
   -p 3010:3010 \
   -e LOGGING_MODE=on \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
   postscope:<version>
@@ -165,6 +182,8 @@ Example `postscope.env`:
 ```env
 PORT=3010
 LOGGING_MODE=hybrid
+BASIC_AUTH_USER=postscope
+BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value
 PUBLIC_LANDING_PAGE=false
 ```
 
@@ -181,6 +200,8 @@ POSTSCOPE_VERSION=<version>
 POSTSCOPE_HOST=127.0.0.1
 POSTSCOPE_PORT=3010
 LOGGING_MODE=hybrid
+BASIC_AUTH_USER=postscope
+BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value
 PUBLIC_LANDING_PAGE=false
 ```
 
@@ -226,6 +247,8 @@ docker run -d \
   --restart unless-stopped \
   -p 3010:3010 \
   -e LOGGING_MODE=hybrid \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
   postscope:<version>
@@ -290,6 +313,8 @@ docker run -d \
   -p 3010:3010 \
   -e APP_VERSION=<new-version> \
   -e LOGGING_MODE=hybrid \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
   postscope:<new-version>
@@ -390,6 +415,8 @@ Pass it as `LIBRARY_ENCRYPTION_KEY`, or mount it as a secret and point `LIBRARY_
 ```bash
 docker run -d --name postscope -p 127.0.0.1:3010:3010 \
   -e LOGGING_MODE=hybrid \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e LIBRARY_ENCRYPTION_KEY_FILE=/run/secrets/postscope_key \
   -v ./postscope_key:/run/secrets/postscope_key:ro \
   -v postscope-data:/app/data \
@@ -445,6 +472,8 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:3010:3010 \
   -e LOGGING_MODE=hybrid \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
   postscope:<version>
@@ -526,6 +555,8 @@ docker run -d \
   --restart unless-stopped \
   -p 3010:3010 \
   -e LOGGING_MODE=hybrid \
+  -e BASIC_AUTH_USER=postscope \
+  -e BASIC_AUTH_PASSWORD=change-me-to-a-long-random-value \
   -e PUBLIC_LANDING_PAGE=false \
   -v postscope-data:/app/data \
   postscope:<new-version>
