@@ -76,6 +76,8 @@ export type AnalysisSlot = 'main' | 'reference'
 
 interface WorkerResponse {
   id: number
+  /** A stage the job has reached; the job is still running. */
+  progress?: AnalysisStage
   ok: boolean
   /** The worker has no analysis to audit again (it was restarted). */
   cacheMiss?: boolean
@@ -93,9 +95,11 @@ class CacheMissError extends Error {
 }
 
 interface PendingJob {
+  slot: AnalysisSlot
   resolve: (result: AnalysisResult) => void
   reject: (error: Error) => void
   timer: ReturnType<typeof setTimeout>
+  onProgress?: (stage: AnalysisStage) => void
 }
 
 class WorkerUnavailableError extends Error {
@@ -105,36 +109,63 @@ class WorkerUnavailableError extends Error {
   }
 }
 
-let worker: Worker | null = null
+/** The stages an analysis goes through, reported while it runs. */
+export type AnalysisStage = 'parse' | 'audit' | 'score'
+
+export class AnalysisCancelledError extends Error {
+  constructor(message = 'Analysis was cancelled.') {
+    super(message)
+    this.name = 'AnalysisCancelledError'
+  }
+}
+
+export function isAnalysisCancelled(error: unknown): boolean {
+  return error instanceof AnalysisCancelledError || (error instanceof Error && error.name === 'AnalysisCancelledError')
+}
+
+/**
+ * One worker per slot: the collection on screen and the older version on the Compare page analyze independently, so
+ * cancelling or replacing one never touches the other.
+ */
+const workers = new Map<AnalysisSlot, Worker>()
 let workerUnavailable = false
 let nextJobId = 1
 const pending = new Map<number, PendingJob>()
 
-function failAll(error: Error): void {
+function failJobs(error: Error, slot?: AnalysisSlot): void {
   for (const [id, job] of pending) {
+    if (slot !== undefined && job.slot !== slot) continue
     clearTimeout(job.timer)
     job.reject(error)
     pending.delete(id)
   }
 }
 
-function resetWorker(): void {
-  worker?.terminate()
-  worker = null
+/** Stops the worker of one slot (or all of them) and fails the jobs that were running there. */
+function resetWorker(slot: AnalysisSlot, error: Error): void {
+  workers.get(slot)?.terminate()
+  workers.delete(slot)
+  failJobs(error, slot)
 }
 
-function getWorker(): Worker | null {
+function getWorker(slot: AnalysisSlot): Worker | null {
   if (workerUnavailable || typeof Worker === 'undefined') return null
-  if (worker) return worker
+  const existing = workers.get(slot)
+  if (existing) return existing
+  let created: Worker
   try {
-    worker = new Worker(new URL('../workers/analysis.worker.ts', import.meta.url), { type: 'module' })
+    created = new Worker(new URL('../workers/analysis.worker.ts', import.meta.url), { type: 'module' })
   } catch {
     workerUnavailable = true
     return null
   }
-  worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+  created.onmessage = (event: MessageEvent<WorkerResponse>) => {
     const job = pending.get(event.data.id)
     if (!job) return
+    if (event.data.progress) {
+      job.onProgress?.(event.data.progress)
+      return
+    }
     pending.delete(event.data.id)
     clearTimeout(job.timer)
     if (event.data.ok && event.data.parsed && event.data.findings) {
@@ -145,14 +176,14 @@ function getWorker(): Worker | null {
       job.reject(new Error(event.data.error || 'Analysis failed'))
     }
   }
-  worker.onerror = (event) => {
-    // A load/runtime failure: stop using the worker and let callers fall back to the main thread.
+  created.onerror = (event) => {
+    // A load/runtime failure: stop using workers and let callers fall back to the main thread.
     event.preventDefault?.()
     workerUnavailable = true
-    resetWorker()
-    failAll(new WorkerUnavailableError())
+    for (const slot of [...workers.keys()]) resetWorker(slot, new WorkerUnavailableError())
   }
-  return worker
+  workers.set(slot, created)
+  return created
 }
 
 type WorkerJob =
@@ -166,19 +197,53 @@ type WorkerJob =
     }
   | { type: 'audit'; slot: AnalysisSlot; options?: AuditOptions; activeEnvironment?: number }
 
-function runInWorker(job: WorkerJob, timeoutMs: number): Promise<AnalysisResult> {
-  const instance = getWorker()
+interface JobControl {
+  timeoutMs: number
+  signal?: AbortSignal
+  onProgress?: (stage: AnalysisStage) => void
+}
+
+function runInWorker(job: WorkerJob, { timeoutMs, signal, onProgress }: JobControl): Promise<AnalysisResult> {
+  if (signal?.aborted) return Promise.reject(new AnalysisCancelledError())
+  const instance = getWorker(job.slot)
   if (!instance) return Promise.reject(new WorkerUnavailableError())
   const id = nextJobId++
   return new Promise<AnalysisResult>((resolve, reject) => {
+    let onAbort: (() => void) | undefined
+    const settle = () => {
+      if (onAbort) signal?.removeEventListener('abort', onAbort)
+    }
     const timer = setTimeout(() => {
       pending.delete(id)
-      // The worker may be stuck on this job; recycle it so later analyses start fresh.
-      resetWorker()
-      failAll(new Error('Analysis was cancelled because another analysis timed out.'))
+      settle()
+      // The worker may be stuck on this job; replace it so later analyses of this slot start fresh.
+      resetWorker(job.slot, new Error('Analysis was cancelled because another analysis timed out.'))
       reject(new Error(`Analysis timed out after ${Math.round(timeoutMs / 1000)} seconds.`))
     }, timeoutMs)
-    pending.set(id, { resolve, reject, timer })
+    pending.set(id, {
+      slot: job.slot,
+      resolve: (result) => {
+        settle()
+        resolve(result)
+      },
+      reject: (error) => {
+        settle()
+        reject(error)
+      },
+      timer,
+      onProgress,
+    })
+    if (signal) {
+      onAbort = () => {
+        if (!pending.has(id)) return
+        pending.delete(id)
+        clearTimeout(timer)
+        // Terminating the slot's worker is what actually stops the work; the other slot keeps its worker and its cache.
+        resetWorker(job.slot, new AnalysisCancelledError('Analysis was cancelled because it was replaced.'))
+        reject(new AnalysisCancelledError())
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
     instance.postMessage({ id, ...job })
   })
 }
@@ -192,6 +257,10 @@ export interface AnalyzeTextOptions {
   /** Index of the environment to select instead of the first one. */
   activeEnvironment?: number
   slot?: AnalysisSlot
+  /** Stops this analysis: its worker is replaced and the call rejects with `AnalysisCancelledError`. */
+  signal?: AbortSignal
+  /** Called as the analysis reaches each stage. */
+  onProgress?: (stage: AnalysisStage) => void
 }
 
 /**
@@ -202,12 +271,14 @@ export interface AnalyzeTextOptions {
 export async function analyzeCollectionText(
   raw: string,
   options?: AuditOptions,
-  { timeoutMs = DEFAULT_TIMEOUT_MS, environments, activeEnvironment, slot = 'main' }: AnalyzeTextOptions = {}
+  { timeoutMs = DEFAULT_TIMEOUT_MS, environments, activeEnvironment, slot = 'main', signal, onProgress }: AnalyzeTextOptions = {}
 ): Promise<AnalysisResult> {
   assertInputWithinLimits(raw, 'collection')
   environments?.forEach((text) => assertInputWithinLimits(text, 'environment'))
+  if (signal?.aborted) throw new AnalysisCancelledError()
+  onProgress?.('parse')
   try {
-    return await runInWorker({ type: 'analyze', slot, raw, options, environments, activeEnvironment }, timeoutMs)
+    return await runInWorker({ type: 'analyze', slot, raw, options, environments, activeEnvironment }, { timeoutMs, signal, onProgress })
   } catch (error) {
     if (!(error instanceof WorkerUnavailableError)) throw error
   }
@@ -215,11 +286,16 @@ export async function analyzeCollectionText(
   const bytes = utf8ByteLength(raw)
   if (bytes > FALLBACK_MAX_BYTES) throw new AnalysisNeedsWorkerError(bytes)
   await yieldToMain()
+  if (signal?.aborted) throw new AnalysisCancelledError()
   const json = JSON.parse(raw) as unknown
   let parsed = attachEnvironments(parseCollection(json), environments)
   if (activeEnvironment !== undefined) parsed = withActiveEnvironment(parsed, activeEnvironment)
   fallbackFull.set(slot, parsed)
+  onProgress?.('audit')
+  await yieldToMain()
+  if (signal?.aborted) throw new AnalysisCancelledError()
   const { findings, suppressed } = runAuditDetailed(parsed, options)
+  onProgress?.('score')
   return { parsed, findings, suppressed }
 }
 
@@ -236,7 +312,7 @@ export async function auditAgain(
   }: Pick<AnalyzeTextOptions, 'timeoutMs' | 'activeEnvironment' | 'slot'> = {}
 ): Promise<AnalysisResult | null> {
   try {
-    return await runInWorker({ type: 'audit', slot, options, activeEnvironment }, timeoutMs)
+    return await runInWorker({ type: 'audit', slot, options, activeEnvironment }, { timeoutMs })
   } catch (error) {
     if (error instanceof CacheMissError) return null
     if (!(error instanceof WorkerUnavailableError)) throw error

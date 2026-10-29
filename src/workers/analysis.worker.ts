@@ -50,7 +50,9 @@ ctx.onmessage = (event: MessageEvent<WorkerRequest>) => {
       if (message.activeEnvironment !== undefined) parsed = withActiveEnvironment(parsed, message.activeEnvironment)
     }
     parsedBySlot.set(slot, parsed)
+    ctx.postMessage({ id: message.id, progress: 'audit' })
     const { findings, suppressed } = runAuditDetailed(parsed, message.options)
+    ctx.postMessage({ id: message.id, progress: 'score' })
     ctx.postMessage({ id: message.id, ok: true, parsed: compactParsed(parsed), findings, suppressed })
   } catch (error) {
     ctx.postMessage({ id: message.id, ok: false, error: error instanceof Error ? error.message : 'Analysis failed' })

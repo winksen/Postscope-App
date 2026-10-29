@@ -19,7 +19,7 @@ const RepairPage = lazyPage(() => import('./RepairPage'), 'RepairPage')
 const ComparePage = lazyPage(() => import('./ComparePage'), 'ComparePage')
 const IdentityPage = lazyPage(() => import('./IdentityPage'), 'IdentityPage')
 import { checkInputBytes, checkInputText, INPUT_LIMITS, utf8ByteLength } from '../lib/inputLimits'
-import { analyzeCollectionText, auditAgain, describeAnalysisError } from '../lib/analyzeCollection'
+import { analyzeCollectionText, auditAgain, describeAnalysisError, isAnalysisCancelled, type AnalysisStage } from '../lib/analyzeCollection'
 import { detectEnvironmentKind, isCollectionJson, parseEnvironment } from '../lib/environment'
 import {
   clearCollectionSession,
@@ -144,6 +144,12 @@ export function AnalyzeApp({
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [landingLoading, setLandingLoading] = useState(false)
+  /** The stage the running import has reached, shown next to the Cancel button. */
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage | null>(null)
+  /** Stops the running import; a new import replaces it. */
+  const importController = useRef<AbortController | null>(null)
+  /** Identifies the latest import, so a finished older one cannot clear the loading state of a newer one. */
+  const importCounter = useRef(0)
   const [restoringSession, setRestoringSession] = useState(true)
   const [savingToLibrary, setSavingToLibrary] = useState(false)
   /** Older version used by the Compare page. It is analyzed with the current rule settings and never saved. */
@@ -341,8 +347,19 @@ export function AnalyzeApp({
       restoring = false
     ): Promise<boolean> => {
       const seq = ++analysisSeq.current
-      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, { environments, activeEnvironment })
+      importController.current?.abort()
+      const controller = new AbortController()
+      importController.current = controller
+      const analysis = await analyzeCollectionText(raw, auditOptionsRef.current, {
+        environments,
+        activeEnvironment,
+        signal: controller.signal,
+        onProgress: (stage) => {
+          if (seq === analysisSeq.current) setAnalysisStage(stage)
+        },
+      })
       if (seq !== analysisSeq.current) return false
+      setAnalysisStage(null)
       const p = analysis.parsed
       const f = analysis.findings
       const s = analysis.suppressed
@@ -430,6 +447,7 @@ export function AnalyzeApp({
 
   const runImport = useCallback(
     (raw: string, environments: string[] = [], olderRaw?: string) => {
+      const importToken = ++importCounter.current
       setLandingLoading(true)
       void applyCollectionJson(raw, null, environments)
         .then((applied) => {
@@ -440,13 +458,28 @@ export function AnalyzeApp({
           }
         })
         .catch((e) => {
+          // A cancelled or replaced import is not a failure.
+          if (isAnalysisCancelled(e)) return
           console.error(e)
           notify({ variant: 'error', title: 'Import failed', description: describeAnalysisError(e) })
         })
-        .finally(() => setLandingLoading(false))
+        .finally(() => {
+          if (importToken !== importCounter.current) return
+          setLandingLoading(false)
+          setAnalysisStage(null)
+        })
     },
     [applyCollectionJson, notify, setActive]
   )
+
+  const handleCancelAnalysis = useCallback(() => {
+    analysisSeq.current += 1
+    importCounter.current += 1
+    importController.current?.abort()
+    setLandingLoading(false)
+    setAnalysisStage(null)
+    notify({ title: 'Analysis cancelled', description: 'Nothing was imported. You can choose another file.' })
+  }, [notify])
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -835,6 +868,8 @@ export function AnalyzeApp({
           onFiles={handleFiles}
           onJsonText={handleJsonText}
           loading={landingLoading || restoringSession}
+          analysisStage={landingLoading ? analysisStage : null}
+          onCancelAnalysis={landingLoading ? handleCancelAnalysis : undefined}
           loggingMode={loggingMode}
           storageMode={storageMode}
           onStorageModeChange={handleStorageModeChange}

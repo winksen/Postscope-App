@@ -31,6 +31,13 @@ import {
 } from '@/lib/deploymentConfig'
 import type { StorageMode } from '@/lib/storagePreferences'
 import { describeDataHandling } from '@/lib/dataHandling'
+import type { AnalysisStage } from '@/lib/analyzeCollection'
+
+const STAGE_LABEL: Record<AnalysisStage, string> = {
+  parse: 'Reading the collection...',
+  audit: 'Checking requests against the rules...',
+  score: 'Calculating the score...',
+}
 
 const fadeTransition = { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
 
@@ -39,6 +46,10 @@ interface DropZoneProps {
   onFiles: (files: File[]) => void
   onJsonText: (rawJson: string) => void
   loading?: boolean
+  /** The stage the running analysis has reached. */
+  analysisStage?: AnalysisStage | null
+  /** Stops the running analysis. */
+  onCancelAnalysis?: () => void
   loggingMode: LoggingMode
   storageMode: StorageMode
   onStorageModeChange: (mode: StorageMode) => void
@@ -65,6 +76,8 @@ export function DropZone({
   onFiles,
   onJsonText,
   loading = false,
+  analysisStage = null,
+  onCancelAnalysis,
   loggingMode,
   storageMode,
   onStorageModeChange,
@@ -428,6 +441,16 @@ export function DropZone({
                       <Skeleton className="mx-auto h-12 w-12 rounded-full" />
                       <Skeleton className="h-4 w-[75%] max-w-xs self-center" />
                       <Skeleton className="h-4 w-full max-w-sm self-center" />
+                      {onCancelAnalysis && (
+                        <div className="flex flex-col items-center gap-2" data-testid="analysis-progress">
+                          <p className="text-sm text-muted-foreground" role="status">
+                            {STAGE_LABEL[analysisStage ?? 'parse']}
+                          </p>
+                          <Button type="button" variant="secondary" size="sm" onClick={onCancelAnalysis}>
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <>
