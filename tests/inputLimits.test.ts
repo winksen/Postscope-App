@@ -97,3 +97,24 @@ test('the CLI gives the same refusal for deep and oversized files and still read
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+import { AnalysisNeedsWorkerError, FALLBACK_MAX_BYTES } from '../src/lib/analyzeCollection'
+
+test('without a worker a small collection is analyzed and a large one is refused at once with guidance', async () => {
+  assert.equal(
+    typeof (globalThis as { Worker?: unknown }).Worker,
+    'undefined',
+    'this runtime has no Worker, like a browser with workers blocked'
+  )
+  const small = await analyzeCollectionText(JSON.stringify(cleanCollection()))
+  assert.ok(small.parsed.requests.length > 0)
+
+  const big = JSON.stringify({ ...cleanCollection(), note: 'x'.repeat(FALLBACK_MAX_BYTES + 10) })
+  const started = Date.now()
+  await assert.rejects(analyzeCollectionText(big), (error: unknown) => {
+    assert.ok(error instanceof AnalysisNeedsWorkerError)
+    assert.match(describeAnalysisError(error), /could not start the analysis worker.*postscope scan/)
+    return true
+  })
+  assert.ok(Date.now() - started < 1000, 'refused before any parsing')
+})

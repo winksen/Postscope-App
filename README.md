@@ -97,6 +97,7 @@ Screenshots are not checked in yet. After running the app locally, capture these
 
 **Prerequisites**
 
+- A browser that allows web workers for collections above 2 MB (without workers only small collections are analyzed; the CLI has no such limit)
 - [Node.js](https://nodejs.org/) 22 or newer (24 LTS recommended)
 - npm (bundled with Node) or another compatible package manager
 

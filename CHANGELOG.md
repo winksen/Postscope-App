@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.9
+
+- Prevented large imports from blocking the page when workers are unavailable
+- Refused collections above 2 MB without a worker, with guidance to use a current browser or the CLI
+- Clarified that the analysis timeout applies to the worker only
+
 ## V0.3.8
 
 - Applied consistent byte and nesting limits to every import path

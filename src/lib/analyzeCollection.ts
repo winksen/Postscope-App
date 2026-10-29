@@ -2,7 +2,7 @@ import { parseCollection } from './parser'
 import { runAuditDetailed, type AuditOptions } from './auditor'
 import type { SuppressedFinding } from './suppressions'
 import { attachEnvironments, withActiveEnvironment } from './environment'
-import { assertInputWithinLimits, isInputLimitError } from './inputLimits'
+import { assertInputWithinLimits, isInputLimitError, utf8ByteLength } from './inputLimits'
 import type { ParsedCollection } from './parser'
 import type { Finding } from './auditor'
 
@@ -13,8 +13,28 @@ export interface AnalysisResult {
   suppressed: SuppressedFinding[]
 }
 
-/** Analyses that take longer than this are aborted so a pathological file cannot hang the tab. */
+/**
+ * Analyses in the worker that take longer than this are aborted, and the worker is replaced. This cannot interrupt
+ * work on the main thread: JavaScript cannot be stopped from a timer while it is running synchronously.
+ */
 const DEFAULT_TIMEOUT_MS = 120_000
+
+/**
+ * Without a worker the whole analysis runs on the main thread and blocks the page until it finishes. That is accepted
+ * only for small files; a larger one is refused straight away with guidance instead of freezing the tab.
+ */
+export const FALLBACK_MAX_BYTES = 2_000_000
+
+export class AnalysisNeedsWorkerError extends Error {
+  readonly bytes: number
+  constructor(bytes: number) {
+    super(
+      `This browser could not start the analysis worker, so only collections up to ${FALLBACK_MAX_BYTES / 1_000_000} MB can be analyzed here (this one is ${Math.ceil(bytes / 100_000) / 10} MB). Use a current browser with web workers allowed, or run "postscope scan" from the command line.`
+    )
+    this.name = 'AnalysisNeedsWorkerError'
+    this.bytes = bytes
+  }
+}
 
 function yieldToMain(): Promise<void> {
   return new Promise((resolve) => {
@@ -26,7 +46,7 @@ function yieldToMain(): Promise<void> {
   })
 }
 
-/** Parse and audit off the critical path so large collections stay responsive. */
+/** Parse and audit after yielding to the page; this runs on the calling thread (the browser uses the worker pipeline below). */
 export async function analyzeCollection(json: unknown, options?: AuditOptions, environments?: readonly string[]): Promise<AnalysisResult> {
   await yieldToMain()
   const parsed = attachEnvironments(parseCollection(json), environments)
@@ -40,6 +60,7 @@ export function describeAnalysisError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? '')
   // Limit errors carry a stable code prefix for logs and tests; people read the sentence after it.
   if (isInputLimitError(error)) return message.replace(/^[A-Z_]+: /, '')
+  if (error instanceof AnalysisNeedsWorkerError) return message
   if (/JSON|Unexpected token|position \d+/i.test(message)) return 'The file is not valid JSON.'
   if (/Invalid Postman collection/i.test(message)) return 'This JSON does not look like a Postman collection (it needs an item array).'
   if (/timed out/i.test(message)) return message
@@ -190,6 +211,9 @@ export async function analyzeCollectionText(
   } catch (error) {
     if (!(error instanceof WorkerUnavailableError)) throw error
   }
+  // The main thread cannot be interrupted once parsing starts, so the size is bounded before it does.
+  const bytes = utf8ByteLength(raw)
+  if (bytes > FALLBACK_MAX_BYTES) throw new AnalysisNeedsWorkerError(bytes)
   await yieldToMain()
   const json = JSON.parse(raw) as unknown
   let parsed = attachEnvironments(parseCollection(json), environments)
