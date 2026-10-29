@@ -25,13 +25,3 @@ export function setStorageMode(mode: StorageMode): void {
 export function isHistoryMode(): boolean {
   return getStorageMode() === 'history'
 }
-
-const UPLOAD_CONSENT_KEY = 'postscope:upload-risk-accepted'
-
-export function hasUploadConsent(): boolean {
-  return readStorage(UPLOAD_CONSENT_KEY) === 'true'
-}
-
-export function setUploadConsent(accepted: boolean): void {
-  writeStorage(UPLOAD_CONSENT_KEY, accepted ? 'true' : 'false')
-}

@@ -6,6 +6,8 @@ export interface DataHandlingOptions {
   serverRedactsSecrets?: boolean
   /** The server encrypts stored collections at rest (LIBRARY_ENCRYPTION_KEY). */
   serverEncrypts?: boolean
+  /** Stored collections are deleted after this many days (0 keeps them until removed). */
+  retentionDays?: number
   /** The person turned on "keep for refresh". */
   keepSession?: boolean
   /** When the stored copy expires (milliseconds since the epoch), if one is stored. */
@@ -47,6 +49,7 @@ export function describeDataHandling(
         ? 'credentials are removed before it is stored'
         : 'stored as imported, including URLs, headers and tokens',
       options.serverEncrypts ? 'encrypted at rest' : 'not encrypted at rest',
+      options.retentionDays ? `deleted after ${options.retentionDays} days` : 'kept until someone removes it',
     ].join(', ')
     collection = `Sent to the app server and shared with your team (${server}).`
   }

@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.5
+
+- Renewed upload consent when the destination or storage policy changes
+- Showed forced team logging as an operator policy with its retention
+- Exposed the library retention period in the app configuration
+
 ## V0.3.4
 
 - Added explicit session retention that stays off until the person turns it on

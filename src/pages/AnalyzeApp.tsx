@@ -28,7 +28,14 @@ import {
   setSessionRetention,
 } from '../lib/collectionSession'
 import { getSavedCollection, listSavedCollections, saveToLibrary, type SavedCollectionMeta } from '../lib/collectionLibrary'
-import { getStorageMode, setStorageMode, hasUploadConsent, setUploadConsent, type StorageMode } from '../lib/storagePreferences'
+import { getStorageMode, setStorageMode, type StorageMode } from '../lib/storagePreferences'
+import {
+  getUploadConsentState,
+  recordUploadConsent,
+  revokeUploadConsent,
+  uploadPolicyDigest,
+  type ConsentState,
+} from '../lib/uploadConsent'
 import {
   canChoosePrivacyMode,
   canSaveToAppStorage,
@@ -74,6 +81,7 @@ interface AnalyzeAppProps {
   libraryAllowDelete?: boolean
   libraryEncrypted?: boolean
   libraryRedactSecrets?: boolean
+  libraryRetentionDays?: number
   auditPolicy?: AuditOptions
 }
 
@@ -94,6 +102,7 @@ export function AnalyzeApp({
   libraryAllowDelete = true,
   libraryEncrypted = false,
   libraryRedactSecrets = false,
+  libraryRetentionDays = 0,
   auditPolicy = EMPTY_POLICY,
 }: AnalyzeAppProps) {
   const { notify } = useToast()
@@ -138,7 +147,23 @@ export function AnalyzeApp({
   const [reference, setReference] = useState<CompareInput | null>(null)
   const [referenceLoading, setReferenceLoading] = useState(false)
   const [storageMode, setStorageModeState] = useState<StorageMode>(() => getStorageMode())
-  const [uploadConsent, setUploadConsentState] = useState(() => hasUploadConsent())
+  // Consent covers one origin and one upload policy; a change to either asks again.
+  const consentOrigin = typeof window === 'undefined' ? '' : window.location.origin
+  const policyDigest = useMemo(
+    () =>
+      uploadPolicyDigest({
+        loggingMode,
+        redactsSecrets: libraryRedactSecrets,
+        encrypted: libraryEncrypted,
+        retentionDays: libraryRetentionDays,
+      }),
+    [loggingMode, libraryRedactSecrets, libraryEncrypted, libraryRetentionDays]
+  )
+  const [consentState, setConsentState] = useState<ConsentState>(() => getUploadConsentState(consentOrigin, policyDigest))
+  useEffect(() => {
+    setConsentState(getUploadConsentState(consentOrigin, policyDigest))
+  }, [consentOrigin, policyDigest])
+  const uploadConsent = consentState === 'accepted'
   const [userAuditPrefs, setUserAuditPrefs] = useState<AuditOptions | null>(() => loadAuditPreferences())
 
   const auditOptions = useMemo(() => effectiveAuditOptions(auditPolicy, userAuditPrefs), [auditPolicy, userAuditPrefs])
@@ -252,10 +277,14 @@ export function AnalyzeApp({
     [loggingMode]
   )
 
-  const handleUploadConsentChange = useCallback((accepted: boolean) => {
-    setUploadConsent(accepted)
-    setUploadConsentState(accepted)
-  }, [])
+  const handleUploadConsentChange = useCallback(
+    (accepted: boolean) => {
+      if (accepted) recordUploadConsent(consentOrigin, policyDigest)
+      else revokeUploadConsent()
+      setConsentState(accepted ? 'accepted' : 'none')
+    },
+    [consentOrigin, policyDigest]
+  )
 
   const refreshSavedCollections = useCallback(async () => {
     if (!shouldShowTeamLibrary(loggingMode)) {
@@ -784,6 +813,8 @@ export function AnalyzeApp({
           onUploadConsentChange={handleUploadConsentChange}
           serverRedactsSecrets={libraryRedactSecrets}
           serverEncrypts={libraryEncrypted}
+          retentionDays={libraryRetentionDays}
+          consentStale={consentState === 'stale'}
           keepSession={keepSession}
           onKeepSessionChange={handleKeepSessionChange}
           savedCollections={teamLibraryVisible ? savedCollections : []}

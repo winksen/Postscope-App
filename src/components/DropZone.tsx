@@ -48,6 +48,10 @@ interface DropZoneProps {
   serverRedactsSecrets?: boolean
   /** The server encrypts stored collections at rest. */
   serverEncrypts?: boolean
+  /** Stored collections are deleted after this many days (0 keeps them until removed). */
+  retentionDays?: number
+  /** The person accepted uploads before, but the origin or the upload policy changed since. */
+  consentStale?: boolean
   /** Keep a copy for refresh in this tab (off by default). */
   keepSession?: boolean
   onKeepSessionChange?: (enabled: boolean) => void
@@ -68,6 +72,8 @@ export function DropZone({
   onUploadConsentChange,
   serverRedactsSecrets = false,
   serverEncrypts = false,
+  retentionDays = 0,
+  consentStale = false,
   keepSession = false,
   onKeepSessionChange,
   savedCollections = [],
@@ -152,7 +158,7 @@ export function DropZone({
   const importBlocked = canChoosePrivacyMode(loggingMode) && requiresUploadConsent(loggingMode, storageMode) && !uploadConsent
 
   const privacyDescription = getPrivacyModeDescription(loggingMode, storageMode)
-  const dataHandling = describeDataHandling(loggingMode, storageMode, { serverRedactsSecrets, serverEncrypts, keepSession })
+  const dataHandling = describeDataHandling(loggingMode, storageMode, { serverRedactsSecrets, serverEncrypts, retentionDays, keepSession })
   const remainingSavedCount = Math.max(savedCollections.length - 5, 0)
 
   return (
@@ -271,8 +277,9 @@ export function DropZone({
                     <CloudArrowUp className="h-6 w-6 text-muted-foreground" weight="fill" />
                   </div>
                   <p className="text-xs leading-snug text-foreground">
-                    <span className="font-medium">Mandatory logging.</span> Imported collections are automatically saved to the app storage
-                    for your team.
+                    <span className="font-medium">Operator policy.</span> This deployment saves every imported collection to the app storage
+                    for your team (<code>LOGGING_MODE=on</code>). It is set by the operator, not by you, so there is nothing to accept here;
+                    ask your operator about retention and access.
                   </p>
                 </div>
               </motion.div>
@@ -295,6 +302,12 @@ export function DropZone({
                     <p className="text-xs leading-snug text-foreground">
                       <span className="font-medium">Upload warning.</span> Files are saved to this app&apos;s storage. Visible to your team,
                       including URLs, headers, and tokens.
+                      {consentStale && (
+                        <span data-testid="consent-stale" className="mt-1 block text-muted-foreground">
+                          This server&apos;s storage policy or address changed since you last accepted, so please review it and accept
+                          again.
+                        </span>
+                      )}
                     </p>
                     <div className="flex items-center gap-2.5">
                       <Checkbox

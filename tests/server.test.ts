@@ -506,4 +506,5 @@ test('the audit log can be switched off and config reports whether the library i
     resetLibraryCache()
   }
   assert.equal(JSON.parse((await raw('/api/config')).body).libraryEncrypted, false)
+  assert.equal(typeof JSON.parse((await raw('/api/config')).body).libraryRetentionDays, 'number')
 })

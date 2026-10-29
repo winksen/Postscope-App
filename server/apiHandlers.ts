@@ -23,6 +23,7 @@ import {
   isHealthVersionExposed,
   isLibraryDeleteAllowed,
   isLibraryRedactionEnabled,
+  getLibraryLimits,
 } from './runtimeConfig'
 import { errorFields, log } from './logger'
 import { redactCollection } from '../src/lib/redaction'
@@ -64,6 +65,7 @@ export async function handleConfigApi(req: IncomingMessage, res: ServerResponse,
     libraryAllowDelete: isLibraryDeleteAllowed(),
     libraryRedactSecrets: isLibraryRedactionEnabled(),
     libraryEncrypted: libraryEncryptionStatus().enabled,
+    libraryRetentionDays: getLibraryLimits().retentionDays,
     auditPolicy: getAuditPolicy(),
     scoreWeights: getScoreWeights(),
   })

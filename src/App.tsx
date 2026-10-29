@@ -58,6 +58,7 @@ export default function App() {
       libraryAllowDelete={config.libraryAllowDelete}
       libraryEncrypted={config.libraryEncrypted}
       libraryRedactSecrets={config.libraryRedactSecrets}
+      libraryRetentionDays={config.libraryRetentionDays}
       auditPolicy={config.auditPolicy}
     />
   )

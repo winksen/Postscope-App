@@ -1,16 +1,16 @@
 services:
   postscope:
-    image: postscope:${POSTSCOPE_VERSION:-0.3.4}
+    image: postscope:${POSTSCOPE_VERSION:-0.3.5}
     build:
       context: .
       args:
-        APP_VERSION: ${POSTSCOPE_VERSION:-0.3.4}
+        APP_VERSION: ${POSTSCOPE_VERSION:-0.3.5}
     container_name: postscope
     restart: unless-stopped
     ports:
       - "${POSTSCOPE_HOST:-127.0.0.1}:${POSTSCOPE_PORT:-3010}:3010"
     environment:
-      APP_VERSION: ${POSTSCOPE_VERSION:-0.3.4}
+      APP_VERSION: ${POSTSCOPE_VERSION:-0.3.5}
       # Team modes (hybrid, on) need BASIC_AUTH_USER and BASIC_AUTH_PASSWORD, otherwise the container exits at start.
       LOGGING_MODE: ${LOGGING_MODE:-off}
       PUBLIC_LANDING_PAGE: ${PUBLIC_LANDING_PAGE:-false}
