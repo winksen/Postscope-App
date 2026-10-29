@@ -3,6 +3,12 @@
 All notable changes to PostScope are listed here, newest first. Each release is one commit titled `Update V<version>`.
 Before V0.1.25 the package version was still `0.0.1`; older entries keep the release numbers used in the commit history. Release tags (`v0.1.25` onward) are annotated tags on the release commit.
 
+## V0.3.12
+
+- Released analysis data when a collection is closed
+- Stopped running jobs and workers when a collection is forgotten or the analyzer is left
+- Added a heap retention probe test for the analysis cache
+
 ## V0.3.11
 
 - Kept rapid imports and environment changes attached to the right result

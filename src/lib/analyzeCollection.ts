@@ -251,6 +251,24 @@ function runInWorker(job: WorkerJob, { timeoutMs, signal, onProgress }: JobContr
 /** Full parsed collections kept when there is no worker, so audits can start from them like the worker's cache. */
 const fallbackFull = new Map<AnalysisSlot, ParsedCollection>()
 
+/**
+ * Releases everything the analysis layer holds for the given collections (both by default): running jobs are
+ * cancelled, the workers are stopped (which drops their parsed copies) and the main thread copies are forgotten.
+ * Call it when a collection is closed, on forget, on logout and when the project changes. Asking for an audit
+ * afterwards finds nothing cached, so the caller analyzes the text again instead of reusing stale data.
+ */
+export function disposeAnalysis(slots: readonly AnalysisSlot[] = ['main', 'reference']): void {
+  for (const slot of slots) {
+    resetWorker(slot, new AnalysisCancelledError('Analysis was cancelled because the collection was closed.'))
+    fallbackFull.delete(slot)
+  }
+}
+
+/** What the analysis layer currently holds. Used by tests as a retention probe; all zeros means nothing is kept. */
+export function analysisCacheStatus(): { workers: number; pendingJobs: number; fallbackSlots: number } {
+  return { workers: workers.size, pendingJobs: pending.size, fallbackSlots: fallbackFull.size }
+}
+
 export interface AnalyzeTextOptions {
   timeoutMs?: number
   environments?: readonly string[]

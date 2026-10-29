@@ -23,6 +23,7 @@ import {
   analyzeCollectionText,
   auditAgain,
   describeAnalysisError,
+  disposeAnalysis,
   isAnalysisCancelled,
   type AnalysisResult,
   type AnalysisStage,
@@ -279,6 +280,9 @@ export function AnalyzeApp({
     [reaudit]
   )
 
+  // Leaving the analyzer (logout, project switch, closing the tab view) releases the workers and their copies.
+  useEffect(() => () => disposeAnalysis(), [])
+
   const lastAuditOptions = useRef(auditOptions)
   useEffect(() => {
     if (lastAuditOptions.current === auditOptions) return
@@ -289,6 +293,7 @@ export function AnalyzeApp({
   useEffect(() => {
     if (referenceRaw === null) {
       setReference(null)
+      disposeAnalysis(['reference'])
       return
     }
     // One request per input and rule settings. Replacing them aborts the previous request (its worker is replaced) and
@@ -622,6 +627,9 @@ export function AnalyzeApp({
   const handleAnalyzeAnother = useCallback(() => {
     analysisSeq.current += 1
     viewGeneration.current += 1
+    importController.current?.abort()
+    // Nothing about the closed collection stays in the workers or in the main thread copies.
+    disposeAnalysis()
     chooseEnvironment(undefined)
     clearCollectionSession()
     setSessionExpiresAt(null)
